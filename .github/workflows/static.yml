@@ -41,6 +41,19 @@ jobs:
             rm -f talent-client.tmp
             echo "::warning::Talent snapshot unavailable; page will show fallback and existing profiles."
           fi
+      - name: Import attributed community talent data
+        run: |
+          mkdir -p "$RUNNER_TEMP/talents-forever"
+          ok=1
+          for class in warrior paladin hunter rogue priest shaman mage warlock druid; do
+            curl --fail --location --retry 1 --connect-timeout 10 --max-time 30 "https://talentsforever.com/export/$class.json" -o "$RUNNER_TEMP/talents-forever/$class.json" || ok=0
+          done
+          if test "$ok" = 1 && python3 scripts/import-talents-forever.py "$RUNNER_TEMP/talents-forever" talent-community.json; then
+            echo "Community talent snapshot imported"
+          else
+            rm -f talent-community.json
+            echo "::warning::Community snapshot unavailable; preserve partial fallback."
+          fi
       - name: Map client talent icons to original WoW textures
         run: |
           input=talent-reference-partial.json
