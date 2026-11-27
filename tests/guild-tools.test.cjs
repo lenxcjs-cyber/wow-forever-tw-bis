@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogSameSlot,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogSameSlot,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -195,3 +195,12 @@ assert.equal(officialMerge.combineOfficialBlue(news.bluePosts,[incoming,incoming
 assert.equal(officialMerge.combineOfficialBlue(news.bluePosts,[incoming])[0].key,incoming.key);
 assert.equal(officialMerge.combineOfficialBlue(news.bluePosts,[{...incoming,translationStatus:"untrusted"}]).length,15);
 console.log("PASS: official-source URL validation, deduplication, translation status and newest-first ordering");
+
+// Catalog score deliberately excludes ambiguous rating/percentage fields and armor type itself.
+const catalogWeights={"敏捷":2,"力量":1,"護甲":0,"命中機率":99};
+const leather=expansion.catalogWeightScore({subclass:"Leather",agility:20,strength:10,armor:80,hit:0},catalogWeights);
+const plate=expansion.catalogWeightScore({subclass:"Plate",agility:5,strength:20,armor:400,hit:10},catalogWeights);
+assert.equal(leather.total,50);assert.equal(plate.total,30);
+assert.ok(leather.total>plate.total);
+assert.equal(expansion.catalogWeightScore({armor:400},{"護甲":2}).total,800);
+assert.equal(expansion.catalogWeightScore({hit:10},{"命中機率":2}).used,0);
