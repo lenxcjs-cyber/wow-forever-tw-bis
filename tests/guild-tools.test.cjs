@@ -383,3 +383,12 @@ assert.equal(sortedPartition.groups.two[0].id,2);
 assert.equal(expansion.catalogWeaponPlan({id:"spec-1"},wpItems,wp,{"雙手DPS":1},{weaponMode:"one"}).melee,null);
 assert.equal(expansion.catalogWeaponPlan({id:"spec-2"},wpItems,wp,{"主手DPS":2,"副手DPS":1},{weaponMode:"two"}).melee,null);
 console.log("PASS: weapon mode preference, hidden-mode search, merged rank and illegal configuration exclusion");
+
+const prepHelpers=new Function(section("function parseRecipeMaterials(","function material(")+";return {parseRecipeMaterials,recipeMaterialTotals,recipeShoppingRows,recipeSearchMatches};")();
+assert.deepEqual(prepHelpers.recipeMaterialTotals([{recipe:{name:"A",mat:"夢葉草 × 2；水晶瓶×1\n夢葉草×1"},count:3}]).totals.sort(),[["夢葉草",9],["水晶瓶",3]].sort());
+assert.equal(prepHelpers.recipeMaterialTotals([{recipe:{name:"缺資料",mat:""},count:1}]).unknown.length,1);
+assert.equal(prepHelpers.parseRecipeMaterials("夢葉草×0、材料×2.5、材料×9007199254740992").filter(x=>x.qty===null).length,3);
+assert.deepEqual(prepHelpers.recipeShoppingRows([["草",10],["瓶",2],["石",5]],{"草":4,"瓶":10,"石":-3}).map(x=>x.remaining),[6,0,5]);
+assert.equal(prepHelpers.recipeSearchMatches({name:"測試配方",mat:"Dreamfoil×2",where:"商人"},"夢葉草 商人",v=>v.replace("Dreamfoil","夢葉草")),true);
+assert.equal(prepHelpers.recipeSearchMatches({name:"測試",mat:"夢葉草×2"},"夢葉草 商人"),false);
+console.log("PASS: recipe quantities, missing materials, owned inventory, multilingual multi-term search");
