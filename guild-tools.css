@@ -162,3 +162,11 @@ html.gt-blue-mode section.spec{display:none!important}
 .gt-legacy-history>summary{cursor:pointer;color:#b8cbe2}
 .gt-legacy-history[open]>summary{margin-bottom:8px}
 html.gt-blue-mode .gt-legacy-history{display:none!important}
+
+/* V21.3 compact shopping list, including owned amounts and shortages. */
+#guild-tools .gt-shopping-grid{display:grid;grid-template-columns:minmax(0,1fr) 55px 85px 55px;align-items:center;gap:6px 10px;margin:10px 0;font-size:13px}
+#guild-tools .gt-shopping-grid>div{min-width:0;overflow-wrap:anywhere}
+#guild-tools .gt-shopping-grid p{margin:3px 0;font-size:11px}
+#guild-tools .gt-shopping-grid input{box-sizing:border-box;width:100%;min-width:0;min-height:32px;padding:4px 6px;font-size:13px}
+#guild-tools .gt-shopping-remaining{color:#e9c78c;font-weight:700;font-variant-numeric:tabular-nums}
+@media(max-width:450px){#guild-tools .gt-shopping-grid{grid-template-columns:minmax(0,1fr) 34px 59px 34px;gap:5px;font-size:12px}}
