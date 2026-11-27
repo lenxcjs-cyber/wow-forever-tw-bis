@@ -29,3 +29,16 @@ assert.equal(exactProfile(catalog.profiles,"rogue","spec-10","not-registered"),n
 assert.equal(exactProfile(catalog.profiles,"warrior","spec-10","mutilate"),null);
 for(const id of ["spec-26","spec-27"]){const p=exactProfile(catalog.profiles,"druid",id,"feral_onehand");assert.ok(p);assert.equal(p.talents,null);}
 console.log("PASS: exact profile identity, missing profiles do not fall back");
+
+// Partial source metadata must never be presented as full client data.
+const {partialBuildCheck}=require("../talents-page.js");
+const partial=JSON.parse(fs.readFileSync(path.join(__dirname,"..","talent-reference-partial.json"),"utf8"));
+assert.equal(partial.build,"1.60.1.71139");
+const partialRows=partial.classes.flatMap(c=>c.talents.map(t=>[c.token+":"+t.tree+":"+t.name,t]));
+const partialIndex=Object.fromEntries(partialRows);
+assert.equal(Object.keys(partialIndex).length,partialRows.length);
+assert.equal(partialIndex["druid:1:Ferocity"].icon,132190);
+assert.equal(partialIndex["rogue:1:Precision"].maxRank,3);
+assert.equal(partialBuildCheck({cls:"rogue",talents:[{},{"Precision":4},{}]},partialIndex).issues.length,2);
+assert.equal(partialBuildCheck({cls:"rogue",talents:[{},{"Unknown":5},{}]},partialIndex).matched,0);
+console.log("PASS: partial metadata rank and tier checks");
