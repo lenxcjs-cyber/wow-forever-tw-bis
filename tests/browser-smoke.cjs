@@ -82,6 +82,9 @@ const server=http.createServer((req,res)=>{
     assert.ok((await plan.innerText()).includes("/ 14 個部位"));
     assert.ok(await plan.locator(".gt-catalog-weapon-plan").isVisible());
     assert.ok(await plan.locator(".gt-catalog-set-plan").isVisible());
+    await plan.getByRole("button",{name:"匯出目前整套面板方案"}).click();
+    assert.ok((await plan.locator(".gt-plan-export textarea").inputValue()).includes("非實戰BiS"));
+    assert.ok((await plan.locator(".gt-plan-export textarea").inputValue()).includes("資料版本："));
     const setPicker=plan.locator(".gt-catalog-set-plan select").first();
     if(await setPicker.count()){assert.ok((await plan.locator(".gt-catalog-set-plan").innerText()).includes("替代防具"));}
     assert.ok((await plan.innerText()).includes("武器與遠程／聖物分"));
