@@ -19,3 +19,17 @@
 #guild-tools .gt-panel{margin-top:14px}
 @media(max-width:760px){#guild-tools .gt-tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}#guild-tools .gt-tabs button{min-height:98px;padding:10px 5px!important}}
 @media(prefers-reduced-motion:reduce){#guild-tools .gt-tabs button{transition:none}}
+
+/* V14.3 integrated navigation */
+.gt-unified{border:1px solid #3a4b60;border-radius:14px;background:#182330;padding:16px;margin:16px 0 22px}
+.gt-unified > #guild-tools{margin:12px 0 0;padding:14px 0 0;border:0;border-top:1px solid #34465a;border-radius:0;background:transparent}
+#guild-tools.gt-flat{margin:16px 0;padding:0;border:0;background:transparent}
+#guild-tools .gt-tabs{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px}
+#guild-tools .gt-tabs button{flex-direction:row;justify-content:center;gap:8px;min-height:46px;padding:9px 8px;border-radius:8px;background:#111c29;font-size:14px}
+#guild-tools .gt-tabs button .gt-icon{font-size:17px}
+#guild-tools .gt-tabs button .gt-desc{display:none}
+#guild-tools .gt-panel:not(:empty){border-top:1px solid #34465a;padding-top:14px;margin-top:14px}
+#guild-tools .gt-panel:empty{display:none}
+#guild-tools .gt-tabs button[aria-pressed=true]{background:#3b3224!important}
+.gt-section-label{font-size:13px;color:#c9b288;margin:0 0 8px}
+@media(max-width:760px){#guild-tools .gt-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}#guild-tools .gt-tabs button{min-height:44px;padding:8px 5px!important}.gt-unified{padding:12px}}
