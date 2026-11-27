@@ -44,6 +44,16 @@ const server=http.createServer((req,res)=>{
     await page.waitForFunction(({expected})=>{const e=document.getElementById("gt-build-select");return !!e&&JSON.stringify(Array.from(e.options).map(o=>o.value).sort())===JSON.stringify(expected);},{expected});
     await page.locator('#guild-tools button[data-tab="audit"]').click();
     assert.ok(await page.locator(".gt-bis-slot").count()>0,"missing candidate cards "+id);
+    const weaponMode=page.locator("#gt-gear-weapon-mode");
+    const verifyWeaponView=async()=>{const names=await page.locator(".gt-bis-slot h4").allTextContents();assert.ok(!(names.some(n=>/雙手武器/.test(n))&&names.some(n=>/主手武器|副手物品/.test(n))),"mutually exclusive weapon slots rendered together "+id);};
+    await verifyWeaponView();
+    if(await weaponMode.isVisible()){
+     await weaponMode.selectOption("one");await verifyWeaponView();
+     assert.equal(await page.locator('.gt-bis-slot[data-slot="雙手武器"]').count(),0);
+     await weaponMode.selectOption("two");await verifyWeaponView();
+     assert.equal(await page.locator('.gt-bis-slot[data-slot="副手物品"], .gt-bis-slot[data-slot="主手武器"]').count(),0);
+     assert.equal(await page.locator('#gt-gear-slot-jump option[value="副手物品"]').count(),0);
+    }
     await page.locator(".gt-audit-research > summary").waitFor({state:"visible"});
     assert.equal(await page.locator(".gt-audit-research").getAttribute("open"),null);
     assert.equal(await page.locator(".gt-community-bis > summary").isVisible(),false);
