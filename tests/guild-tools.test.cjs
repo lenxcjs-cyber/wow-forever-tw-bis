@@ -63,3 +63,27 @@ assert.equal(combo.weaponSetScore([mh,oh],{"命中機率":2},{}).total,8);
 assert.equal(combo.weaponSetScore([mh,{...oh,wm:{}}],{"副手DPS":1},{}).incomplete,true);
 assert.equal(combo.weaponSetScore([mh,sh],{"武器DPS":1},{}).incomplete,false);
 console.log("PASS: syntax, build registry, talent totals, weapon scopes, shared hit cap, 12 weapon-set tests and material totals");
+
+// Feral defaults and explicit one-hand alternatives.
+const feralItems=[
+ {id:"f1",slot:"主手",type:"雙手錘",stats:{},wm:{DPS:"50"}},
+ {id:"f2",slot:"主手",type:"單手錘",stats:{},wm:{DPS:"32"}},
+ {id:"f3",slot:"副手",type:"持有型副手",stats:{},wm:{}},
+ {id:"f4",slot:"副手",type:"匕首",stats:{},wm:{DPS:"20"}},
+ {id:"f5",slot:"副手",type:"盾牌",stats:{},wm:{}},
+ {id:"f6",slot:"主手",type:"法杖",stats:{},wm:{DPS:"48"}},
+ {id:"f7",slot:"主手",type:"雙手斧",stats:{},wm:{DPS:"60"}},
+ {id:"f8",slot:"遠程",type:"塑像",stats:{},wm:{}}
+];
+for(const id of ["spec-26","spec-27"]){
+ for(const [slot,type,ok] of [["主手","雙手錘",true],["主手","單手錘",false],["副手","持有型副手",false],["主手","雙手斧",false],["主手","法杖",true],["遠程","塑像",true]])assert.equal(!gate.skillGate(id,{slot,type}),ok,id+" "+type);
+ assert.equal(combo.weaponSets(feralItems,x=>!gate.skillGate(id,x),"twohand").length,2);
+ gate.buildChoice[id]="feral_onehand";
+ for(const [slot,type,ok] of [["主手","單手錘",true],["主手","雙手錘",false],["副手","持有型副手",true],["副手","匕首",false],["副手","盾牌",false],["遠程","塑像",true]])assert.equal(!gate.skillGate(id,{slot,type}),ok,id+" "+type);
+ const sets=combo.weaponSets(feralItems,x=>!gate.skillGate(id,x),"general");
+ assert.equal(sets.length,1);assert.deepEqual(sets[0].items.map(x=>x.id),["f2","f3"]);
+}
+gate.buildChoice["spec-27"]="bear_cat";
+assert.ok(gate.skillGate("spec-27",{slot:"主手",type:"單手錘"}));
+assert.equal(score(feralItems[5],{"雙手DPS":2}).total,96);
+console.log("PASS: feral weapon eligibility, complete combinations, staff DPS and hybrid build");
