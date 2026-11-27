@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,catalogArmorPlan,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -243,3 +243,16 @@ assert.equal(expansion.gearCatalogEligible({id:"spec-13"},daggerRecord,priest,"�
 assert.equal(expansion.gearCatalogEligible({id:"spec-13"},daggerRecord,priest,"主手"),true);
 assert.deepEqual(expansion.candidateCatalogCheck({stats:{"攻擊強度":30,"治療加成":20,"命中機率":2}},{attack_power:35,healing:20,hit:5}).differences,[{label:"攻擊強度",old:30,current:35}]);
 console.log("PASS: hand-specific catalog eligibility, complete proficiency validation and expanded stat audits");
+
+// Full-catalog armor plan: cross-armor is legal, same IDs are never duplicated, and unsupported effects do not inflate scores.
+const planProf={Warrior:{armor:{Plate:40},weapons:[]}};
+const itemForPlan=(id,slot,subclass,agility,extra={})=>({id,slot,subclass,agility,item_class:"Armor",quality:3,source_summary:"World drop",...extra});
+const planItems=[itemForPlan(101,"Chest","Plate",10),itemForPlan(102,"Chest","Leather",20),itemForPlan(103,"Chest","Cloth",100,{estimated:1}),itemForPlan(104,"Finger","Miscellaneous",9),itemForPlan(104,"Finger","Miscellaneous",9),itemForPlan(105,"Finger","Miscellaneous",8),itemForPlan(106,"Finger","Miscellaneous",1),itemForPlan(107,"Trinket","Miscellaneous",12,{effects:"Proc"}),itemForPlan(108,"Trinket","Miscellaneous",0),itemForPlan(109,"Head","Plate",99,{source_summary:" "})];
+const armorPlan=expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"敏捷":1});
+assert.deepEqual(armorPlan.groups.find(g=>g.slot==="胸部").picks.map(p=>p.item.id),[102]);
+assert.deepEqual(armorPlan.groups.find(g=>g.slot==="戒指").picks.map(p=>p.item.id),[104,105]);
+assert.equal(armorPlan.expected,14);assert.equal(armorPlan.filled,4);assert.equal(armorPlan.total,49);
+assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"敏捷":1},{excludeEffects:true}).total,37);
+assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"敏捷":1},{minQuality:4}).filled,0);
+assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"命中機率":1}).filled,0);
+console.log("PASS: catalog armor plan honors cross-armor, distinct ring IDs, quality, source evidence and score limitations");
