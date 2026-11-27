@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogSameSlot,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -129,3 +129,13 @@ assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Armor",slot:"Chest",
 assert.deepEqual(expansion.gearCatalogTags({source_summary:"World drop",bonding:"Binds when equipped"}),["世界掉落","裝綁"]);
 assert.deepEqual(expansion.gearCatalogTags({source_summary:"Crafted: Leatherworking",bonding:"Binds when equipped"}),["裝綁","製作"]);
 console.log("PASS: expanded gear candidates, feral reputation weapon, class eligibility, source and binding filters");
+
+assert.equal(expansion.gearClassIndex("spec-28"),8);
+assert.equal(expansion.gearClassIndex("spec-29"),-1);
+assert.ok(expansion.gearCatalogEligible({id:"spec-28"},{item_class:"Armor",slot:"Chest",subclass:"Leather",class_mask:1024,required_level:55},p));
+assert.equal(expansion.gearType({slot:"Two-Hand",subclass:"Two-Handed Mace"}),"雙手錘");
+assert.equal(expansion.catalogSameSlot({slot:"Chest"},{slot:"Robe"}),true);
+assert.equal(expansion.catalogSameSlot({slot:"One-Hand"},{slot:"Two-Hand"}),false);
+const diffs=expansion.catalogDiff({dps:56.5,strength:18,crit:28},{dps:53.8,strength:26,crit:14});
+assert.deepEqual(diffs.map(x=>[x.key,x.delta]),[["dps",2.7],["strength",-8],["crit",14]]);
+console.log("PASS: restoration druid catalog eligibility and same-slot raw stat differences");
