@@ -22,3 +22,10 @@ const dataFile=path.join(__dirname,"..","talent-client.json");
 if(fs.existsSync(dataFile)){const data=JSON.parse(fs.readFileSync(dataFile,"utf8"));assert.equal(data.build,"1.60.1.71139");assert.equal(data.format,"zephras-talents/1");for(const [k,plan] of Object.entries(LEVEL)){const cls=data.classes.find(c=>c.token.toLowerCase()===k);assert.ok(validateClass(cls),k);run(cls,plan);}console.log("PASS: all nine client-data leveling paths (459 legal points)");}else console.log("SKIP live dataset: client snapshot unavailable; fixture checks passed");
 const catalog=JSON.parse(fs.readFileSync(path.join(__dirname,"..","talent-builds.json"),"utf8"));assert.equal(new Set(catalog.profiles.map(p=>p.id)).size,28);assert.equal(new Set(catalog.profiles.map(p=>p.id+":"+p.key)).size,catalog.profiles.length);for(const p of catalog.profiles.filter(p=>p.talents))assert.equal(p.talents.flatMap(Object.values).reduce((a,b)=>a+b,0),51,p.label);
 console.log("PASS: fixture, profile registry and talent totals");
+
+const {exactProfile}=require("../talents-page.js");
+for(const p of catalog.profiles)assert.equal(exactProfile(catalog.profiles,p.cls,p.id,p.key),p);
+assert.equal(exactProfile(catalog.profiles,"rogue","spec-10","not-registered"),null);
+assert.equal(exactProfile(catalog.profiles,"warrior","spec-10","mutilate"),null);
+for(const id of ["spec-26","spec-27"]){const p=exactProfile(catalog.profiles,"druid",id,"feral_onehand");assert.ok(p);assert.equal(p.talents,null);}
+console.log("PASS: exact profile identity, missing profiles do not fall back");
