@@ -52,6 +52,16 @@ const server=http.createServer((req,res)=>{
   await build.waitFor({state:"visible"});await build.selectOption("general");
   await page.locator('#guild-tools button[data-tab="audit"]').click();
   assert.equal(await page.locator(".gt-cat-evidence details").count(),5);
+  await page.locator('.gt-bis-slot a[href*="/item/19323/"]').first().waitFor({state:"visible"});
+  assert.ok(await page.locator(".gt-full-gear > summary").isVisible());
+  const acquisition=page.locator("#guild-tools").getByLabel("取得方式",{exact:true});
+  await acquisition.selectOption("聲望");
+  assert.ok(await page.locator('.gt-bis-slot a[href*="/item/19323/"]').first().isVisible());
+  await acquisition.selectOption("裝綁");
+  assert.equal(await page.locator('.gt-bis-slot a[href*="/item/19323/"]').count(),0);
+  assert.ok(await page.locator('.gt-bis-slot a[href*="/item/252484/"]').count()>0);
+  await acquisition.selectOption("");
+  console.log("PASS: AV mace in main cat gear and acquisition/BoE filters");
   const slots=await page.locator(".gt-bis-slot h4").allTextContents();
   assert.ok(slots.length,"feral candidate cards missing");
   assert.ok(!slots.some(x=>/副手|單手/.test(x)),"feral invalid slot: "+slots.join(","));
