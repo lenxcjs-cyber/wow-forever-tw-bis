@@ -5,7 +5,9 @@
   "sources": [
     "https://foreverdb.net/classes",
     "https://www.method.gg/wow-forever/class-guides",
-    "https://www.icy-veins.com/wow-forever/class-guides"
+    "https://www.icy-veins.com/wow-forever/class-guides",
+    "https://mobalytics.gg/wow-forever/classes/feral-druid-guide",
+    "https://mobalytics.gg/wow-forever/classes/feral-druid-tank-guide"
   ],
   "specs": {
     "spec-1": {
@@ -1109,7 +1111,7 @@
     },
     "spec-26": {
       "title": "野性貓",
-      "priority": "維持貓形態，依能量、連擊點與流血剩餘時間決定下一步，不固定背按鍵順序。",
+      "priority": "維持貓形態，依能量、連擊點與流血剩餘時間決定下一步，不固定背按鍵順序。 11/27 攻略指出撕碎及爪擊會受武器傷害影響；貓形態揮擊速度與原武器不同，勿套用一般近戰攻速模型。",
       "skills": [
         [
           "撕碎",
@@ -1142,10 +1144,10 @@
           "撕扯不需刷新或目標即將死亡時考慮；保留後續能量。"
         ],
         [
-          "原始撕咬（參考譯名）",
-          "Primal Bite",
-          "連動",
-          "需對應野性天賦；依當版觸發、能量與連擊點提示安排。"
+          "精靈之火",
+          "Faerie Fire",
+          "輔助",
+          "隊伍缺少相應護甲減益時在貓形態補上，與坦克或其他德魯伊協調；不為重複減益浪費冷卻。"
         ],
         [
           "猛虎之怒",
@@ -1164,7 +1166,7 @@
     },
     "spec-27": {
       "title": "野性熊",
-      "priority": "保持巨熊形態，依仇恨、怒氣和承傷分配技能；離開形態前確認已交接坦克。",
+      "priority": "保持巨熊形態，依仇恨、怒氣和承傷分配技能；離開形態前確認已交接坦克。 原始撕咬及割傷受武器傷害影響，仍需按永恆版形態規則評估。",
       "skills": [
         [
           "槌擊",
@@ -1207,6 +1209,12 @@
           "Feral Charge",
           "控制",
           "已點出且符合距離時接怪或打斷；注意不要離開治療範圍。"
+        ],
+        [
+          "原始撕咬（參考譯名）",
+          "Primal Bite",
+          "核心",
+          "需對應野性天賦及熊形態；有足夠怒氣時作為單體仇恨技能，切換貓形態時不能使用。"
         ]
       ],
       "class": "druid"
