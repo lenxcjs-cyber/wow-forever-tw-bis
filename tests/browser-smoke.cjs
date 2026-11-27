@@ -152,7 +152,8 @@ const server=http.createServer((req,res)=>{
   assert.equal(await bf.locator("#blue-list details").nth(1).getAttribute("open"),"");
   await bf.locator("#blue-list details > summary").nth(1).click();
   assert.equal(await bf.locator("#blue-list details[open]").count(),0);
-  assert.equal(await bf.locator(":scope > .gt-blue-source a").count(),2);
+  assert.equal(await bf.locator(":scope > .gt-blue-source a").count(),3);
+  assert.ok(await bf.getByRole("link",{name:"藍帖同步執行紀錄"}).isVisible());
   assert.equal(await bf.locator(":scope > .gt-blue-source a").first().getAttribute("href"),"https://us.forums.blizzard.com/en/wow/c/wow-forever/346");
   assert.equal(await bf.locator('a[href*="exwind.net"]').count(),0);
   await bf.locator("#blue-list details > summary").first().click();
