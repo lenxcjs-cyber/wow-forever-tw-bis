@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from html.parser import HTMLParser
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 from collections import Counter
@@ -13,12 +14,13 @@ from collections import Counter
 ROOT=Path(__file__).resolve().parents[1]
 OUT=ROOT/"official-blue-live.json"
 QUEUE=Path(os.environ.get("RUNNER_TEMP","/tmp"))/"tomb-blue-queue.json"
-CATEGORIES={"us":[347,352],"eu":[359]}
-SEEDS={"us":[2403040,2429007,2429074,2416343,2415068],"eu":[]}
+CATEGORIES={"us":["wow-forever/world-of-warcraft-forever-general-discussion/347","wow-forever/wow-forever-bug-report/352"],"eu":["wow-forever/359"]}
+SEEDS={"us":[2403040,2429007,2429074,2416343,2415068,2426335],"eu":[]}
 AGENT="TombGuildDatabase/1.0 (public WoW notices; low-rate polling)"
-MAX_TOPICS=12
+MAX_TOPICS=18
 MAX_TRANSLATIONS=6
 ROBOTS={}
+BLOCKED=set()
 def now(): return datetime.now(timezone.utc).isoformat()
 def base(region): return "https://"+region+".forums.blizzard.com"
 def fetch(url, parse=True):
@@ -28,12 +30,17 @@ def fetch(url, parse=True):
         if p.netloc not in ROBOTS:
             rp=RobotFileParser();rp.parse(fetch("https://"+p.netloc+"/robots.txt",False).splitlines());ROBOTS[p.netloc]=rp
         if not ROBOTS[p.netloc].can_fetch(AGENT,url): raise ValueError("robots policy excludes path")
-    time.sleep(.8)
-    with urlopen(Request(url,headers={"User-Agent":AGENT,"Accept":"application/json" if parse else "text/plain"}),timeout=15) as r:
-        if urlparse(r.geturl()).netloc!=p.netloc: raise ValueError("redirect outside official host")
-        raw=r.read(8_000_001)
-        if len(raw)>8_000_000: raise ValueError("response too large")
-        return json.loads(raw) if parse else raw.decode("utf-8")
+    if p.netloc in BLOCKED:raise ValueError("host rate limited; retry next scheduled run")
+    time.sleep(1.0)
+    try:
+        with urlopen(Request(url,headers={"User-Agent":AGENT,"Accept":"application/json" if parse else "text/plain"}),timeout=15) as r:
+            if urlparse(r.geturl()).netloc!=p.netloc: raise ValueError("redirect outside official host")
+            raw=r.read(8_000_001)
+            if len(raw)>8_000_000: raise ValueError("response too large")
+            return json.loads(raw) if parse else raw.decode("utf-8")
+    except HTTPError as e:
+        if e.code==429:BLOCKED.add(p.netloc)
+        raise
 class Plain(HTMLParser):
     def __init__(self): super().__init__(convert_charrefs=True);self.parts=[];self.skip=0
     def handle_starttag(self,t,a):
@@ -52,8 +59,11 @@ def canon(region,tid,n):return f"{region}:{int(tid)}:{int(n)}"
 def official_key(url):
     p=urlparse(url or "")
     if p.netloc not in ("us.forums.blizzard.com","eu.forums.blizzard.com"):return None
-    m=re.search(r"/t/(?:[^/]+/)?(\d+)(?:/(\d+))?/?$",p.path)
-    return canon(p.netloc.split(".")[0],m[1],m[2] or 1) if m else None
+    if "/t/" not in p.path:return None
+    parts=p.path.split("/t/",1)[1].strip("/").split("/")
+    if parts and not parts[0].isdigit():parts=parts[1:]
+    if not parts or not parts[0].isdigit() or (len(parts)>1 and not parts[1].isdigit()):return None
+    return canon(p.netloc.split(".")[0],parts[0],parts[1] if len(parts)>1 else 1)
 def archive_keys():
     s=(ROOT/"guild-tools.js").read_text(encoding="utf-8")
     m=re.search(r"const bluePosts=(\[.*?\]);\nfunction specHotfixes",s,re.S)
@@ -64,18 +74,26 @@ def read_state():
 def atomic_write(path,obj):
     tmp=path.with_suffix(".tmp");tmp.write_text(json.dumps(obj,ensure_ascii=False,indent=2)+"\n",encoding="utf-8");tmp.replace(path)
 def get_topics(region, state):
-    topics={i:{"id":i,"pinned":True} for i in SEEDS[region]}
+    known={i:{"id":i,"pinned":True} for i in SEEDS[region]}
+    # Recent categories are each sampled independently; pinned and staff-associated topics prioritized.
+    selected={}
     for cat in CATEGORIES[region]:
         try:
             d=fetch(base(region)+f"/en/wow/c/{cat}/l/latest.json")
-            for t in d["topic_list"]["topics"]:
-                if t.get("id"):topics[t["id"]]=t
+            rows=d["topic_list"]["topics"]
+            staff_ids={u["id"] for u in d.get("users",[]) if u.get("id") and is_staff(u)}
+            def priority(t):
+                staff=any(p.get("user_id") in staff_ids for p in t.get("posters",[]))
+                return (0 if staff else 1,0 if t.get("pinned") else 1)
+            for t in sorted(rows,key=priority)[:6]:
+                if t.get("id"):selected[t["id"]]=t
         except Exception as e: print("Category unavailable",region,cat,type(e).__name__,str(e)[:160])
-    def priority(t):
-        key=region+":"+str(t["id"])
-        return (0 if t["id"] in SEEDS[region] else 1,0 if t.get("pinned") else 1,0 if key not in state["topics"] else 1)
-    candidates=sorted(topics.values(),key=priority)
-    return candidates[:MAX_TOPICS]
+    # Previously found official notices can be edited even when no longer near the top.
+    for p in state["posts"][:30]:
+        if p.get("region","").lower()==region and p.get("identity"):
+            tid=int(p["identity"].split(":")[1])
+            if len(known)<8:known.setdefault(tid,{"id":tid})
+    return list({**known,**selected}.values())[:MAX_TOPICS]
 def selected_facts(body):
     # Only a short selection of factual changes, not a complete translated article.
     # Avoid copying long passages or quoted player messages.
@@ -88,7 +106,7 @@ def selected_facts(body):
         if len(result)>=2:break
     return result
 def poll():
-    state=read_state();original=json.dumps(state,sort_keys=True);archive=archive_keys();by={p["identity"]:p for p in state["posts"]};queue=[];successful=0
+    state=read_state();original=json.dumps(state,sort_keys=True);old_posts=json.dumps(state["posts"],sort_keys=True);archive=archive_keys();by={p["identity"]:p for p in state["posts"]};queue=[];successful=0
     cutoff=datetime.now(timezone.utc)-timedelta(days=7)
     for region in CATEGORIES:
         for t in get_topics(region,state):
@@ -103,7 +121,7 @@ def poll():
                 stream=d["post_stream"].get("stream",[])
                 have={p["id"] for p in posts}
                 missing=[i for i in stream[-20:] if i not in have]
-                if missing and tid in SEEDS[region]:
+                if missing:
                     try:
                         more=fetch(base(region)+f"/en/wow/t/{tid}/posts.json?"+ "&".join("post_ids%5B%5D="+str(i) for i in missing))
                         posts+=more["post_stream"]["posts"]
@@ -118,7 +136,7 @@ def poll():
                     except Exception:continue
                     if stamp<cutoff and identity not in by:continue
                     body=plain(p["cooked"]);title=str(d.get("title") or t.get("title") or "Official notice")
-                    fingerprint=hashlib.sha256((title+"\n"+body).encode()).hexdigest()
+                    fingerprint=hashlib.sha256(body.encode()).hexdigest()
                     old=state["seen"].get(identity)
                     state["seen"][identity]=fingerprint
                     if identity in archive and old is None and identity not in by:continue
@@ -126,17 +144,17 @@ def poll():
                     if old==fingerprint and identity in archive and identity not in by:continue
                     url=base(region)+f"/en/wow/t/{tid}/{n}"
                     changed=identity in by or identity in archive
-                    item={"identity":identity,"key":archive.get(identity,"official-"+identity),"date":stamp.date().isoformat(),"publishedAt":p.get("created_at"),"updatedAt":dt,"title":"官方新公告（繁中翻譯待處理）","author":str(p.get("username") or "Blizzard"),"url":url,"region":region.upper(),"translationStatus":"pending","sections":[{"category":"官方公告","title":"官方已發布","body":"已偵測到暴雪公告；繁中重點尚未完成，請先閱讀官方原文。"}],"revision":changed}
+                    item={"identity":identity,"key":"official-"+identity,"date":stamp.date().isoformat(),"publishedAt":p.get("created_at"),"updatedAt":dt,"title":"官方新公告（繁中翻譯待處理）","author":str(p.get("username") or "Blizzard"),"url":url,"region":region.upper(),"translationStatus":"pending","sections":[{"category":"官方公告","title":"官方已發布","body":"已偵測到暴雪公告；繁中重點尚未完成，請先閱讀官方原文。"}],"revision":changed}
                     if identity not in by or old!=fingerprint:by[identity]=item
                     queue.append({"identity":identity,"title":title,"facts":selected_facts(body)})
-                state["topics"][region+":"+str(tid)]=str(d.get("last_posted_at") or t.get("last_posted_at") or "")
+                # Do not record ordinary player activity as a new official update.
             except Exception as e:print("Topic unavailable",region,tid,type(e).__name__,str(e)[:160])
     if not successful:raise RuntimeError("No official topic could be read; retain previous published data")
     state["posts"]=sorted(by.values(),key=lambda p:p.get("updatedAt") or "",reverse=True)[:150]
     # Keep fingerprints bounded; no update timestamp or commit for identical results.
     state["seen"]=dict(list(state["seen"].items())[-1500:]);state["topics"]=dict(list(state["topics"].items())[-600:])
-    if json.dumps(state,sort_keys=True)!=original:
-        state["lastPublished"]=now();atomic_write(OUT,state)
+    if json.dumps(state["posts"],sort_keys=True)!=old_posts:state["lastPublished"]=now()
+    if not OUT.exists() or json.dumps(state,sort_keys=True)!=original:atomic_write(OUT,state)
     atomic_write(QUEUE,queue[:MAX_TRANSLATIONS])
     print("Official topic responses:",successful,"translation queue:",min(len(queue),MAX_TRANSLATIONS),"notices:",len(state["posts"]))
 def translate():
@@ -159,6 +177,7 @@ def translate():
     for q in queue:
         try:
             p=by[q["identity"]];title=zh(q["title"]);sections=[]
+            if Counter(re.findall(r"\d+(?:\.\d+)?",q["title"]))!=Counter(re.findall(r"\d+(?:\.\d+)?",title)):raise ValueError("Title numbers changed")
             for fact in q["facts"]:
                 value=zh(fact)
                 if Counter(re.findall(r"\d+(?:\.\d+)?",fact))!=Counter(re.findall(r"\d+(?:\.\d+)?",value)):continue
