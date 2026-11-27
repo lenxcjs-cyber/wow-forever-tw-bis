@@ -40,7 +40,9 @@ const server=http.createServer((req,res)=>{
     await page.waitForFunction(({expected})=>{const e=document.getElementById("gt-build-select");return !!e&&JSON.stringify(Array.from(e.options).map(o=>o.value).sort())===JSON.stringify(expected);},{expected});
     await page.locator('#guild-tools button[data-tab="audit"]').click();
     assert.ok(await page.locator(".gt-bis-slot").count()>0,"missing candidate cards "+id);
-    await page.locator(".gt-community-bis > summary").waitFor({state:"visible"});
+    await page.locator(".gt-audit-research > summary").waitFor({state:"visible"});
+    assert.equal(await page.locator(".gt-audit-research").getAttribute("open"),null);
+    assert.equal(await page.locator(".gt-community-bis > summary").isVisible(),false);
     await page.locator('#guild-tools button[data-tab="v11"]').click();
     seen.add(id);classFor[id]=c.value;buildCount+=expected.length;
    }
@@ -52,6 +54,8 @@ const server=http.createServer((req,res)=>{
   if(fs.existsSync(path.join(root,"gear-catalog.json"))){
     await classes.selectOption(classFor["spec-28"]);await spec.selectOption("spec-28");
     await page.locator('#guild-tools button[data-tab="audit"]').click();
+    await page.locator(".gt-audit-tools > summary").click();
+    assert.ok(await page.locator(".gt-full-gear > summary").isVisible());
     const full=page.locator(".gt-full-gear");
     await full.locator("summary").first().click();
     await full.locator('select:has(option[value="live"])').selectOption("all");
@@ -65,6 +69,7 @@ const server=http.createServer((req,res)=>{
     assert.equal(await coverage.inputValue(),"");
     await full.getByRole("button",{name:"清除比較基準"}).waitFor({state:"visible"});
     await full.getByRole("button",{name:"清除比較基準"}).click();
+    await page.locator(".gt-audit-research > summary").click();
     const audit=page.locator(".gt-catalog-audit");
     await audit.locator("summary").first().click();
     await audit.locator("select").selectOption("all");
@@ -75,6 +80,7 @@ const server=http.createServer((req,res)=>{
     const weightKey="gt-sim-weights-v1:spec-28:"+profile;
     await page.evaluate(key=>localStorage.setItem(key,JSON.stringify({weights:{"智力":1,"精神":1,"治療加成":2},source:"browser test"})),weightKey);
     await page.locator('#guild-tools button[data-tab="audit"]').click();
+    await page.locator(".gt-audit-tools > summary").click();
     const plan=page.locator(".gt-armor-plan");
     await plan.locator("summary").first().click();
     await plan.locator("article").first().waitFor({state:"visible"});
@@ -100,14 +106,22 @@ const server=http.createServer((req,res)=>{
   await page.locator('#guild-tools button[data-tab="audit"]').click();
   assert.equal(await page.locator(".gt-cat-evidence details").count(),5);
   await page.locator('.gt-bis-slot a[href*="/item/19323/"]').first().waitFor({state:"visible"});
+  assert.equal(await page.locator(".gt-feral-set > summary").isVisible(),false);
+  await page.locator(".gt-audit-research > summary").click();
   await page.locator(".gt-feral-set > summary").click();
   assert.equal(await page.locator('.gt-feral-set a[href*="/item/22679"], .gt-feral-set a[href*="/item/226788/"]').count(),4);
   assert.ok(await page.locator(".gt-spec-hotfix > summary").isVisible());
   await page.locator(".gt-spec-hotfix > summary").click();
   assert.ok((await page.locator(".gt-spec-hotfix").innerText()).includes("野性德魯伊套裝"));
   console.log("PASS: cat four-piece research and relevant hotfix links in actual UI");
+  assert.equal(await page.locator(".gt-full-gear > summary").isVisible(),false);
+  await page.locator(".gt-audit-tools > summary").click();
   assert.ok(await page.locator(".gt-full-gear > summary").isVisible());
+  await page.locator(".gt-audit-tools > summary").click();
+  await page.locator(".gt-audit-research > summary").click();
   const acquisition=page.locator("#gt-acquisition-filter");
+  assert.equal(await acquisition.isVisible(),false);
+  await page.locator(".gt-gear-more-filters > summary").click();
   await acquisition.selectOption("聲望");
   assert.ok(await page.locator('.gt-bis-slot a[href*="/item/19323/"]').first().isVisible());
   await acquisition.selectOption("裝綁");
@@ -136,8 +150,11 @@ const server=http.createServer((req,res)=>{
   await workspace.locator(".gt-gear-filters input").fill("not-a-real-item-xyz");
   assert.equal(await pane.locator(".gt-bis-slot").count(),0);
   await workspace.getByRole("button",{name:"清除篩選"}).click();
+  await workspace.locator(".gt-gear-more-filters > summary").click();
+  assert.equal(await density.isVisible(),false);
   assert.ok(await pane.locator(".gt-bis-slot").count()>0);
   assert.ok((await talentFrame.locator("#treeJump button").count())>=4);
+  assert.equal(await talentFrame.locator("#overview details").first().getAttribute("open"),null);
   await talentFrame.locator("#treeJump button").last().click();
   assert.ok(await talentFrame.locator("#detail").isVisible());
   const lastSlot=await jump.locator("option").last().getAttribute("value");
