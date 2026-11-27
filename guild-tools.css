@@ -8,3 +8,14 @@
 .gt-field{display:grid;gap:5px;margin:10px 0}.gt-field span{color:#c9b288;font-size:13px}.gt-field input,.gt-field select{width:100%;min-width:0}
 .gt-card{padding:14px;margin:10px 0;background:#1b2532;border:1px solid #394758;border-radius:10px;overflow-wrap:anywhere}.gt-card>a{font-weight:650}.gt-muted{font-size:13px;color:#9eafc6}.gt-weight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px}.gt-check{display:flex;gap:9px;align-items:baseline;padding:8px 0;border-bottom:1px solid #334052}.gt-check span{flex:1}.gt-check small{flex:1}.gt-check input{accent-color:#d8b77b}.gt-panel progress{width:100%;height:12px;accent-color:#b99b60}.gt-card ul{padding-left:20px}.gt-card li{margin:5px 0}.gt-panel details{padding:10px;background:#121a24;border-radius:8px}
 @media(max-width:600px){#guild-tools{padding:12px}.gt-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.gt-tabs button{padding:8px 5px!important}.gt-check{flex-wrap:wrap}.gt-check small{flex-basis:100%;padding-left:25px}}
+
+/* V14.2 dashboard navigation */
+#guild-tools .gt-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0 24px}
+#guild-tools .gt-tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:108px;padding:14px 8px;border:1px solid #405873;border-radius:14px;background:#192b40;color:#f6d08c;font-weight:700;font-size:15px;transition:background .18s,border-color .18s,box-shadow .18s}
+#guild-tools .gt-tabs button .gt-icon{font-size:27px;line-height:1.2}
+#guild-tools .gt-tabs button .gt-desc{font-size:12px;font-weight:400;color:#b6c8df;text-align:center}
+#guild-tools .gt-tabs button:hover,#guild-tools .gt-tabs button:focus-visible{background:#243e58;border-color:#c8a568;outline-offset:3px}
+#guild-tools .gt-tabs button[aria-pressed=true]{box-shadow:inset 0 0 0 1px #b99b60}
+#guild-tools .gt-panel{margin-top:14px}
+@media(max-width:760px){#guild-tools .gt-tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}#guild-tools .gt-tabs button{min-height:98px;padding:10px 5px!important}}
+@media(prefers-reduced-motion:reduce){#guild-tools .gt-tabs button{transition:none}}
