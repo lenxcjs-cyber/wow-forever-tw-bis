@@ -98,6 +98,12 @@ const server=http.createServer((req,res)=>{
     const setPicker=plan.locator(".gt-catalog-set-plan select").first();
     if(await setPicker.count()){assert.ok((await plan.locator(".gt-catalog-set-plan").innerText()).includes("替代防具"));}
     assert.ok((await plan.innerText()).includes("武器與遠程／聖物分"));
+    await plan.locator('select:has(option[value="no-rep"])').selectOption("no-rep");
+    await plan.getByRole("button",{name:"匯出目前整套面板方案"}).click();
+    assert.ok((await plan.locator(".gt-plan-export textarea").inputValue()).includes("排除已標記聲望裝備"));
+    await plan.locator('select:has(option[value="no-rep"])').selectOption("boe");
+    assert.equal(await plan.locator("article").count(),12);
+    await plan.locator('select:has(option[value="no-rep"])').selectOption("all");
     await plan.locator('select:has(option[value="plain"])').selectOption("plain");
     assert.equal(await plan.locator("article").count(),12);
     await page.evaluate(key=>localStorage.removeItem(key),weightKey);
