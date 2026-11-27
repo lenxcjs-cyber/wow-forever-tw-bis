@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V20.5 beta · 2026-11-27
+/* 墓鐘資料庫 V20.6 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -357,7 +357,7 @@ function material(){
 }
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
 function optimizer(){
- title("V20.5 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
+ title("V20.6 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
  const id=getSpec(),baseSpec=bySpec.get(id);if(!baseSpec)return;const s={...baseSpec,slots:expandCandidateSlots(baseSpec)};
  const out=node("div"),slot=select([...s.slots].map(([k])=>[k,k])),current=inp("0","number"),target=inp("留空＝不限制","number"),result=node("div");
  current.value="0";current.min="0";current.step="0.1";target.min="0";target.step="0.1";const talentHit=inp("0","number");talentHit.value="0";talentHit.min="0";talentHit.step="0.1";
@@ -861,7 +861,7 @@ function itemIconURL(map,id){
 }
 let itemIconPromise=null;
 function loadItemIcons(){
- if(!itemIconPromise)itemIconPromise=fetch("item-icons.json",{cache:"force-cache"}).then(r=>{if(!r.ok)throw Error("HTTP");return r.json();}).catch(()=>null);
+ if(!itemIconPromise)itemIconPromise=fetch("item-icons.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("HTTP");return r.json();}).catch(()=>null);
  return itemIconPromise;
 }
 function itemIcon(id){
@@ -870,6 +870,22 @@ function itemIcon(id){
  const img=node("img");img.alt="";img.width=36;img.height=36;img.loading="lazy";img.referrerPolicy="no-referrer";
  img.onerror=()=>{box.hidden=true;};box.hidden=false;box.append(img);img.src=url;
  });return box;
+}
+function candidateDataCoverage(ids,locale,iconMap){
+ const unique=[...new Set(ids.map(String).filter(id=>/^\d+$/.test(id)))];
+ const localized=locale?.build==="1.60.1.71139"?unique.filter(id=>typeof locale.items?.[id]==="string"&&/[\u3400-\u9fff]/.test(locale.items[id])).length:null;
+ const icons=iconMap?.build==="1.60.1.71139"?unique.filter(id=>!!itemIconURL(iconMap,id)).length:null;
+ return {total:unique.length,localized,icons};
+}
+function candidateDataCoverageView(items){
+ const d=node("details",undefined,"gt-card gt-display-coverage"),out=node("div");
+ add(d,node("summary","繁中名稱與圖示涵蓋率"),node("p","只統計此構築候選中的不同物品ID；原始圖示有對應，不代表外部圖片一定能成功載入。","gt-muted"),out);
+ let loaded=false;
+ d.addEventListener("toggle",async()=>{if(!d.open||loaded)return;loaded=true;
+ const map=await loadItemIcons();if(!d.isConnected)return;
+ const v=candidateDataCoverage(items.map(x=>x.id),globalThis.GTLocaleData,map);
+ out.replaceChildren(node("p","候選物品："+v.total+" 件"),node("p","官方繁中名稱："+(v.localized===null?"指定版本資料未取得":v.localized+" / "+v.total)),node("p","原始圖示對應："+(v.icons===null?"指定版本圖示資料未取得":v.icons+" / "+v.total)),node("p","未對應的物品維持參考譯名／英文或不顯示圖示，不猜測。","gt-muted"));
+ });return d;
 }
 function auditSlotOrder(name){
  const s=String(name||"");const groups=[/頭部|頭盔|^頭$/,/頸部|項鍊/,/肩部|肩甲/,/背部|披風/,/胸部|胸甲/,/手腕|護腕/,/手部|手套/,/腰部|腰帶/,/腿部|腿甲/,/腳部|足部|鞋|靴/,/戒指|指環/,/飾品/,/副手|盾牌/,/遠程|遠距|聖物|魔杖|塑像|圖騰|聖契/,/主手|單手|雙手|近戰|武器/];
@@ -932,7 +948,7 @@ function audit(){
  jump.addEventListener("change",()=>{const target=Array.from(out.querySelectorAll(".gt-bis-slot")).find(c=>c.dataset.slot===jump.value);if(target)gearScroll.scrollTop+=target.getBoundingClientRect().top-gearScroll.getBoundingClientRect().top-8;});
  const moreFilters=node("details",undefined,"gt-gear-more-filters"),moreFields=node("div",undefined,"gt-gear-more-fields");add(moreFields,field("取得方式",acq),field("篩選",mode),field("顯示密度",compact),button("清除篩選",()=>{q.value="";acq.value="";mode.value="all";draw();}));add(moreFilters,node("summary","更多篩選與顯示設定"),moreFields);add(gearFilters,field("搜尋",q),field("跳至部位",jump),moreFilters);add(gearScroll,out);add(left,leftHead,frame);add(right,rightHead,gearFilters,gearScroll);add(workspace,left,right);
  const research=node("details",undefined,"gt-card gt-audit-research"),tools=node("details",undefined,"gt-card gt-audit-tools");
- add(research,node("summary","配裝研究與資料核對"),bisReasonView(spec),...(spec.id==="spec-26"?[feralSetView(spec)]:[]),...(spec.id==="spec-26"&&feralWeaponMode(spec.id)==="twohand"?[catWeaponResearch(spec)]:[]),communityEvidenceView(spec,slots),candidateAuditView(spec,slots),excludedDetails,node("p","構築排除 "+excluded.length+" 筆不適用候選。","gt-muted"),metrics,progress,node("p","完整度僅統計已列部位及文字資料，不代表已驗證。","gt-muted"));
+ add(research,node("summary","配裝研究與資料核對"),bisReasonView(spec),...(spec.id==="spec-26"?[feralSetView(spec)]:[]),...(spec.id==="spec-26"&&feralWeaponMode(spec.id)==="twohand"?[catWeaponResearch(spec)]:[]),communityEvidenceView(spec,slots),candidateAuditView(spec,slots),candidateDataCoverageView(all),excludedDetails,node("p","構築排除 "+excluded.length+" 筆不適用候選。","gt-muted"),metrics,progress,node("p","完整度僅統計已列部位及文字資料，不代表已驗證。","gt-muted"));
  add(tools,node("summary","進階配裝與全裝備查詢"),catalogArmorPlanView(spec),gearCatalogView(spec),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]));
  add(panel,workspace,node("p",model?"排序："+(model.source||"本機權重")+"（部分面板試算）":"排序：既有候選及外部攻略，非實戰BiS。","gt-muted"),tools,research);draw();attachLegacy(spec);
 }
