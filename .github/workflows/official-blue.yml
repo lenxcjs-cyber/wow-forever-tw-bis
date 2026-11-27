@@ -63,7 +63,7 @@ jobs:
           try: old=json.loads(subprocess.check_output(["git","show","HEAD:official-blue-live.json"]))
           except Exception: old={"posts":[]}
           new=json.loads(Path("official-blue-live.json").read_text())
-          print("yes" if old.get("posts")!=new.get("posts") else "no")
+          print("yes" if old.get("posts")!=new.get("posts") or old.get("lastCheck")!=new.get("lastCheck") else "no")
           PY
           )
           git commit -m "Sync official Blizzard blue notices"
