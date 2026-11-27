@@ -500,8 +500,8 @@ if(toolboxDetails&&mainSpec){
  }else{toolboxDetails.open=true;root.classList.add("gt-flat");const summary=toolboxDetails.querySelector("summary");if(summary)summary.style.display="none";}
 }else{root.classList.add("gt-flat");}
 
-const syncSpec=()=>{syncBuild();if(["v8","v9","v10","v13","v14","audit"].includes(active))show(active);};
-mainSpec?.addEventListener("change",syncSpec);syncBuild();if(specEls.length&&bySpec.size){enableLegacyConsolidation();}
+const syncSpec=()=>{syncBuild();if(!active&&getSpec()){show("audit");return;}if(["v8","v9","v10","v13","v14","audit"].includes(active))show(active);};
+mainSpec?.addEventListener("change",syncSpec);syncBuild();if(specEls.length&&bySpec.size){enableLegacyConsolidation();}if(getSpec()&&!active)show("audit");
 const selectorGroup=mainSpec?.closest(".gt-unified")||mainSpec?.parentElement?.parentElement;
 selectorGroup?.addEventListener("change",e=>{if(e.target!==mainSpec&&e.target.tagName==="SELECT"&&!root.contains(e.target))queueMicrotask(syncSpec);});
 
