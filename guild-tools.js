@@ -545,14 +545,14 @@ function catalogCandidateIds(spec){return new Set([...expandCandidateSlots(spec)
 function candidateCatalogCheck(candidate,record){
  if(!record)return {state:"未收錄",differences:[]};
  if(Number(record.estimated))return {state:"經典推定",differences:[]};
- const differences=[];
+ const differences=[];let compared=0;
  const baseFields={strength:"力量",agility:"敏捷",stamina:"耐力",intellect:"智力",spirit:"精神",armor:"護甲"};
  for(const [key,label] of Object.entries(baseFields)){
-  const a=candidate.stats?.[label],b=record[key];if(Number.isFinite(a)&&Number.isFinite(b)&&a!==b)differences.push({label,old:a,current:b});
+  const a=candidate.stats?.[label],b=record[key];if(Number.isFinite(a)&&Number.isFinite(b)){compared++;if(a!==b)differences.push({label,old:a,current:b});}
  }
  const wd=Object.entries(candidate.wm||{}).find(([k])=>/每秒傷害|DPS/i.test(k));const a=wd?Number(wd[1]):NaN,b=record.dps;
- if(Number.isFinite(a)&&Number.isFinite(b)&&!Number(record.dps_approx)&&Math.abs(a-b)>0.11)differences.push({label:"武器DPS",old:a,current:b});
- return {state:differences.length?"數值差異待核":"已比對（有限欄位）",differences};
+ if(Number.isFinite(a)&&Number.isFinite(b)&&!Number(record.dps_approx)){compared++;if(Math.abs(a-b)>0.11)differences.push({label:"武器DPS",old:a,current:b});}
+ return {state:differences.length?"數值差異待核":compared?"已比對（有限欄位）":"沒有可直接比較的數值",compared,differences};
 }
 let gearCatalogPromise=null;
 function loadGearCatalog(){
@@ -571,7 +571,7 @@ function candidateAuditView(spec,slots){
  const issue=r=>r.check.state!=="已比對（有限欄位）"||r.eligible===false||!r.rec?.source_summary;
  add(out,node("p","資料版本："+data.meta.client_build+"｜"+rows.length+" 筆部位候選｜"+rows.filter(r=>!issue(r)).length+" 筆有限欄位相符且有來源文字｜"+rows.filter(issue).length+" 筆待核對","gt-muted"),field("核對範圍",mode),list);
  function draw(){list.replaceChildren();const visible=rows.filter(r=>mode.value==="all"||issue(r));for(const {x,rec,check,eligible} of visible){
- const c=node("article",undefined,"gt-card");add(c,link(zhItem(x)+"（"+x.slot+"）",x.url),node("p",check.state+(eligible===false?"｜資料目錄初步資格不符":"")+(rec&&!rec.source_summary?"｜目錄缺取得來源":""),"gt-muted"));
+ const c=node("article",undefined,"gt-card");add(c,link(zhItem(x)+"（"+x.slot+"）",x.url),node("p",check.state+(check.compared?"｜"+check.compared+" 個可比欄位":"")+(eligible===false?"｜資料目錄初步資格不符":"")+(rec&&!rec.source_summary?"｜目錄缺取得來源":""),"gt-muted"));
  for(const v of check.differences)add(c,node("p",v.label+"：本站 "+v.old+" ／ 目錄 "+v.current));
  if(rec)add(c,node("p","目錄來源："+(rec.source_summary||"待查")+"；掉落及階段須另核","gt-muted"),link("依物品ID查閱繁中遊戲資料","https://www.wowhead.com/forever/tw/item="+rec.id));
  list.append(c);}
