@@ -74,6 +74,12 @@ const server=http.createServer((req,res)=>{
   await page.locator('#guild-tools button[data-tab="audit"]').click();
   assert.equal(await page.locator(".gt-cat-evidence details").count(),5);
   await page.locator('.gt-bis-slot a[href*="/item/19323/"]').first().waitFor({state:"visible"});
+  await page.locator(".gt-feral-set > summary").click();
+  assert.equal(await page.locator('.gt-feral-set a[href*="/item/22679"], .gt-feral-set a[href*="/item/226788/"]').count(),4);
+  assert.ok(await page.locator(".gt-spec-hotfix > summary").isVisible());
+  await page.locator(".gt-spec-hotfix > summary").click();
+  assert.ok((await page.locator(".gt-spec-hotfix").innerText()).includes("野性德魯伊套裝"));
+  console.log("PASS: cat four-piece research and relevant hotfix links in actual UI");
   assert.ok(await page.locator(".gt-full-gear > summary").isVisible());
   const acquisition=page.locator("#gt-acquisition-filter");
   await acquisition.selectOption("聲望");
@@ -106,9 +112,14 @@ const server=http.createServer((req,res)=>{
   for(const selector of ["#class-select","#spec-select","#gt-build-bar","#guild-tools .gt-tabs"]){assert.equal(await page.locator(selector).isVisible(),false,selector);}
   assert.equal(await page.locator("section.spec:visible").count(),0);
   const bf=page.locator("#gt-blue-board");
-  assert.equal(await bf.getAttribute("data-release"),"18.4");
+  assert.equal(await bf.getAttribute("data-release"),"18.9");
   assert.equal(await page.locator("iframe").count(),0,"no homepage iframe in blue mode");
   await bf.locator("#blue-list article").first().waitFor({state:"visible"});
+  assert.equal(await bf.locator("#blue-list article").count(),14);
+  await bf.locator('#blue-list details[data-post-key="199"] > summary').click();
+  assert.equal(await bf.locator('#blue-list details[data-post-key="199"] .gt-blue-body h4').count(),6);
+  assert.ok((await bf.locator('#blue-list details[data-post-key="199"]').innerText()).includes("20%、40%、60%、80%或100%"));
+  await bf.locator('#blue-list details[data-post-key="199"] > summary').click();
   assert.equal(await bf.locator("#blue-list details[open]").count(),0,"posts initially collapsed");
   assert.equal(await bf.locator("iframe").count(),0,"no external frame before user action");
   await bf.locator("#blue-list details > summary").first().click();
@@ -149,6 +160,7 @@ const server=http.createServer((req,res)=>{
   console.log("PASS: blue mode deep link and browser history");
   await page.goto(origin+"/blue-18-3.html");
   await page.locator("#posts article").first().waitFor({state:"visible"});
+  assert.equal(await page.locator("#posts article").count(),14,"legacy standalone matches homepage");
   assert.equal(await page.locator("iframe").count(),0);
   await page.locator("#posts details > summary").first().click();
   assert.equal(await page.locator("iframe").count(),0);
