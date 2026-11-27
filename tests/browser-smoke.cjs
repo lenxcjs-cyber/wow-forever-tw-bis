@@ -38,6 +38,10 @@ const server=http.createServer((req,res)=>{
     const expected=catalog.filter(p=>p.id===id).map(p=>p.key).sort();
     assert.ok(expected.length,"missing catalog "+id);
     await page.waitForFunction(({expected})=>{const e=document.getElementById("gt-build-select");return !!e&&JSON.stringify(Array.from(e.options).map(o=>o.value).sort())===JSON.stringify(expected);},{expected});
+    await page.locator('#guild-tools button[data-tab="audit"]').click();
+    assert.ok(await page.locator(".gt-bis-slot").count()>0,"missing candidate cards "+id);
+    await page.locator(".gt-community-bis > summary").waitFor({state:"visible"});
+    await page.locator('#guild-tools button[data-tab="v11"]').click();
     seen.add(id);classFor[id]=c.value;buildCount+=expected.length;
    }
   }
@@ -76,12 +80,16 @@ const server=http.createServer((req,res)=>{
   assert.equal(await bf.locator("#posts details.post-toggle").nth(1).getAttribute("open"),"");
   await bf.locator("#posts details.post-toggle > summary").nth(1).click();
   assert.equal(await bf.locator("#posts details[open]").count(),0);
-  await bf.locator("#live-source summary").click();
-  await bf.locator("#live-source iframe").waitFor({state:"attached"});
-  assert.equal(await bf.locator("#live-source iframe").getAttribute("src"),"https://exwind.net/zhTW/blue/forever/");
-  await bf.locator("#live-source summary").click();
-  await bf.locator("#live-source iframe").waitFor({state:"detached"});
-  console.log("PASS: collapsed posts and user-triggered EXWIND reader lifecycle (external requests blocked in test)");
+  assert.equal(await bf.locator("#live-source a").count(),2);
+  assert.equal(await bf.locator("#live-source a").first().getAttribute("href"),"https://exwind.net/zhTW/blue/forever/");
+  await bf.locator("#posts details.post-toggle > summary").first().click();
+  assert.equal(await bf.locator("iframe").count(),0,"never create blocked external frames");
+  assert.equal(await bf.locator('#posts details.post-toggle[open] a[href*="/post/blue/"]').count(),1);
+  assert.equal(await bf.locator('#posts details.post-toggle[open] a[href*="/post/blue/"]').getAttribute("target"),"_blank");
+  const articleKeys=await bf.locator("#posts details.post-toggle").evaluateAll(xs=>xs.map(x=>x.dataset.postKey));
+  assert.equal(new Set(articleKeys).size,articleKeys.length,"unique source article");
+  await bf.locator("#posts details.post-toggle > summary").first().click();
+  console.log("PASS: independent grouped blue posts, direct source link and no blocked iframes");
   await bf.locator("#q").fill("德魯伊 2026-11-25");
   assert.ok(await bf.locator("#posts article").count()>0);
   await bf.locator("#q").fill("no-such-post-123");
