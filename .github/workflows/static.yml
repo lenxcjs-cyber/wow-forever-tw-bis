@@ -67,6 +67,22 @@ jobs:
           fi
       - name: Stamp homepage asset versions
         run: python3 scripts/stamp-assets.py
+      - name: Install browser test dependency
+        id: browser_setup
+        continue-on-error: true
+        run: npm install --prefix "$RUNNER_TEMP/guild-browser" --no-save --no-package-lock playwright@1.57.0
+      - name: Run real browser smoke checks
+        if: steps.browser_setup.outcome == 'success'
+        run: |
+          export NODE_PATH="$RUNNER_TEMP/guild-browser/node_modules"
+          export CHROME_PATH="$(command -v google-chrome || command -v chromium || true)"
+          if test -z "$CHROME_PATH"; then
+            "$RUNNER_TEMP/guild-browser/node_modules/.bin/playwright" install chromium
+          fi
+          node tests/browser-smoke.cjs
+      - name: Report skipped browser tests
+        if: steps.browser_setup.outcome != 'success'
+        run: echo "::warning::Browser dependency installation unavailable; browser tests skipped."
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
