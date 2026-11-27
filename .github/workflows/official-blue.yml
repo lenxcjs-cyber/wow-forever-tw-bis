@@ -1,0 +1,82 @@
+name: Sync official Blizzard Forever blue posts
+on:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/sync-official-blue.py'
+      - 'tests/test-official-blue.py'
+      - '.github/workflows/official-blue.yml'
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: official-blue-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test source validation and deduplication
+        run: python tests/test-official-blue.py
+      - name: Poll Blizzard public forum JSON
+        id: poll
+        run: |
+          python scripts/sync-official-blue.py poll
+          python -c 'import json,os; from pathlib import Path; q=Path(os.environ["RUNNER_TEMP"])/"tomb-blue-queue.json"; print("pending="+str(bool(json.loads(q.read_text()))).lower())' >> "$GITHUB_OUTPUT"
+      - name: Cache local translation model
+        if: steps.poll.outputs.pending == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/argos-translate
+            ~/.cache/pip
+          key: official-blue-argos-en-zh-py311-v1
+      - name: Translate short factual selections offline
+        if: steps.poll.outputs.pending == 'true'
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          python -m pip install 'argostranslate==1.11.1' 'opencc-python-reimplemented==0.1.7'
+          python scripts/sync-official-blue.py translate
+      - name: Publish data changes only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add official-blue-live.json
+          if git diff --cached --quiet; then
+            echo "No new official notices or translations"
+            exit 0
+          fi
+          changed=$(python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          try: old=json.loads(subprocess.check_output(["git","show","HEAD:official-blue-live.json"]))
+          except Exception: old={"posts":[]}
+          new=json.loads(Path("official-blue-live.json").read_text())
+          print("yes" if old.get("posts")!=new.get("posts") else "no")
+          PY
+          )
+          git commit -m "Sync official Blizzard blue notices"
+          git pull --rebase origin main
+          git push origin HEAD:main
+          if test "$changed" = yes; then
+            for attempt in 1 2 3; do
+              if gh workflow run static.yml --ref main; then
+                echo "Triggered Pages publication"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "::error::Blue notices committed, but Pages dispatch failed"
+            exit 1
+          fi
