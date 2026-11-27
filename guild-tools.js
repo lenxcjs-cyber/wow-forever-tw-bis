@@ -731,7 +731,7 @@ function catalogWeaponScore(x,position,weights){
 function catalogWeaponPlan(spec,records,prof,weights,options={}){
  weights=effectiveGearWeights(spec.id,weights);
  const pools=new Map(["主手","副手","雙手武器","遠程","聖物"].map(k=>[k,[]])),seen=new Set();
- const kind=variantFor(spec.id)?.[4]||buildFor(spec.id),rogue=gearClassIndex(spec.id)===3,feral=feralWeaponMode(spec.id),requirePair=rogue||["dual","shield","mutilate","backstab","hemo"].includes(kind)||feral==="onehand",requireTwo=feral==="twohand"||["twohand","weaving"].includes(kind);
+ const kind=variantFor(spec.id)?.[4]||buildFor(spec.id),rogue=gearClassIndex(spec.id)===3,feral=feralWeaponMode(spec.id),requirePair=rogue||["dual","shield","mutilate","backstab","hemo"].includes(kind)||feral==="onehand",requireTwo=feral==="twohand"||["twohand","weaving"].includes(kind),allowTwo=!requirePair&&options.weaponMode!=="one",allowOne=!requireTwo&&options.weaponMode!=="two";
  for(const x of records){
   if(!String(x.id??"")||!catalogPlanSourceAllowed(x,options)||Number(x.quality||0)<Number(options.minQuality||0)||options.excludeEffects&&catalogHasSpecial(x))continue;
   for(const [position,pool] of pools){
@@ -745,8 +745,8 @@ function catalogWeaponPlan(spec,records,prof,weights,options={}){
  }
  for(const pool of pools.values())pool.sort((a,b)=>b.score.total-a.score.total||Number(a.item.id)-Number(b.item.id));
  const choices=[],push=(kind,picks)=>{const total=picks.reduce((n,p)=>n+p.score.total,0);if(total>0)choices.push({kind,picks,total});};
- if(!requirePair&&pools.get("雙手武器").length)push("雙手武器",[pools.get("雙手武器")[0]]);
- if(!requireTwo){
+ if(allowTwo&&pools.get("雙手武器").length)push("雙手武器",[pools.get("雙手武器")[0]]);
+ if(allowOne){
   const main=pools.get("主手").slice(0,2),off=pools.get("副手").slice(0,2);
   for(const m of main){
    if(!requirePair)push("單主手",[m]);
@@ -796,7 +796,7 @@ function candidateAuditView(spec,slots){
  }catch(e){started=false;out.replaceChildren(node("p","目錄無法載入，收合後可重試。"));}
  });return d;
 }
-function catalogArmorPlanView(spec){
+function catalogArmorPlanView(spec,displayMode=()=> "auto"){
  const d=node("details",undefined,"gt-card gt-armor-plan");add(d,node("summary","整套裝備 · 面板權重試算（含合法跨甲）"),node("p","從全來源裝備目錄逐部位選擇已儲存面板權重的最高分；含十個單件部位及兩個戒指、兩個飾品，另比較合法武器組合、遠程與聖物。只列有客戶端資料及來源文字的正分候選，取得階段仍待核對。同一物品ID不重複；不同ID的唯一群組尚未確認。","gt-muted"));
  const out=node("div");d.append(out);let started=false;
  d.addEventListener("toggle",async()=>{
@@ -806,10 +806,10 @@ function catalogArmorPlanView(spec){
   started=true;out.replaceChildren(node("p","正在讀取全來源裝備目錄…"));
   try{
    const data=await loadGearCatalog();if(!d.isConnected)return;
-   const quality=select([["0","不限品質"],["2","優良以上"],["3","精良以上"],["4","史詩以上"]]),effect=select([["all","保留特殊效果與套裝（不計效果）"],["plain","排除有特殊效果或套裝文字的物品"]]),sourceFilter=select([["all","所有已記載來源"],["no-rep","排除已標記聲望裝備"],["boe","只看已標記裝備綁定"]]),rows=node("div");
-   const omitted=[...catalogWeightCoverage(weights).filter(k=>!Object.values(catalogDpsKeys).includes(k)&&k!=="武器DPS"),...omittedFeralWeights(spec.id,model?.weights).map(k=>k+"（野性形態待驗證）")];out.replaceChildren(node("p","權重來源："+(model.source||"使用者設定")+"｜資料版本："+data.meta.client_build,"gt-muted"),node("p","未計入權重："+(omitted.join("、")||"無其他已設定欄位")+"；尚未計算命中門檻、套裝、特殊效果、陣營、職業以外限制及戰鬥環境。","gt-muted"),field("品質",quality),field("取得條件（依來源標記，非開放驗證）",sourceFilter),field("特殊效果範圍",effect),rows);
+   const quality=select([["0","不限品質"],["2","優良以上"],["3","精良以上"],["4","史詩以上"]]),effect=select([["all","保留特殊效果與套裝（不計效果）"],["plain","排除有特殊效果或套裝文字的物品"]]),sourceFilter=select([["all","所有已記載來源"],["no-rep","排除已標記聲望裝備"],["boe","只看已標記裝備綁定"]]),planWeapon=select([["follow","沿用上方武器配置"],["auto","比較所有合法配置"],["two","僅雙手武器"],["one","僅單手／副手"]]),rows=node("div");
+   const omitted=[...catalogWeightCoverage(weights).filter(k=>!Object.values(catalogDpsKeys).includes(k)&&k!=="武器DPS"),...omittedFeralWeights(spec.id,model?.weights).map(k=>k+"（野性形態待驗證）")];out.replaceChildren(node("p","權重來源："+(model.source||"使用者設定")+"｜資料版本："+data.meta.client_build,"gt-muted"),node("p","未計入權重："+(omitted.join("、")||"無其他已設定欄位")+"；尚未計算命中門檻、套裝、特殊效果、陣營、職業以外限制及戰鬥環境。","gt-muted"),field("品質",quality),field("取得條件（依來源標記，非開放驗證）",sourceFilter),field("特殊效果範圍",effect),field("武器配置",planWeapon),rows);
    function draw(){
-    const options={minQuality:Number(quality.value),excludeEffects:effect.value==="plain",excludeReputation:sourceFilter.value==="no-rep",boeOnly:sourceFilter.value==="boe"},plan=catalogArmorPlan(spec,data.items,data.prof,weights,options),weapon=catalogWeaponPlan(spec,data.items,data.prof,weights,options);
+    const options={minQuality:Number(quality.value),excludeEffects:effect.value==="plain",excludeReputation:sourceFilter.value==="no-rep",boeOnly:sourceFilter.value==="boe",weaponMode:planWeapon.value==="follow"?displayMode():planWeapon.value},plan=catalogArmorPlan(spec,data.items,data.prof,weights,options),weapon=catalogWeaponPlan(spec,data.items,data.prof,weights,options);
     rows.replaceChildren(node("p","已選 "+plan.filled+" / "+plan.expected+" 個部位｜防具與飾品分 "+plan.total.toFixed(2)+"｜武器與遠程／聖物分 "+weapon.total.toFixed(2)+"｜合計 "+(plan.total+weapon.total).toFixed(2)+"（非整套BiS）","gt-muted"));
     for(const group of plan.groups){
      const c=node("article",undefined,"gt-card");add(c,node("h4",group.slot+"｜"+group.picks.length+"/"+group.count),node("p",group.eligible+" 件有正分的合資格候選","gt-muted"));
@@ -827,7 +827,7 @@ function catalogArmorPlanView(spec){
     add(setPanel,node("h4","套裝件數與散件取捨"),node("p",setCounts.length?"目前防具方案："+setCounts.map(([n,c])=>zhDisplay(n)+" "+c+" 件").join("；"):"目前防具方案未包含已標記套裝。","gt-muted"),node("p","僅依客戶端套裝名稱辨識，名稱相同不保證套裝ID一致。指定最低件數可找出面板分數最高的防具替代方案；套裝效果不自動計分。","gt-muted"));
     const pools=catalogSetPools(spec,data.items,data.prof,weights,options),sets=catalogSetOptions(pools);
     const weaponPicks=[...(weapon.melee?.picks||[]),...weapon.extra],exportPlan=(armor,label,total)=>{
-     const text=catalogPlanText({spec:spec.name||spec.id,build:buildFor(spec.id),version:data.meta.client_build,source:model.source,filter:quality.options[quality.selectedIndex]?.text+"；"+sourceFilter.options[sourceFilter.selectedIndex]?.text+"；"+effect.options[effect.selectedIndex]?.text,label,total:total+weapon.total,omitted},[...armor,...weaponPicks].map(p=>({...p,name:zhItem(p.item)})));
+     const text=catalogPlanText({spec:spec.name||spec.id,build:buildFor(spec.id),version:data.meta.client_build,source:model.source,filter:quality.options[quality.selectedIndex]?.text+"；"+sourceFilter.options[sourceFilter.selectedIndex]?.text+"；"+effect.options[effect.selectedIndex]?.text+"；武器："+({two:"雙手",one:"單手／副手"}[options.weaponMode]||"所有合法配置"),label,total:total+weapon.total,omitted},[...armor,...weaponPicks].map(p=>({...p,name:zhItem(p.item)})));
      const exportBox=node("textarea");exportBox.readOnly=true;exportBox.rows=10;exportBox.style.width="100%";exportBox.value=text;
      share.replaceChildren(node("p","可選取或複製以下配置分享給公會成員。"),exportBox,button("複製方案",async()=>{try{await navigator.clipboard.writeText(text);shareStatus.textContent="已複製。";}catch(e){exportBox.focus();exportBox.select();shareStatus.textContent="請手動複製已選取的文字。";}}),shareStatus);
     };
@@ -851,7 +851,7 @@ function catalogArmorPlanView(spec){
     }else setPanel.append(node("p","此篩選條件下沒有至少兩件的已標記套裝候選。","gt-muted"));
     rows.append(setPanel);
    }
-   quality.addEventListener("change",draw);effect.addEventListener("change",draw);sourceFilter.addEventListener("change",draw);draw();
+   quality.addEventListener("change",draw);effect.addEventListener("change",draw);sourceFilter.addEventListener("change",draw);planWeapon.addEventListener("change",draw);d.addEventListener("gt-weapon-mode-change",()=>{if(planWeapon.value==="follow")draw();});draw();
   }catch(e){started=false;out.replaceChildren(node("p","裝備目錄暫時無法讀取，收合後重試。"));}
  });return d;
 }
@@ -978,7 +978,7 @@ function audit(){
  let storedMode="";try{storedMode=localStorage.getItem(weaponModeKey)||"";}catch(e){}
  weaponMode.value=auditWeaponPreference(partition.modes,storedMode);
  weaponMode.id="gt-gear-weapon-mode";
- function chooseWeaponMode(value){if(!partition.modes.includes(value))return;weaponMode.value=value;try{localStorage.setItem(weaponModeKey,value);}catch(e){}draw();}
+ function chooseWeaponMode(value){if(!partition.modes.includes(value))return;weaponMode.value=value;try{localStorage.setItem(weaponModeKey,value);}catch(e){}draw();armorPlan.dispatchEvent(new Event("gt-weapon-mode-change"));}
  const all=slots.flatMap(x=>x.items),sourceMissing=x=>!x.source||/待查|待核|未知|未確認|衝突/.test(x.source+" "+(x.availability||"")),evidenceMissing=x=>!x.evidence,missing=x=>sourceMissing(x)||evidenceMissing(x)||!!x.review||!!x.model?.incomplete;
  const populated=slots.filter(x=>x.items.length),firsts=slots.map(x=>x.items.find(i=>!i.review&&!i.model?.incomplete)).filter(Boolean);
  const metrics=node("div",undefined,"gt-bis-summary");
@@ -1024,7 +1024,7 @@ function audit(){
  const moreFilters=node("details",undefined,"gt-gear-more-filters"),moreFields=node("div",undefined,"gt-gear-more-fields");add(moreFields,field("取得方式",acq),field("篩選",mode),field("顯示密度",compact),button("清除篩選",()=>{q.value="";acq.value="";mode.value="all";draw();}));add(moreFilters,node("summary","更多篩選與顯示設定"),moreFields);add(gearFilters,field("搜尋",q),field("跳至部位",jump),...(partition.modes.length>1?[field("武器配置（擇一）",weaponMode)]:[]),moreFilters);add(gearScroll,out);add(left,leftHead,frame);add(right,rightHead,gearFilters,gearScroll);add(workspace,left,right);
  const research=node("details",undefined,"gt-card gt-audit-research"),tools=node("details",undefined,"gt-card gt-audit-tools");
  add(research,node("summary","配裝研究與資料核對"),bisReasonView(spec),...(spec.id==="spec-26"?[feralSetView(spec)]:[]),...(spec.id==="spec-26"&&feralWeaponMode(spec.id)==="twohand"?[catWeaponResearch(spec)]:[]),communityEvidenceView(spec,slots),candidateAuditView(spec,slots),candidateDataCoverageView(all),excludedDetails,node("p","構築排除 "+excluded.length+" 筆不適用候選。","gt-muted"),metrics,progress,node("p","完整度僅統計已列部位及文字資料，不代表已驗證。","gt-muted"));
- add(tools,node("summary","進階配裝與全裝備查詢"),catalogArmorPlanView(spec),gearCatalogView(spec),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]));
+ const armorPlan=catalogArmorPlanView(spec,()=>weaponMode.value||"auto");add(tools,node("summary","進階配裝與全裝備查詢"),armorPlan,gearCatalogView(spec),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]));
  add(panel,workspace,node("p",(model?"排序："+(model.source||"本機權重")+"（部分面板試算）":"排序：既有候選及外部攻略，非實戰BiS。")+(omittedFeralWeights(spec.id,saved?.weights).length?" 野性武器DPS未計入。":""),"gt-muted"),tools,research);draw();attachLegacy(spec);
 }
 function talentPageURL(embedded=false){
