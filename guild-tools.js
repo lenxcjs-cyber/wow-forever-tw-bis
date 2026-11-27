@@ -868,7 +868,7 @@ function itemIcon(id){
  const box=node("span",undefined,"gt-item-icon");box.hidden=true;box.setAttribute("aria-hidden","true");
  loadItemIcons().then(map=>{if(!box.isConnected)return;const url=itemIconURL(map,id);if(!url)return;
  const img=node("img");img.alt="";img.width=36;img.height=36;img.loading="lazy";img.referrerPolicy="no-referrer";
- img.onload=()=>{if(box.isConnected)box.hidden=false;};img.onerror=()=>{box.hidden=true;};box.append(img);img.src=url;
+ img.onerror=()=>{box.hidden=true;};box.hidden=false;box.append(img);img.src=url;
  });return box;
 }
 function auditSlotOrder(name){
