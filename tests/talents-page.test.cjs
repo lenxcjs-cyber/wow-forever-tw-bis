@@ -42,3 +42,17 @@ assert.equal(partialIndex["rogue:1:Precision"].maxRank,3);
 assert.equal(partialBuildCheck({cls:"rogue",talents:[{},{"Precision":4},{}]},partialIndex).issues.length,2);
 assert.equal(partialBuildCheck({cls:"rogue",talents:[{},{"Unknown":5},{}]},partialIndex).matched,0);
 console.log("PASS: partial metadata rank and tier checks");
+
+const communityFile=path.join(__dirname,"..","talent-community.json");
+if(fs.existsSync(communityFile)){
+ const d=JSON.parse(fs.readFileSync(communityFile,"utf8"));
+ const {validateCommunitySnapshot}=require("../talents-page.js");
+ assert.ok(validateCommunitySnapshot(d),"community snapshot schema");
+ for(const [token,plan] of Object.entries(LEVEL)){
+  const cls=d.classes.find(c=>c.token===token);
+  assert.ok(cls,token);
+  run(cls,plan);
+  assert.ok(cls.talents.every(t=>/^[a-z][a-z0-9_]+$/i.test(t.icon)),token+" icon identifiers");
+ }
+ console.log("PASS: all nine imported community-data leveling paths (459 points against imported rules), icon IDs");
+}else console.log("SKIP community dataset: not downloaded");
