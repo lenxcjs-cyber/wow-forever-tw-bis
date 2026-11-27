@@ -72,7 +72,7 @@ const guides=[
 const root=$("#guild-tools");if(!root)return;
 const tabs=[["v8","天賦手法"],["v9","掉落反查"],["v10","收集進度"],["v11","團本準備"],["v12","官方藍帖"],["v13","配方材料"],["v14","配裝試算"],["audit","BiS 資料稽核"]];
 const nav=node("div",undefined,"gt-tabs"),panel=node("div",undefined,"gt-panel");
-const info=node("p","選擇工具；原有職業、專精與裝備選單保留在下方。","gt-muted");
+const info=node("p","V14.2 · 選擇下方功能按鈕，快速查詢公會資料。原有職業與裝備選單維持不變。","gt-muted");
 add(root,node("h2","公會工具箱"),info,nav,panel);
 let active="v8";
 const specPairs=[...bySpec.values()].map(s=>[s.id,s.name]);
@@ -94,7 +94,9 @@ function optimizer(){title("V14 · 個人化配裝比較（試算版）","比較
 function audit(){title("V14.1 · BiS 資料稽核","檢查既有候選卡片的完整性，不等於外部來源交叉驗證。即使卡片有證據文字，也不代表已確認為整套 BiS。");const out=node("div"),q=inp("搜尋裝備、部位或來源"),mode=select([["all","全部候選"],["missing","缺少來源或證據"]]);const p=specPicker(draw);function draw(){const spec=bySpec.get(p.value);if(!spec)return;out.replaceChildren();const all=[...spec.slots.values()].flat();const missing=x=>!x.evidence||!x.source||/待查|待核|未知/.test(x.source);const empty=[...spec.slots].filter(([k,v])=>!v.length).map(([k])=>k);add(out,node("p",spec.name+" · "+all.length+" 筆候選 · "+all.filter(missing).length+" 筆缺來源或證據文字"),node("p","空白候選部位："+(empty.join("、")||"無（僅指已列出的部位）"),"gt-muted"));for(const x of all.filter(x=>(mode.value!=="missing"||missing(x))&&[x.name,x.slot,x.source,x.id].join(" ").toLowerCase().includes(q.value.trim().toLowerCase()))){const c=box(out,x.slot+" · #"+x.rank+" "+x.name,missing(x)?"資料缺項，優先複核":"已有來源與證據文字，仍需外部複核");add(c,node("p",x.source),node("p",x.evidence||"未提供證據文字","gt-muted"),link("原物品資料",x.url));}}q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,field("專精",p),field("篩選",mode),field("搜尋",q),out);draw();}
 const renderers={audit,v8:guide,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
 function show(key){active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
-for(const [key,label] of tabs){const b=button(label,()=>show(key));b.dataset.tab=key;nav.append(b);}
+const dashboardMeta={v8:["⚔️","天賦與實戰技巧"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","官方更新摘要"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","檢查來源與證據"]};
+for(const [key,label] of tabs){const b=button(label,()=>show(key));b.dataset.tab=key;const [symbol,desc]=dashboardMeta[key];const pict=node("span",symbol,"gt-icon");pict.setAttribute("aria-hidden","true");b.replaceChildren(pict,node("span",label),node("span",desc,"gt-desc"));nav.append(b);}
+const toolboxDetails=root.closest("details");if(toolboxDetails)toolboxDetails.open=true;
 $("#spec-select")?.addEventListener("change",()=>{if(["v8","v10","v14","audit"].includes(active))show(active);});
 show("v8");
 })();
