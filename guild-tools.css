@@ -102,3 +102,10 @@ html.gt-blue-mode section.spec{display:none!important}
 #guild-tools .gt-gear-scroll .gt-bis-slot h4{padding:8px 10px;background:#29384b;border-radius:5px;font-size:16px}
 @media(max-width:900px){#guild-tools .gt-build-workspace{grid-template-columns:minmax(0,1fr)}#guild-tools .gt-build-column{height:clamp(480px,74vh,800px)}}
 @media(max-width:400px){#guild-tools .gt-gear-filters{grid-template-columns:minmax(0,1fr)}#guild-tools .gt-build-column{height:max(580px,78vh)}}
+
+/* V20.3: compact equipment mode keeps name, source and evidence while reducing stat height. */
+#guild-tools .gt-gear-compact .gt-stat-wrap{display:none}
+#guild-tools .gt-gear-compact .gt-bis-slot{padding:8px}
+#guild-tools .gt-gear-compact .gt-bis-alt{gap:4px;padding:6px 0}
+#guild-tools .gt-gear-compact .gt-bis-source{padding:5px 8px}
+#guild-tools .gt-gear-filters>button{align-self:end;min-height:36px;font-size:13px;padding:5px 8px}
