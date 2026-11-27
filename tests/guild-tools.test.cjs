@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,catalogArmorPlan,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,catalogArmorPlan,catalogWeaponPlan,catalogWeaponScore,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -256,3 +256,18 @@ assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"敏�
 assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"敏捷":1},{minQuality:4}).filled,0);
 assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"命中機率":1}).filled,0);
 console.log("PASS: catalog armor plan honors cross-armor, distinct ring IDs, quality, source evidence and score limitations");
+
+// Full catalog weapons: exact DPS, distinct IDs, main/off restrictions and shield requirements.
+const wp={Warrior:{armor:{Plate:40,Shield:1},weapons:["One-Handed Sword","Two-Handed Sword"]},Rogue:{armor:{Leather:1},weapons:["Dagger"]}};
+const weaponForPlan=(id,slot,subclass,dps,extra={})=>({id,slot,subclass,dps,item_class:"Weapon",quality:3,source_summary:"World drop",...extra});
+const wpItems=[weaponForPlan(201,"One-Hand","One-Handed Sword",50),weaponForPlan(202,"One-Hand","One-Handed Sword",40),weaponForPlan(203,"Main Hand","One-Handed Sword",45),weaponForPlan(204,"Two-Hand","Two-Handed Sword",70),weaponForPlan(205,"One-Hand","One-Handed Sword",100,{dps_approx:1}),{id:206,slot:"Shield",subclass:"Shield",item_class:"Armor",armor:100,source_summary:"Vendor",quality:3}];
+const dualPlan=expansion.catalogWeaponPlan({id:"spec-2"},wpItems,wp,{"主手DPS":2,"副手DPS":1});
+assert.deepEqual(dualPlan.melee.picks.map(p=>p.item.id),[201,202]);assert.equal(dualPlan.total,140);
+assert.equal(expansion.catalogWeaponPlan({id:"spec-1"},wpItems,wp,{"雙手DPS":1}).melee.picks[0].item.id,204);
+const shieldPlan=expansion.catalogWeaponPlan({id:"spec-3"},wpItems,wp,{"主手DPS":1,"護甲":1});
+assert.equal(shieldPlan.melee.kind,"主手＋盾牌");assert.deepEqual(shieldPlan.melee.picks.map(p=>p.item.id),[201,206]);assert.equal(shieldPlan.total,150);
+assert.equal(expansion.catalogWeaponPlan({id:"spec-3"},wpItems.filter(x=>x.id!==206),wp,{"主手DPS":1}).melee,null);
+assert.equal(expansion.catalogWeaponScore(wpItems[5],"副手",{"武器DPS":5,"護甲":1}).total,100);
+assert.equal(expansion.catalogWeaponScore(wpItems[4],"主手",{"武器DPS":1}).incomplete,true);
+assert.equal(expansion.catalogWeaponPlan({id:"spec-10"},[weaponForPlan(211,"One-Hand","Dagger",50)],wp,{"武器DPS":1}).melee,null);
+console.log("PASS: full catalog weapon configurations and hand-specific DPS");
