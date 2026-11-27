@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -326,3 +326,17 @@ const localeFixture={build:"1.60.1.71139",items:{"19323":"測試名稱","2":"Eng
 assert.deepEqual(coverageHelper([19323,"19323",2,3,"invalid"],localeFixture,iconFixture),{total:3,localized:1,icons:1});
 assert.deepEqual(coverageHelper([19323],{...localeFixture,build:"other"},null),{total:1,localized:null,icons:null});
 console.log("PASS: distinct candidate IDs, version-aware localized name and icon coverage");
+
+assert.equal(expansion.catalogSlotCheck({slot:"副手",type:"盾牌"},{slot:"One-Hand"}),false);
+assert.equal(expansion.catalogSlotCheck({slot:"副手",type:"匕首"},{slot:"Shield"}),false);
+assert.equal(expansion.catalogSlotCheck({slot:"副手",type:"持有型副手"},{slot:"Held In Off-hand"}),true);
+assert.equal(expansion.catalogSlotCheck({slot:"聖物",type:"塑像"},{slot:"Ranged"}),false);
+assert.equal(expansion.catalogSlotCheck({slot:"遠程",type:"弓"},{slot:"Relic"}),false);
+assert.equal(expansion.catalogSlotCheck({slot:"雙手武器"},{slot:"Two-Hand"}),true);
+assert.equal(expansion.candidateCatalogPosition({slot:"副手",type:"匕首"},{slot:"One-Hand"}),"副手");
+assert.equal(expansion.candidateCatalogPosition({slot:"主手",type:"雙手錘"},{slot:"Two-Hand"}),"雙手武器");
+assert.equal(expansion.catalogHasSpecial({effects:[],other_stats:{},item_set:" "}),false);
+assert.equal(expansion.catalogHasSpecial({effects:[""],other_stats:"[]"}),false);
+assert.equal(expansion.catalogHasSpecial({effects:["Equip: effect"]}),true);
+assert.equal(expansion.catalogHasSpecial({item_set:"Set"}),true);
+console.log("PASS: strict weapon slot reconciliation and empty effect handling");
