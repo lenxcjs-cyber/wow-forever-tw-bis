@@ -47,6 +47,7 @@ const server=http.createServer((req,res)=>{
   }
   assert.equal(seen.size,new Set(catalog.map(p=>p.id)).size,"all classes/specs accessible");
   assert.equal(buildCount,catalog.length,"all profile options accessible");
+  assert.equal(await page.title(),"墓鐘資料庫");
   console.log("PASS: actual homepage class/spec/build selection",seen.size,buildCount);
   await classes.selectOption(classFor["spec-26"]);await spec.selectOption("spec-26");
   await build.waitFor({state:"visible"});await build.selectOption("general");
@@ -54,7 +55,7 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator(".gt-cat-evidence details").count(),5);
   await page.locator('.gt-bis-slot a[href*="/item/19323/"]').first().waitFor({state:"visible"});
   assert.ok(await page.locator(".gt-full-gear > summary").isVisible());
-  const acquisition=page.locator("#guild-tools").getByLabel("取得方式",{exact:true});
+  const acquisition=page.locator("#gt-acquisition-filter");
   await acquisition.selectOption("聲望");
   assert.ok(await page.locator('.gt-bis-slot a[href*="/item/19323/"]').first().isVisible());
   await acquisition.selectOption("裝綁");
