@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogWeaponPlan,catalogWeaponScore,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -298,3 +298,12 @@ assert.equal(fourSet.total,57);assert.equal(new Set(fourSet.picks.map(p=>p.item.
 assert.equal(expansion.catalogSetAlternative(setPools,"Example Set",5),null);
 assert.deepEqual(expansion.catalogSetOptions(expansion.catalogSetPools({id:"spec-2"},setItems,planProf,{"敏捷":1},{excludeEffects:true})),[]);
 console.log("PASS: exact armor set constraints, zero-stat set pieces, duplicate ID handling and trade-off scores");
+
+// Net effect is incremental versus the baseline, not the total set bonus.
+assert.deepEqual(expansion.catalogSetTradeoff(107,97),{gap:10,required:10,net:null});
+assert.deepEqual(expansion.catalogSetTradeoff(107,97,12),{gap:10,required:10,net:2});
+assert.deepEqual(expansion.catalogSetTradeoff(107,97,-5),{gap:10,required:10,net:-15});
+assert.equal(expansion.catalogSetTradeoff(Infinity,97,12),null);
+const exportText=expansion.catalogPlanText({spec:"狂暴",build:"dual",version:"1.60",source:"test",filter:"不限品質",label:"測試",total:97,omitted:["命中機率"]},[{slot:"頭部",name:"測試\n頭盔",item:{id:302,source_summary:"World drop"},score:{total:20}}]);
+assert.ok(exportText.includes("非實戰BiS"));assert.ok(exportText.includes("頭部｜測試 頭盔｜ID 302｜20.00｜World drop"));assert.ok(exportText.includes("未計權重：命中機率"));
+console.log("PASS: net set benefit comparison and shareable gear plan export");
