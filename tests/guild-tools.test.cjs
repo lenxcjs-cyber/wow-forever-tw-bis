@@ -313,3 +313,10 @@ assert.deepEqual(["遠程武器","頭部","副手","主手","戒指"].sort((a,b)
 assert.equal(auditHelpers.auditMatches({name:"Example",id:123,stats:{"敏捷":20},wm:{"武器DPS":10}},"主手",["敏捷","123"]),true);
 assert.equal(auditHelpers.auditMatches({name:"Example",stats:{"敏捷":20}},"主手",["智力"]),false);
 console.log("PASS: ordered equipment slots and multi-term stat search");
+
+const iconHelper=new Function(section("function itemIconURL(","let itemIconPromise=")+";return itemIconURL;")();
+const iconFixture={build:"1.60.1.71139",items:{"19323":"inv_mace_01","2":"../bad","3":"https://example.com/x"}};
+assert.equal(iconHelper(iconFixture,19323),"https://wow.zamimg.com/images/wow/icons/medium/inv_mace_01.jpg");
+assert.equal(iconHelper(iconFixture,2),"");assert.equal(iconHelper(iconFixture,3),"");assert.equal(iconHelper(iconFixture,999),"");
+assert.equal(iconHelper({...iconFixture,build:"other"},19323),"");
+console.log("PASS: item icon URL validation and exact version matching");
