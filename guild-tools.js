@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V21.1 beta · 2026-11-27
+/* 墓鐘資料庫 V21.2 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -1048,7 +1048,7 @@ function talentHub(){
  add(panel,frame);
 }
 const renderers={audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
-function show(key){if(siteMode==="blue")return;cleanupFrame();restoreLegacy();active=key;navMoreSummary.textContent=["audit","v13"].includes(key)?"更多功能":"更多功能 · "+(tabs.find(t=>t[0]===key)?.[1]||"");for(const b of $("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
+function show(key){if(siteMode==="blue")return;cleanupFrame();restoreLegacy();active=key;navMoreSummary.textContent=["audit","v13"].includes(key)?"更多功能":"更多功能 · "+(tabs.find(t=>t[0]===key)?.[1]||"");for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
 const navPrimary=node("div",undefined,"gt-nav-primary"),navMore=node("details",undefined,"gt-nav-more"),navMoreSummary=node("summary","更多功能"),navMoreBody=node("div",undefined,"gt-nav-more-body");add(navMore,navMoreSummary,navMoreBody);add(nav,navPrimary,navMore);
 const dashboardMeta={v8:["⚔️","天賦樹、玩法與練等"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","繁中藍帖專頁"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","左右並排天賦與裝備"]};
 for(const [key,label] of [...tabs].sort((a,b)=>Number(b[0]==="audit")-Number(a[0]==="audit"))){const b=button(label,()=>{show(key);navMore.open=false;});b.dataset.tab=key;b.title=dashboardMeta[key][1];b.textContent=key==="v13"?"附魔與消耗品":label;(key==="audit"||key==="v13"?navPrimary:navMoreBody).append(b);}
