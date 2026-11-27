@@ -360,3 +360,15 @@ assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"World drop",est
 assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Reputation vendor"},{excludeReputation:true}),false);
 assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Drop",bonding:"Binds when picked up"},{boeOnly:true}),false);
 console.log("PASS: source constraints for reputation and BoE equipment plans");
+
+const weaponDisplay=new Function(section("function auditSlotOrder(","function audit(")+";return {auditWeaponGroups,auditWeaponVisible};")();
+const mixedSlots=[{name:"頭部",items:[{id:1,type:"布甲"}]},{name:"主手",items:[{id:2,type:"法杖"},{id:3,type:"單手錘"}]},{name:"雙手武器",items:[{id:2,type:"法杖"}]},{name:"副手物品",items:[{id:4,type:"持有型副手"}]},{name:"遠程武器",items:[{id:5,type:"魔杖"}]}];
+const partition=weaponDisplay.auditWeaponGroups(mixedSlots);
+assert.deepEqual(partition.modes,["two","one"]);
+const twoSlots=weaponDisplay.auditWeaponVisible(partition,"two"),oneSlots=weaponDisplay.auditWeaponVisible(partition,"one");
+assert.deepEqual(twoSlots.map(s=>s.name),["頭部","雙手武器","遠程武器"]);
+assert.deepEqual(oneSlots.map(s=>s.name),["頭部","主手武器","副手物品","遠程武器"]);
+assert.deepEqual(twoSlots.flatMap(s=>s.items.map(x=>x.id)),[1,2,5]);
+assert.deepEqual(oneSlots.flatMap(s=>s.items.map(x=>x.id)),[1,3,4,5]);
+assert.deepEqual(weaponDisplay.auditWeaponGroups([{name:"雙手武器",items:[{id:1,type:"法杖"}]},{name:"副手",items:[]}]).modes,["two"]);
+console.log("PASS: exclusive two-hand and one-hand/offhand display groups, dedup and ranged preservation");
