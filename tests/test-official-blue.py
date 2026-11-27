@@ -19,6 +19,20 @@ class Tests(unittest.TestCase):
         text="Damage increased to 10 percent for the ability.\nMana cost reduced by 5 percent.\n"+"Long "*60
         facts=blue.selected_facts(text);self.assertEqual(len(facts),2)
         self.assertLessEqual(sum(len(x.split()) for x in facts),25)
+    def test_checkpoint(self):
+        from datetime import timedelta
+        stamp=datetime(2026,11,27,12,tzinfo=timezone.utc)
+        state={}
+        healthy={"us":{"read":4,"attempted":4},"eu":{"read":2,"attempted":2}}
+        blue.checkpoint(state,healthy,stamp)
+        self.assertEqual(state["lastCheck"]["status"],"ok")
+        first=state["lastCheck"].copy()
+        blue.checkpoint(state,healthy,stamp+timedelta(minutes=10))
+        self.assertEqual(state["lastCheck"],first)
+        blue.checkpoint(state,healthy,stamp+timedelta(hours=6))
+        self.assertNotEqual(state["lastCheck"],first)
+        blue.checkpoint(state,{"us":{"read":3,"attempted":4},"eu":{"read":0,"attempted":0}},stamp+timedelta(hours=6,minutes=10))
+        self.assertEqual(state["lastCheck"]["status"],"partial")
     def test_poll_and_dedup(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d);stamp=datetime.now(timezone.utc).isoformat()
