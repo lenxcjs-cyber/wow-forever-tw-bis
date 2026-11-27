@@ -662,7 +662,7 @@ function catalogWeaponPlan(spec,records,prof,weights,options={}){
   }
  }
  choices.sort((a,b)=>b.total-a.total||b.picks.length-a.picks.length);
- const melee=choices[0]||null,extra=["遠程","聖物"].map(k=>pools.get(k)[0]).filter(x=>x&&x.score.total>0);
+ const melee=choices[0]||null,extra=["遠程","聖物"].map(k=>pools.get(k)[0]).filter(x=>x&&x.score.total>0).sort((a,b)=>b.score.total-a.score.total).slice(0,1); // Shared ranged/relic equipment slot.
  return {melee,extra,total:(melee?.total||0)+extra.reduce((n,p)=>n+p.score.total,0),requirePair,requireTwo};
 }
 function candidateCatalogCheck(candidate,record){
