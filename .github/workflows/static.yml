@@ -43,6 +43,14 @@ jobs:
           fi
       - name: Check independent talent page and leveling routes
         run: node tests/talents-page.test.cjs
+      - name: Report actual talent data availability
+        run: |
+          if test -f talent-client.json; then
+            echo '### Talent snapshot: available; real-data tests ran' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '### Talent snapshot: unavailable; real-data tests skipped' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Site deployed in fallback mode. Do not mark 459 leveling steps as verified.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
