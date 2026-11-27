@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V16.6 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V16.7 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -216,16 +216,16 @@ const guides=[
 ["持續治療、直接治療及法力","預判傷害安排HoT，按緊急程度補直接治療，管理啟動及續航。","druid/restoration"]
 ];
 const root=$("#guild-tools");if(!root)return;
-const tabs=[["v8","天賦手法"],["v9","掉落反查"],["v10","收集進度"],["v11","團本準備"],["v12","官方藍帖"],["v13","配方材料"],["v14","配裝試算"],["audit","BiS 資料稽核"]];
+const tabs=[["v8","天賦流派"],["v9","掉落反查"],["v10","收集進度"],["v11","團本準備"],["v12","官方藍帖"],["v13","配方材料"],["v14","配裝試算"],["audit","BiS 資料稽核"]];
 const nav=node("div",undefined,"gt-tabs"),panel=node("div",undefined,"gt-panel");
 const info=node("p","V14.2 · 選擇下方功能按鈕，快速查詢公會資料。原有職業與裝備選單維持不變。","gt-muted");
-const talentPageLink=node("a","天賦流派專頁｜天賦樹、逐階效果與野外1–60練等","gt-card");talentPageLink.href="talents.html";talentPageLink.style.display="block";talentPageLink.style.margin="8px 0";add(root,node("p","03 選擇功能","gt-section-label"),talentPageLink,nav,panel);
+add(root,node("p","03 選擇功能","gt-section-label"),nav,panel);
 let active="";
 const specPairs=[...bySpec.values()].map(s=>[s.id,s.name]);
 const getSpec=()=>{const el=$("#spec-select");return el&&!el.disabled&&bySpec.has(el.value)?el.value:"";};
 const buildBar=node("div");root.insertBefore(buildBar,nav);
 function syncBuild(){
- const id=getSpec();buildBar.replaceChildren();if(id){const i=Number(id.split("-")[1])-1,classes=["warrior","paladin","hunter","rogue","priest","shaman","mage","warlock","druid"];talentPageLink.href="talents.html?"+new URLSearchParams({class:classes[Math.min(8,Math.floor(i/3))],spec:id,build:buildFor(id)});}else talentPageLink.href="talents.html";
+ const id=getSpec();buildBar.replaceChildren();
  if(!rogueProfiles[id])return;
  const pick=select(rogueProfiles[id]);pick.value=buildFor(id);
  pick.addEventListener("change",()=>{chooseBuild(id,pick.value);syncBuild();if(active)show(active);});
@@ -389,9 +389,22 @@ function audit(){
  add(out,node("p","顯示 "+count+" / "+slots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));}
  const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),excludedDetails,metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),field("篩選",mode),field("搜尋",q),out);draw();
 }
-const renderers={audit,v8:guide,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
-function show(key){active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v8","v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
-const dashboardMeta={v8:["⚔️","天賦與實戰技巧"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","官方更新摘要"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","檢查來源與證據"]};
+function talentPageURL(embedded=false){
+ const id=getSpec(),p=new URLSearchParams();
+ if(id){const i=Number(id.split("-")[1])-1,classes=["warrior","paladin","hunter","rogue","priest","shaman","mage","warlock","druid"];p.set("class",classes[Math.min(8,Math.floor(i/3))]);p.set("spec",id);p.set("build",buildFor(id));}
+ if(embedded)p.set("embed","1");return "talents.html"+(p.size?"?"+p.toString():"");
+}
+function talentHub(){
+ title("天賦流派與野外練等","在此切換滿等天賦樹、各階效果與九職業逐級練等；也可開啟獨立頁面分享。");
+ const full=link("開啟獨立天賦頁面",talentPageURL());const frame=node("iframe");frame.title="天賦流派與野外練等";frame.style.cssText="display:block;width:100%;height:950px;border:0;border-radius:8px;background:#0e131c";
+ const status=node("p","載入天賦頁面中…","gt-muted");
+ frame.addEventListener("load",()=>{status.textContent="";try{const doc=frame.contentDocument;const win=frame.contentWindow;if(!doc||!win||!doc.body)return;const fit=()=>{if(!frame.isConnected){observer?.disconnect();return;}frame.style.height=Math.max(420,Math.ceil(doc.body.getBoundingClientRect().height)+16)+"px";};const observer=typeof win.ResizeObserver==="function"?new win.ResizeObserver(fit):null;observer?.observe(doc.body);fit();}catch(e){status.textContent="可使用上方獨立頁面連結。";}});
+ frame.src=talentPageURL(true);
+ if(getSpec()){const legacy=node("details");legacy.append(node("summary","原有天賦與實戰手法研究"));const header=[...panel.childNodes];guide();const old=[...panel.childNodes];panel.replaceChildren(...header);legacy.append(...old);add(panel,full,status,frame,legacy);}else add(panel,full,status,frame);
+}
+const renderers={audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
+function show(key){active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
+const dashboardMeta={v8:["⚔️","天賦樹、玩法與練等"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","官方更新摘要"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","檢查來源與證據"]};
 for(const [key,label] of tabs){const b=button(label,()=>show(key));b.dataset.tab=key;const [symbol,desc]=dashboardMeta[key];const pict=node("span",symbol,"gt-icon");pict.setAttribute("aria-hidden","true");b.replaceChildren(pict,node("span",label),node("span",desc,"gt-desc"));nav.append(b);}
 const toolboxDetails=root.closest("details");
 const mainSpec=$("#spec-select");
