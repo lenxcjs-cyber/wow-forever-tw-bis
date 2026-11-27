@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V19.8 beta · 2026-11-27
+/* 墓鐘資料庫 V19.9 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -357,7 +357,7 @@ function material(){
 }
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
 function optimizer(){
- title("V19.8 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
+ title("V19.9 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
  const id=getSpec(),baseSpec=bySpec.get(id);if(!baseSpec)return;const s={...baseSpec,slots:expandCandidateSlots(baseSpec)};
  const out=node("div"),slot=select([...s.slots].map(([k])=>[k,k])),current=inp("0","number"),target=inp("留空＝不限制","number"),result=node("div");
  current.value="0";current.min="0";current.step="0.1";target.min="0";target.step="0.1";const talentHit=inp("0","number");talentHit.value="0";talentHit.min="0";talentHit.step="0.1";
@@ -500,8 +500,20 @@ function feralSetView(spec){
  for(const p of expandedGear.filter(x=>x.setGroup==="feralheart-cat"))add(d,link(zhItem(p),p.refs[0]),node("p",p.kind+" · "+p.source,"gt-muted"));
  add(d,link("四件方案及附魔參考","https://www.wowhead.com/forever/guide/classes/druid/feral/bis-gear-dps"),node("p",""),link("11/27 散件及取得資料","https://www.zockify.com/forever/bis/?class=druid&faction=alliance&phase=pre-raid&spec=feral"),node("p",""),link("11/23 套裝熱修","https://us.forums.blizzard.com/en/wow/t/2403040/15"));return d;
 }
+function liveClassHotfixView(spec){
+ const d=node("details",undefined,"gt-card gt-live-hotfix");
+ const out=node("div");add(d,node("summary","自動藍帖 · 此職業可能受影響"),node("p","依官方英文公告中的職業名稱自動辨識；不是專精、技能或裝備影響的已驗證結論，不會直接改動BiS排名。","gt-muted"),out);
+ let loaded=false;
+ d.addEventListener("toggle",async()=>{if(!d.open||loaded)return;loaded=true;out.replaceChildren(node("p","讀取自動同步資料…"));
+ try{const r=await fetch("official-blue-live.json",{cache:"no-cache"});if(!r.ok)throw Error("HTTP");const data=await r.json();if(!d.isConnected)return;if(data.format!==1||!Array.isArray(data.posts))throw Error("format");
+ const posts=liveClassPosts(spec.id,data.posts);out.replaceChildren(node("p",blueCheckpointText(data),"gt-muted"));
+ for(const p of posts)add(out,node("p",p.date+"｜"+p.title),node("p",p.translationStatus==="pending"?"翻譯待處理":"機器重點待人工核對","gt-muted"),link("閱讀官方公告",p.url));
+ if(!posts.length)out.append(node("p","目前自動同步資料未標記此職業；不代表沒有相關改動。","gt-muted"));
+ }catch(e){loaded=false;out.replaceChildren(node("p","自動資料暫時無法讀取；收合再展開可重試。"));}
+ });return d;
+}
 function bisReasonView(spec){
- const d=node("section",undefined,"gt-card");add(d,node("h4","本專精配裝判斷依據"),node("p",bisReasons[Number(spec.id.split("-")[1])-1]),node("p","本段是裝備評估原則，不是已驗證的屬性權重。未模擬套裝、觸發與完整角色配置前，不將舊單件排名當作最終BiS。","gt-muted"));const updates=specHotfixes(spec.id);if(updates.length){const hot=node("details",undefined,"gt-spec-hotfix");hot.append(node("summary","影響此專精的近期熱修（"+updates.length+" 項）"));for(const x of updates){add(hot,node("p",x.date+"｜"+x.title+"："+x.impact),link("公告來源",x.url));}d.append(hot);}return d;
+ const d=node("section",undefined,"gt-card");add(d,node("h4","本專精配裝判斷依據"),node("p",bisReasons[Number(spec.id.split("-")[1])-1]),node("p","本段是裝備評估原則，不是已驗證的屬性權重。未模擬套裝、觸發與完整角色配置前，不將舊單件排名當作最終BiS。","gt-muted"));const updates=specHotfixes(spec.id);if(updates.length){const hot=node("details",undefined,"gt-spec-hotfix");hot.append(node("summary","影響此專精的近期熱修（"+updates.length+" 項）"));for(const x of updates){add(hot,node("p",x.date+"｜"+x.title+"："+x.impact),link("公告來源",x.url));}d.append(hot);}d.append(liveClassHotfixView(spec));return d;
 }
 function catWeaponResearch(spec){
  if(spec.id!=="spec-26"||feralWeaponMode(spec.id)!=="twohand")return null;
@@ -768,7 +780,7 @@ function gearCatalogView(spec){
  });return d;
 }
 function audit(){
- title("V19.8 · 跨甲 BiS 裝備、武器與準備資料總覽","跨甲以實際效益為優先；不因護甲較低而排除合法裝備。優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V19.9 · 跨甲 BiS 裝備、武器與準備資料總覽","跨甲以實際效益為優先；不因護甲較低而排除合法裝備。優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID（可用空格分隔）"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),acq=select([["","全部取得方式"],["聲望","聲望"],["世界掉落","世界掉落"],["製作","專業製作"],["裝綁","裝備綁定／拍賣場"],["任務","任務"],["商人","商人／兌換"],["其他","其他（含副本）"]]),out=node("div");acq.id="gt-acquisition-filter";acq.setAttribute("aria-label","取得方式");
  const model=savedModel(spec.id);
@@ -871,6 +883,14 @@ function combineOfficialBlue(seed,live){
  for(const p of live||[])if(validOfficialPost(p)&&["machine","title-only","pending"].includes(p.translationStatus))map.set(p.key,p);
  return [...map.values()].sort((a,b)=>(b.updatedAt||b.date).localeCompare(a.updatedAt||a.date));
 }
+const blueClassKeys=["warrior","paladin","hunter","rogue","priest","shaman","mage","warlock","druid"];
+const blueClassZh=["戰士","聖騎士","獵人","盜賊","牧師","薩滿","法師","術士","德魯伊"];
+function liveClassPosts(specId,posts){
+ const n=Number(String(specId).split("-")[1]);if(!Number.isInteger(n)||n<1||n>28)return [];
+ const key=blueClassKeys[Math.min(8,Math.floor((n-1)/3))];
+ return combineOfficialBlue([],posts).filter(p=>Array.isArray(p.classMentions)&&p.classMentions.includes(key));
+}
+function blueClassLabels(p){return Array.isArray(p.classMentions)?blueClassKeys.filter(k=>p.classMentions.includes(k)).map(k=>blueClassZh[blueClassKeys.indexOf(k)]):[];}
 function blueCheckpointText(d,now=Date.now()){
  const check=d?.lastCheck,at=Date.parse(check?.at||"");
  const date=v=>new Date(v).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"});
@@ -880,9 +900,9 @@ function blueCheckpointText(d,now=Date.now()){
  return "最近發布的抓取紀錄："+date(at)+"（台灣時間）｜"+(check.status==="partial"?"部分抽查未成功":"抽查主題均讀取成功")+(counts?"｜"+counts:"")+published+(now-at>7*3600000?"｜紀錄已逾7小時，請檢查排程或發布狀態。":"｜紀錄最多每6小時更新，非即時排程狀態。");
 }
 function renderBlueBoard(host){
- const board=node("section",undefined,"gt-blue-board");board.dataset.release="19.8";board.id="gt-blue-board";
+ const board=node("section",undefined,"gt-blue-board");board.dataset.release="19.9";board.id="gt-blue-board";
  const sourceURL="https://us.forums.blizzard.com/en/wow/c/wow-forever/346";
- add(board,node("h3","永恆官方藍帖"),node("p","V19.8 · 暴雪官方直連","gt-muted"),node("p","只追蹤暴雪官方永恆論壇；每10分鐘排程抽查（可能延遲，非完整論壇掃描）。人工整理與機器翻譯分開標示；每則公告獨立收合。","gt-muted"));
+ add(board,node("h3","永恆官方藍帖"),node("p","V19.9 · 暴雪官方直連","gt-muted"),node("p","只追蹤暴雪官方永恆論壇；每10分鐘排程抽查（可能延遲，非完整論壇掃描）。人工整理與機器翻譯分開標示；每則公告獨立收合。","gt-muted"));
  const src=node("div",undefined,"gt-blue-source");add(src,link("暴雪美服永恆論壇",sourceURL),link("暴雪歐服永恆論壇","https://eu.forums.blizzard.com/en/wow/c/wow-forever/359"),link("藍帖同步執行紀錄","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/actions/workflows/official-blue.yml"));board.append(src);const syncStatus=node("p","官方歷史公告已載入；正在檢查自動更新資料。","gt-muted");syncStatus.id="blue-sync-status";board.append(syncStatus);let entries=combineOfficialBlue(bluePosts,[]);
  const filter=node("div",undefined,"gt-blue-filters"),q=inp("職業、技能、日期"),category=select([["","全部"],...Array.from(new Set(bluePosts.flatMap(p=>p.sections.map(x=>x.category)))).map(x=>[x,x])]),count=node("p",undefined,"gt-muted"),out=node("div");q.id="blue-query";category.id="blue-category";count.setAttribute("role","status");out.id="blue-list";
  add(filter,field("搜尋公告",q),field("分類",category));add(board,filter,count,out);
@@ -891,12 +911,12 @@ function renderBlueBoard(host){
   for(const d of out.querySelectorAll("details")){if(d.open)expanded.add(d.dataset.postKey);else expanded.delete(d.dataset.postKey);}
   out.replaceChildren();
   const terms=q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const list=entries.filter(p=>(!category.value||p.sections.some(x=>x.category===category.value))&&terms.every(t=>[p.title,p.author,p.date,...p.sections.flatMap(x=>[x.category,x.title,x.body,x.impact||""])].join(" ").toLowerCase().includes(t)));
+  const list=entries.filter(p=>(!category.value||p.sections.some(x=>x.category===category.value))&&terms.every(t=>[p.title,p.author,p.date,...blueClassLabels(p),...p.sections.flatMap(x=>[x.category,x.title,x.body,x.impact||""])].join(" ").toLowerCase().includes(t)));
   count.textContent="顯示 "+list.length+" 篇公告";
   for(const p of list){
    const article=node("article"),d=node("details"),head=node("summary"),meta=node("div"),body=node("div",undefined,"gt-blue-body");d.dataset.postKey=p.key;
    add(meta,node("div",p.title,"gt-blue-title"),node("div","永恆服 · "+p.date+" · "+[...new Set(p.sections.map(x=>x.category))].join("／")+(p.author?" · "+p.author:""),"gt-blue-meta"));head.append(meta);
-   body.append(node("p",p.translationStatus==="pending"?"官方公告已偵測 · 翻譯待處理":p.translationStatus==="machine"?"機器繁中重點 · 未人工校對 · 非全文":p.translationStatus==="title-only"?"機器繁中標題 · 內文待整理":"公會繁中改動整理（非官方全文）","gt-muted"));if(p.updatedAt)body.append(node("p","官方更新時間："+new Date(p.updatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+"（台灣時間）"+(p.revision?"｜修訂版":""),"gt-muted"));
+   body.append(node("p",p.translationStatus==="pending"?"官方公告已偵測 · 翻譯待處理":p.translationStatus==="machine"?"機器繁中重點 · 未人工校對 · 非全文":p.translationStatus==="title-only"?"機器繁中標題 · 內文待整理":"公會繁中改動整理（非官方全文）","gt-muted"));if(blueClassLabels(p).length)body.append(node("p","自動辨識職業（待核對）："+blueClassLabels(p).join("、"),"gt-muted"));if(p.updatedAt)body.append(node("p","官方更新時間："+new Date(p.updatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+"（台灣時間）"+(p.revision?"｜修訂版":""),"gt-muted"));
    for(const section of p.sections){add(body,node("h4",section.title),node("p",section.body));if(section.impact)add(body,node("p","配裝／遊玩提醒："+section.impact,"gt-blue-impact"));}
    const links=node("div",undefined,"gt-blue-source");links.append(link("閱讀暴雪官方原文",p.url||sourceURL));body.append(links);
    add(d,head,body);d.open=expanded.has(p.key);d.addEventListener("toggle",()=>{if(!d.isConnected)return;if(d.open)expanded.add(p.key);else expanded.delete(p.key);});article.append(d);out.append(article);
