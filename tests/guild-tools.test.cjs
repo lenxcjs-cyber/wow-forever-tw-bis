@@ -125,6 +125,14 @@ expansion.buildChoice["spec-26"]="general";
 assert.ok(expansion.gearCatalogEligible(cat,{item_class:"Weapon",slot:"Two-Hand",subclass:"Two-Handed Mace",class_mask:1024,required_level:55},p));
 assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Weapon",slot:"One-Hand",subclass:"Dagger"},p),false);
 assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Armor",slot:"Chest",subclass:"Plate"},p),false);
+// Cross-armor candidates must not disappear when the upstream proficiency table lists only the highest tier.
+for(const [id,cls,max] of [["spec-1","Warrior",3],["spec-4","Paladin",3],["spec-7","Hunter",2],["spec-10","Rogue",1],["spec-13","Priest",0],["spec-16","Shaman",2],["spec-19","Mage",0],["spec-22","Warlock",0],["spec-28","Druid",1]]){
+ const tiers=["Cloth","Leather","Mail","Plate"],prof={[cls]:{armor:{[tiers[max]]:1},weapons:[]}};
+ for(const [i,subclass] of tiers.entries())assert.equal(expansion.gearCatalogEligible({id},{item_class:"Armor",slot:"Chest",subclass,required_level:60},prof),i<=max,cls+" "+subclass);
+}
+assert.equal(expansion.gearCatalogEligible({id:"spec-1"},{item_class:"Armor",slot:"Chest",subclass:"Cloth",required_level:61},{Warrior:{armor:{Plate:40}}}),false);
+assert.ok(gate.skillGate("spec-13",{slot:"胸部",type:"皮甲"}));
+assert.equal(gate.skillGate("spec-4",{slot:"胸部",type:"布甲"}),"");
 assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Armor",slot:"Chest",subclass:"Leather",class_mask:1},p),false);
 assert.deepEqual(expansion.gearCatalogTags({source_summary:"World drop",bonding:"Binds when equipped"}),["世界掉落","裝綁"]);
 assert.deepEqual(expansion.gearCatalogTags({source_summary:"Crafted: Leatherworking",bonding:"Binds when equipped"}),["裝綁","製作"]);
