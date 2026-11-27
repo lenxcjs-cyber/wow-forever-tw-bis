@@ -909,7 +909,7 @@ function audit(){
  const leftHead=node("div",undefined,"gt-build-column-head"),rightHead=node("div",undefined,"gt-build-column-head");
  add(leftHead,node("h4","天賦流派"),link("獨立開啟天賦",talentPageURL(false)));
  add(rightHead,node("h4","BiS 裝備候選"),button("回到頂端",()=>{gearScroll.scrollTop=0;jump.value="";}));
- compact.id="gt-gear-density";compact.addEventListener("change",()=>{gearScroll.classList.toggle("gt-gear-compact",compact.value==="compact");});
+ jump.id="gt-gear-slot-jump";compact.id="gt-gear-density";compact.addEventListener("change",()=>{gearScroll.classList.toggle("gt-gear-compact",compact.value==="compact");});
  gearScroll.tabIndex=0;gearScroll.setAttribute("role","region");gearScroll.setAttribute("aria-label","依部位捲動裝備候選");
  jump.addEventListener("change",()=>{const target=Array.from(out.querySelectorAll(".gt-bis-slot")).find(c=>c.dataset.slot===jump.value);if(target)gearScroll.scrollTop+=target.getBoundingClientRect().top-gearScroll.getBoundingClientRect().top-8;});
  add(gearFilters,field("搜尋",q),field("取得方式",acq),field("篩選",mode),field("裝備部位快速跳轉",jump),field("顯示密度",compact),button("清除篩選",()=>{q.value="";acq.value="";mode.value="all";draw();}));add(gearScroll,out);add(left,leftHead,frame);add(right,rightHead,gearFilters,gearScroll);add(workspace,left,right);
