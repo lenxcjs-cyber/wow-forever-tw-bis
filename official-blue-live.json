@@ -10,5 +10,19 @@
     "us:2426335:4": "89308b06426c142df6ce8ff46b5652ca4121535f7e59dbdd71987b713315dd92"
   },
   "topics": {},
-  "lastPublished": null
+  "lastPublished": null,
+  "lastCheck": {
+    "at": "2026-11-27T11:55:01.662839+00:00",
+    "status": "ok",
+    "regions": {
+      "us": {
+        "attempted": 17,
+        "read": 17
+      },
+      "eu": {
+        "attempted": 6,
+        "read": 6
+      }
+    }
+  }
 }
