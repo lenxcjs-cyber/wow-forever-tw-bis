@@ -252,8 +252,8 @@ const server=http.createServer((req,res)=>{
   await skillsPane.getByText("此構築未收錄逐項配點：不假定已習得天賦技能。",{exact:true}).waitFor({state:"visible"});
   await build.selectOption("general");
   await spec.selectOption("spec-27");
-  await skillsPane.getByText("野性熊 · 7 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
-  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),7);
+  await skillsPane.getByText("野性熊 · 8 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),8);
   await spec.selectOption("spec-26");
   await talentFrame.locator("#overview").getByText("9/32/10",{exact:true}).waitFor({state:"visible"});
   console.log("PASS: skill guides below talent trees, English search, utility search, build and spec switching");
