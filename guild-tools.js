@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V17.7 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V17.8 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -440,7 +440,7 @@ function weaponSetView(spec,model){
  d.append(out);draw();return d;
 }
 function audit(){
- title("V17.7 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V17.8 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const model=savedModel(spec.id);
@@ -487,16 +487,24 @@ function talentPageURL(embedded=false){
  if(id){const i=Number(id.split("-")[1])-1,classes=["warrior","paladin","hunter","rogue","priest","shaman","mage","warlock","druid"];p.set("class",classes[Math.min(8,Math.floor(i/3))]);p.set("spec",id);p.set("build",buildFor(id));}
  if(embedded)p.set("embed","1");return "talents.html"+(p.size?"?"+p.toString():"");
 }
+let frameCleanup=null;
+function cleanupFrame(){if(frameCleanup){frameCleanup();frameCleanup=null;}}
+function fitEmbedded(frame){
+ cleanupFrame();
+ let observer=null,child=null,stopped=false;
+ const onload=()=>{if(stopped)return;observer?.disconnect();observer=null;try{const doc=frame.contentDocument,win=frame.contentWindow;if(!doc?.body||!win)return;child=doc.querySelector("main")||doc.body;const fit=()=>{if(stopped||!frame.isConnected)return;const height=Math.max(280,Math.ceil(child.getBoundingClientRect().height)+24);if(Math.abs(frame.getBoundingClientRect().height-height)>2)frame.style.height=height+"px";};observer=typeof win.ResizeObserver==="function"?new win.ResizeObserver(fit):null;observer?.observe(child);fit();}catch(e){}};
+ frame.addEventListener("load",onload);frameCleanup=()=>{stopped=true;observer?.disconnect();frame.removeEventListener("load",onload);};
+}
 function talentHub(){
  title("天賦流派與野外練等","使用首頁的職業、專精與玩法選單，直接查看天賦及練等。");
  if(!getSpec()){panel.append(node("p","請先在上方選擇職業及專精。"));return;}
  const frame=node("iframe");frame.title="天賦流派與野外練等";frame.style.cssText="display:block;width:100%;height:950px;border:0;border-radius:8px;background:#0e131c";
- frame.addEventListener("load",()=>{try{const doc=frame.contentDocument,win=frame.contentWindow;if(!doc?.body||!win)return;let observer;const fit=()=>{if(!frame.isConnected){observer?.disconnect();return;}frame.style.height=Math.max(420,Math.ceil(doc.body.getBoundingClientRect().height)+16)+"px";};observer=typeof win.ResizeObserver==="function"?new win.ResizeObserver(fit):null;observer?.observe(doc.body);fit();}catch(e){}});
- frame.src=talentPageURL(true)+"&v=17.6";
+ fitEmbedded(frame);
+ frame.src=talentPageURL(true)+"&v=17.8";
  add(panel,frame);
 }
 const renderers={audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
-function show(key){restoreLegacy();active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
+function show(key){if(siteMode==="blue")return;cleanupFrame();restoreLegacy();active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
 const dashboardMeta={v8:["⚔️","天賦樹、玩法與練等"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","繁中藍帖專頁"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","檢查來源與證據"]};
 for(const [key,label] of tabs){const b=button(label,()=>{if(key==="v12")location.assign("blue-posts.html");else show(key);});b.dataset.tab=key;const [symbol,desc]=dashboardMeta[key];const pict=node("span",symbol,"gt-icon");pict.setAttribute("aria-hidden","true");b.replaceChildren(pict,node("span",label),node("span",desc,"gt-desc"));nav.append(b);}
 let pickerArea=null,siteMode="class",lastClassTab="audit";
@@ -513,8 +521,8 @@ if(toolboxDetails&&mainSpec){
  }else{toolboxDetails.open=true;root.classList.add("gt-flat");const summary=toolboxDetails.querySelector("summary");if(summary)summary.style.display="none";}
 }else{root.classList.add("gt-flat");}
 
-const syncSpec=()=>{if(siteMode==="blue")return;syncBuild();if(!active&&getSpec()){show("audit");return;}if(["v8","v9","v10","v13","v14","audit"].includes(active))show(active);};
-mainSpec?.addEventListener("change",syncSpec);for(const id of bySpec.keys())syncWeaponCards(id);syncBuild();if(specEls.length&&bySpec.size){enableLegacyConsolidation();}if(getSpec()&&!active)show("audit");
+let lastSpecKey=null;const syncSpec=()=>{if(siteMode==="blue")return;const id=getSpec(),key=id+":"+(id?buildFor(id):"");if(key===lastSpecKey)return;lastSpecKey=key;syncBuild();if(!active&&getSpec()){show("audit");return;}if(["v8","v9","v10","v13","v14","audit"].includes(active))show(active);};
+mainSpec?.addEventListener("change",()=>queueMicrotask(syncSpec));for(const id of bySpec.keys())syncWeaponCards(id);syncBuild();if(specEls.length&&bySpec.size){enableLegacyConsolidation();}if(getSpec()&&!active)show("audit");
 const selectorGroup=mainSpec?.closest(".gt-unified")||mainSpec?.parentElement?.parentElement;
 selectorGroup?.addEventListener("change",e=>{if(e.target!==mainSpec&&e.target.tagName==="SELECT"&&!root.contains(e.target))queueMicrotask(syncSpec);});
 const modeBar=node("div",undefined,"gt-site-mode"),classMode=button("職業資料",()=>switchMode("class")),blueMode=button("官方藍帖",()=>switchMode("blue"));
@@ -526,22 +534,26 @@ const fallbackControls=[];
 if(!pickerArea&&mainSpec){let p=mainSpec.parentElement;while(p&&p!==root&&!p.contains(root)&&p.querySelectorAll("select").length<2)p=p.parentElement;if(p&&p!==root&&!p.contains(root))fallbackControls.push(p);else for(const e of [$("#class-select"),mainSpec])if(e)fallbackControls.push(e.closest("label")||e);}
 function setModeHidden(e,hidden){if(!e)return;if(hidden){if(!e.hasAttribute("data-gt-mode-hidden")){e.dataset.gtModeHidden=e.style.getPropertyValue("display");e.dataset.gtModePriority=e.style.getPropertyPriority("display");}e.style.setProperty("display","none","important");}else if(e.hasAttribute("data-gt-mode-hidden")){const v=e.dataset.gtModeHidden,p=e.dataset.gtModePriority;if(v)e.style.setProperty("display",v,p);else e.style.removeProperty("display");delete e.dataset.gtModeHidden;delete e.dataset.gtModePriority;}}
 function renderBlueMode(){
- restoreLegacy();active="v12";panel.replaceChildren();
+ cleanupFrame();restoreLegacy();active="v12";panel.replaceChildren();
  const frame=node("iframe");frame.title="繁體中文官方藍帖";frame.style.cssText="display:block;width:100%;height:900px;border:0;border-radius:8px;background:#0e131c";
- frame.src="blue-posts.html?embed=1&v=17.7";
- frame.addEventListener("load",()=>{try{const doc=frame.contentDocument,win=frame.contentWindow;if(!doc?.body||!win)return;let observer;const fit=()=>{if(!frame.isConnected){observer?.disconnect();return;}frame.style.height=Math.max(420,Math.ceil(doc.body.getBoundingClientRect().height)+16)+"px";};observer=typeof win.ResizeObserver==="function"?new win.ResizeObserver(fit):null;observer?.observe(doc.body);fit();}catch(e){}});
+ fitEmbedded(frame);
+ frame.src="blue-posts.html?embed=1&v=17.8";
  panel.append(frame);
 }
-function switchMode(next){
+function switchMode(next,record=true){
+ if(!["class","blue"].includes(next))return;
+ if(next===siteMode)return;
  if(next==="blue"&&siteMode!=="blue"&&active&&active!=="v12")lastClassTab=active;
  siteMode=next;const blue=next==="blue";
  classMode.setAttribute("aria-pressed",String(!blue));blueMode.setAttribute("aria-pressed",String(blue));
  classMode.style.borderColor=blue?"#52647b":"#e9c88c";blueMode.style.borderColor=blue?"#e9c88c":"#52647b";
  for(const e of [pickerArea,...fallbackControls,buildBar,navLabel,nav])setModeHidden(e,blue);
+ if(record){try{const u=new URL(location.href);if(blue)u.searchParams.set("view","blue");else u.searchParams.delete("view");history.pushState(null,"",u);}catch(e){}}
  if(blue)renderBlueMode();else{syncBuild();show(lastClassTab);}
 }
 classMode.setAttribute("aria-pressed","true");blueMode.setAttribute("aria-pressed","false");classMode.style.borderColor="#e9c88c";
-if(new URLSearchParams(location.search).get("view")==="blue")switchMode("blue");
+if(new URLSearchParams(location.search).get("view")==="blue")switchMode("blue",false);
+window.addEventListener("popstate",()=>switchMode(new URLSearchParams(location.search).get("view")==="blue"?"blue":"class",false));
 
 
 })();
