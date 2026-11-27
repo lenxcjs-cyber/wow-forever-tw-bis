@@ -320,3 +320,9 @@ assert.equal(iconHelper(iconFixture,19323),"https://wow.zamimg.com/images/wow/ic
 assert.equal(iconHelper(iconFixture,2),"");assert.equal(iconHelper(iconFixture,3),"");assert.equal(iconHelper(iconFixture,999),"");
 assert.equal(iconHelper({...iconFixture,build:"other"},19323),"");
 console.log("PASS: item icon URL validation and exact version matching");
+
+const coverageHelper=new Function(section("function itemIconURL(","function auditSlotOrder(")+";return candidateDataCoverage;")();
+const localeFixture={build:"1.60.1.71139",items:{"19323":"測試名稱","2":"English"}};
+assert.deepEqual(coverageHelper([19323,"19323",2,3,"invalid"],localeFixture,iconFixture),{total:3,localized:1,icons:1});
+assert.deepEqual(coverageHelper([19323],{...localeFixture,build:"other"},null),{total:1,localized:null,icons:null});
+console.log("PASS: distinct candidate IDs, version-aware localized name and icon coverage");
