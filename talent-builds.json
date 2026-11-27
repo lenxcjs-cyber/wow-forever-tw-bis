@@ -1,0 +1,2102 @@
+{
+  "version": "16.6",
+  "profiles": [
+    {
+      "id": "spec-1",
+      "key": "twohand",
+      "label": "雙手武器：武器專精",
+      "cls": "warrior",
+      "className": "戰士",
+      "spec": "武器",
+      "split": "32/17/2",
+      "talents": [
+        {
+          "Improved Heroic Strike": 3,
+          "Improved Rend": 3,
+          "Improved Tactical Mastery": 3,
+          "Improved Overpower": 2,
+          "Anger Management": 1,
+          "Deep Wounds": 3,
+          "Spearing Strike": 1,
+          "Two-Handed Weapon Specialization": 3,
+          "Impale": 2,
+          "Bloodthrill": 2,
+          "Sweeping Strikes": 1,
+          "Weaponmaster": 5,
+          "Improved Slam": 2,
+          "Mortal Strike": 1
+        },
+        {
+          "Cruelty": 5,
+          "Lingering Rage": 5,
+          "Enrage": 5,
+          "Improved Execute": 2
+        },
+        {
+          "Improved Bloodrage": 2
+        }
+      ],
+      "style": "雙手武器傷害、怒氣效率與致死打擊構築",
+      "rotation": "主動技能前預留怒氣；單體維持主要傷害技能，斬殺階段依怒氣調整。",
+      "research": "依武器類型及技能頻率測量傷害；不可只用白字DPS比較。"
+    },
+    {
+      "id": "spec-1",
+      "key": "arms_raid",
+      "label": "武器：團本不受擊變體",
+      "cls": "warrior",
+      "className": "戰士",
+      "spec": "武器",
+      "split": "32/17/2",
+      "talents": null,
+      "style": "雙手武器；改配怒氣天賦",
+      "rotation": "主動技能前預留怒氣；單體維持主要傷害技能，斬殺階段依怒氣調整。",
+      "research": "依武器類型及技能頻率測量傷害；不可只用白字DPS比較。"
+    },
+    {
+      "id": "spec-2",
+      "key": "dual",
+      "label": "雙持：狂怒",
+      "cls": "warrior",
+      "className": "戰士",
+      "spec": "狂怒",
+      "split": "17/34/0",
+      "talents": [
+        {
+          "Improved Heroic Strike": 3,
+          "Improved Rend": 3,
+          "Improved Tactical Mastery": 3,
+          "Improved Overpower": 2,
+          "Anger Management": 1,
+          "Deep Wounds": 3,
+          "Impale": 2
+        },
+        {
+          "Cruelty": 5,
+          "Unbridled Wrath": 5,
+          "Furious Precision": 3,
+          "Enrage": 4,
+          "Dual Wield Specialization": 5,
+          "Reckless Swings": 1,
+          "Improved Execute": 2,
+          "Improved Berserker Rage": 2,
+          "Death Wish": 1,
+          "Improved Whirlwind": 2,
+          "Flurry": 3,
+          "Bloodthirst": 1
+        },
+        {}
+      ],
+      "style": "雙持、怒氣與爆發窗口",
+      "rotation": "維持近戰自動攻擊；比較主副手組合，避免怒氣不足時過度使用耗怒技能。",
+      "research": "主副手DPS分開，白字與技能命中分開；攻速影響怒氣及觸發。"
+    },
+    {
+      "id": "spec-2",
+      "key": "fury_dungeon",
+      "label": "狂怒：五人副本",
+      "cls": "warrior",
+      "className": "戰士",
+      "spec": "狂怒",
+      "split": "17/34/0",
+      "talents": [
+        {
+          "Improved Heroic Strike": 3,
+          "Improved Rend": 3,
+          "Improved Tactical Mastery": 3,
+          "Improved Overpower": 2,
+          "Anger Management": 1,
+          "Deep Wounds": 3,
+          "Impale": 2
+        },
+        {
+          "Cruelty": 5,
+          "Unbridled Wrath": 5,
+          "Furious Precision": 3,
+          "Enrage": 5,
+          "Dual Wield Specialization": 5,
+          "Reckless Swings": 1,
+          "Improved Execute": 2,
+          "Death Wish": 1,
+          "Improved Whirlwind": 2,
+          "Flurry": 3,
+          "Bloodthirst": 1,
+          "Lingering Rage": 1
+        },
+        {}
+      ],
+      "style": "雙持；怒氣與範圍戰鬥",
+      "rotation": "維持近戰自動攻擊；比較主副手組合，避免怒氣不足時過度使用耗怒技能。",
+      "research": "主副手DPS分開，白字與技能命中分開；攻速影響怒氣及觸發。"
+    },
+    {
+      "id": "spec-2",
+      "key": "fury_spear",
+      "label": "狂怒：Spearing Strike 變體",
+      "cls": "warrior",
+      "className": "戰士",
+      "spec": "狂怒",
+      "split": "18/33/0",
+      "talents": null,
+      "style": "雙持；依敵人類型",
+      "rotation": "維持近戰自動攻擊；比較主副手組合，避免怒氣不足時過度使用耗怒技能。",
+      "research": "主副手DPS分開，白字與技能命中分開；攻速影響怒氣及觸發。"
+    },
+    {
+      "id": "spec-3",
+      "key": "shield",
+      "label": "盾牌坦克：盾牌猛擊",
+      "cls": "warrior",
+      "className": "戰士",
+      "spec": "防護",
+      "split": "4/15/32",
+      "talents": [
+        {
+          "Deflection": 4
+        },
+        {
+          "Cruelty": 5,
+          "Unbridled Wrath": 5,
+          "Enrage": 5
+        },
+        {
+          "Shield Specialization": 5,
+          "Anticipation": 5,
+          "Improved Revenge": 3,
+          "Last Stand": 1,
+          "Master of Defense": 2,
+          "Defiance": 3,
+          "Vanguard": 1,
+          "Improved Shield Wall": 2,
+          "Concussion Blow": 1,
+          "Focused Rage": 3,
+          "Bastion": 5,
+          "Shield Slam": 1
+        }
+      ],
+      "style": "盾牌、生存、仇恨與怒氣",
+      "rotation": "先維持減傷與仇恨；嘲諷與防禦技能保留給失控或高傷窗口。",
+      "research": "盾牌構築須有盾牌；仇恨與有效生命分開評估，法傷不當作物理仇恨權重。"
+    },
+    {
+      "id": "spec-3",
+      "key": "prot_dungeon",
+      "label": "防護：五人副本雷霆一擊",
+      "cls": "warrior",
+      "className": "戰士",
+      "spec": "防護",
+      "split": "4/15/32",
+      "talents": [
+        {
+          "Deflection": 4
+        },
+        {
+          "Cruelty": 5,
+          "Unbridled Wrath": 5,
+          "Enrage": 5
+        },
+        {
+          "Shield Specialization": 5,
+          "Anticipation": 2,
+          "Improved Revenge": 3,
+          "Last Stand": 1,
+          "Master of Defense": 2,
+          "Defiance": 3,
+          "Vanguard": 1,
+          "Improved Shield Wall": 2,
+          "Concussion Blow": 1,
+          "Focused Rage": 3,
+          "Bastion": 5,
+          "Shield Slam": 1,
+          "Improved Thunder Clap": 3
+        }
+      ],
+      "style": "盾牌；多目標仇恨",
+      "rotation": "先維持減傷與仇恨；嘲諷與防禦技能保留給失控或高傷窗口。",
+      "research": "盾牌構築須有盾牌；仇恨與有效生命分開評估，法傷不當作物理仇恨權重。"
+    },
+    {
+      "id": "spec-3",
+      "key": "prot_defensive",
+      "label": "防護：防禦變體",
+      "cls": "warrior",
+      "className": "戰士",
+      "spec": "防護",
+      "split": "5/15/31",
+      "talents": [
+        {
+          "Deflection": 5
+        },
+        {
+          "Cruelty": 5,
+          "Unbridled Wrath": 5,
+          "Enrage": 5
+        },
+        {
+          "Shield Specialization": 5,
+          "Anticipation": 5,
+          "Improved Revenge": 3,
+          "Last Stand": 1,
+          "Master of Defense": 2,
+          "Defiance": 3,
+          "Vanguard": 1,
+          "Concussion Blow": 1,
+          "Focused Rage": 3,
+          "Bastion": 5,
+          "Shield Slam": 1,
+          "Improved Thunder Clap": 1
+        }
+      ],
+      "style": "盾牌；生存與仇恨",
+      "rotation": "先維持減傷與仇恨；嘲諷與防禦技能保留給失控或高傷窗口。",
+      "research": "盾牌構築須有盾牌；仇恨與有效生命分開評估，法傷不當作物理仇恨權重。"
+    },
+    {
+      "id": "spec-4",
+      "key": "general",
+      "label": "神聖：團隊治療",
+      "cls": "paladin",
+      "className": "聖騎士",
+      "spec": "神聖",
+      "split": "32/7/12",
+      "talents": [
+        {
+          "Spiritual Focus": 5,
+          "Healing Light": 3,
+          "Reverence": 2,
+          "Purifying Power": 2,
+          "Divine Favor": 1,
+          "Illumination": 5,
+          "Divine Precision": 2,
+          "Infusion of Light": 2,
+          "Oath of Light": 1,
+          "Holy Shock": 1,
+          "Boundless Light": 2,
+          "Holy Power": 5,
+          "Light's Vigil": 1
+        },
+        {
+          "Divine Intellect": 5,
+          "Guardian's Favor": 2
+        },
+        {
+          "Benediction": 5,
+          "Improved Judgement": 2,
+          "Conviction": 3,
+          "Pursuit of Justice": 2
+        }
+      ],
+      "style": "智力、治療與法力續航",
+      "rotation": "以坦克與優先目標治療為主；依團隊傷害與法力使用群補和祝福。",
+      "research": "以有效治療及耗魔比較，扣除溢補。"
+    },
+    {
+      "id": "spec-4",
+      "key": "holy_defensive",
+      "label": "神聖：防禦／命中變體",
+      "cls": "paladin",
+      "className": "聖騎士",
+      "spec": "神聖",
+      "split": "32/11/8",
+      "talents": null,
+      "style": "治療；法術命中不可通用",
+      "rotation": "以坦克與優先目標治療為主；依團隊傷害與法力使用群補和祝福。",
+      "research": "以有效治療及耗魔比較，扣除溢補。"
+    },
+    {
+      "id": "spec-5",
+      "key": "shield",
+      "label": "盾牌坦克：Holy Shield／Shieldsworn",
+      "cls": "paladin",
+      "className": "聖騎士",
+      "spec": "防護",
+      "split": "0/35/16",
+      "talents": [
+        {},
+        {
+          "Redoubt": 5,
+          "Precision": 3,
+          "Sacred Duty": 2,
+          "Templar's Bulwark": 1,
+          "Shield Specialization": 2,
+          "Toughness": 3,
+          "Swift Judgement": 1,
+          "Improved Righteous Fury": 3,
+          "Anticipation": 5,
+          "Holy Shield": 1,
+          "Reckoning": 5,
+          "Iron Creed": 3,
+          "Shieldsworn": 1
+        },
+        {
+          "Deflection": 5,
+          "Improved Judgement": 2,
+          "Conviction": 3,
+          "Sanctified Judgement": 3,
+          "Pursuit of Justice": 2,
+          "Sacred Arbiter": 1
+        }
+      ],
+      "style": "法傷、智力、防禦與盾牌",
+      "rotation": "正義之怒；奉獻、審判與盾牌技能建立仇恨；依怪物數量和法力決定施放頻率。",
+      "research": "按實際法術係數和盾牌防禦評估；不可套用防戰權重。"
+    },
+    {
+      "id": "spec-5",
+      "key": "pal_dungeon",
+      "label": "防護：五人副本",
+      "cls": "paladin",
+      "className": "聖騎士",
+      "spec": "防護",
+      "split": "0/32/19",
+      "talents": [
+        {},
+        {
+          "Redoubt": 5,
+          "Precision": 3,
+          "Sacred Duty": 2,
+          "Templar's Bulwark": 1,
+          "Shield Specialization": 2,
+          "Toughness": 3,
+          "Swift Judgement": 1,
+          "Improved Righteous Fury": 3,
+          "Holy Shield": 1,
+          "Reckoning": 5,
+          "Iron Creed": 3,
+          "Shieldsworn": 1,
+          "Guardian's Favor": 2
+        },
+        {
+          "Deflection": 5,
+          "Improved Judgement": 2,
+          "Conviction": 3,
+          "Sanctified Judgement": 3,
+          "Pursuit of Justice": 2,
+          "Sacred Arbiter": 1,
+          "Vindication": 3
+        }
+      ],
+      "style": "盾牌；多目標與控制",
+      "rotation": "正義之怒；奉獻、審判與盾牌技能建立仇恨；依怪物數量和法力決定施放頻率。",
+      "research": "按實際法術係數和盾牌防禦評估；不可套用防戰權重。"
+    },
+    {
+      "id": "spec-6",
+      "key": "twohand",
+      "label": "雙手武器：懲戒",
+      "cls": "paladin",
+      "className": "聖騎士",
+      "spec": "懲戒",
+      "split": "12/8/31",
+      "talents": [
+        {
+          "Divine Strength": 5,
+          "Improved Seals": 5,
+          "Holy Conduit": 2
+        },
+        {
+          "Divine Intellect": 5,
+          "Precision": 3
+        },
+        {
+          "Benediction": 5,
+          "Improved Judgement": 2,
+          "Conviction": 3,
+          "Sanctified Judgement": 3,
+          "Unyielding Faith": 1,
+          "Seal of Command": 1,
+          "Pursuit of Justice": 2,
+          "Sacred Arbiter": 1,
+          "Two-Handed Weapon Specialization": 3,
+          "Repentance": 1,
+          "Vengeance": 3,
+          "Champion of the Light": 5,
+          "Unsealed Wrath": 1
+        }
+      ],
+      "style": "雙手武器、聖印與審判",
+      "rotation": "維持適合構築的聖印，依審判、近戰技能與法力分配爆發。",
+      "research": "物理及法術貢獻分開，武器速度依聖印構築評估。"
+    },
+    {
+      "id": "spec-6",
+      "key": "ret_shock",
+      "label": "懲戒：Holy Shock 混合流",
+      "cls": "paladin",
+      "className": "聖騎士",
+      "spec": "懲戒",
+      "split": "23/0/28",
+      "talents": null,
+      "style": "混合傷害；獨立武器與法傷分析待補",
+      "rotation": "維持適合構築的聖印，依審判、近戰技能與法力分配爆發。",
+      "research": "物理及法術貢獻分開，武器速度依聖印構築評估。"
+    },
+    {
+      "id": "spec-6",
+      "key": "ret_vindication",
+      "label": "懲戒：Vindication 變體",
+      "cls": "paladin",
+      "className": "聖騎士",
+      "spec": "懲戒",
+      "split": "10/8/33",
+      "talents": null,
+      "style": "雙手武器；團隊減益",
+      "rotation": "維持適合構築的聖印，依審判、近戰技能與法力分配爆發。",
+      "research": "物理及法術貢獻分開，武器速度依聖印構築評估。"
+    },
+    {
+      "id": "spec-7",
+      "key": "pet",
+      "label": "獸王：寵物＋遠程",
+      "cls": "hunter",
+      "className": "獵人",
+      "spec": "野獸控制",
+      "split": "31/20/0",
+      "talents": [
+        {
+          "Deadly Aspects": 5,
+          "Endurance Training": 3,
+          "Focused Fire": 2,
+          "Bestial Swiftness": 1,
+          "Unleashed Fury": 5,
+          "Ferocity": 5,
+          "Summon Hawk": 1,
+          "Intimidation": 1,
+          "Bestial Discipline": 2,
+          "Frenzy": 5,
+          "Bestial Wrath": 1
+        },
+        {
+          "Lethal Attacks": 5,
+          "Improved Stings": 3,
+          "Careful Aim": 5,
+          "Rapid Killing": 2,
+          "Trueshot Aura": 1,
+          "Mortal Shots": 4
+        },
+        {}
+      ],
+      "style": "寵物、遠程輸出與命中",
+      "rotation": "維持自動射擊與寵物攻擊，安排寵物爆發及轉火。",
+      "research": "量測寵物繼承與存活率；遠程DPS與近戰武器DPS分開。"
+    },
+    {
+      "id": "spec-7",
+      "key": "pet_aura",
+      "label": "獸王：已有強擊光環變體",
+      "cls": "hunter",
+      "className": "獵人",
+      "spec": "野獸控制",
+      "split": "31/20/0",
+      "talents": [
+        {
+          "Deadly Aspects": 5,
+          "Endurance Training": 3,
+          "Focused Fire": 2,
+          "Bestial Swiftness": 1,
+          "Unleashed Fury": 5,
+          "Ferocity": 5,
+          "Summon Hawk": 1,
+          "Intimidation": 1,
+          "Bestial Discipline": 2,
+          "Frenzy": 5,
+          "Bestial Wrath": 1
+        },
+        {
+          "Lethal Attacks": 5,
+          "Improved Stings": 3,
+          "Careful Aim": 5,
+          "Rapid Killing": 2,
+          "Mortal Shots": 5
+        },
+        {}
+      ],
+      "style": "寵物與遠程；Mortal Shots 調整",
+      "rotation": "維持自動射擊與寵物攻擊，安排寵物爆發及轉火。",
+      "research": "量測寵物繼承與存活率；遠程DPS與近戰武器DPS分開。"
+    },
+    {
+      "id": "spec-8",
+      "key": "lonewolf",
+      "label": "射擊：獨行遠程",
+      "cls": "hunter",
+      "className": "獵人",
+      "spec": "射擊",
+      "split": "5/41/5",
+      "talents": [
+        {
+          "Deadly Aspects": 5
+        },
+        {
+          "Lethal Attacks": 5,
+          "Improved Stings": 3,
+          "Efficiency": 5,
+          "Careful Aim": 5,
+          "Rapid Killing": 2,
+          "Improved Arcane Shot": 5,
+          "Lone Wolf": 1,
+          "Trueshot Aura": 1,
+          "Mortal Shots": 5,
+          "Rapid Recuperation": 2,
+          "Barrage": 1,
+          "Ranged Weapon Specialization": 5,
+          "Sniper Shot": 1
+        },
+        {
+          "Improved Tracking": 5
+        }
+      ],
+      "style": "遠程武器、命中與射擊時序",
+      "rotation": "安排射擊技能，避免無必要中斷自動射擊。",
+      "research": "遠程攻速與射擊時序影響輸出，近戰武器主要看適用屬性。"
+    },
+    {
+      "id": "spec-8",
+      "key": "mm_pet",
+      "label": "射擊：帶寵物",
+      "cls": "hunter",
+      "className": "獵人",
+      "spec": "射擊",
+      "split": "16/35/0",
+      "talents": null,
+      "style": "遠程與寵物；不套獨行者權重",
+      "rotation": "安排射擊技能，避免無必要中斷自動射擊。",
+      "research": "遠程攻速與射擊時序影響輸出，近戰武器主要看適用屬性。"
+    },
+    {
+      "id": "spec-8",
+      "key": "mm_surv",
+      "label": "射擊：生存混合",
+      "cls": "hunter",
+      "className": "獵人",
+      "spec": "射擊",
+      "split": "5/33/13",
+      "talents": null,
+      "style": "遠程輸出；額外生存系天賦",
+      "rotation": "安排射擊技能，避免無必要中斷自動射擊。",
+      "research": "遠程攻速與射擊時序影響輸出，近戰武器主要看適用屬性。"
+    },
+    {
+      "id": "spec-9",
+      "key": "weaving",
+      "label": "生存：雙手武器近遠穿插",
+      "cls": "hunter",
+      "className": "獵人",
+      "spec": "生存",
+      "split": "0/20/31",
+      "talents": [
+        {},
+        {
+          "Lethal Attacks": 5,
+          "Improved Stings": 3,
+          "Careful Aim": 5,
+          "Improved Arcane Shot": 1,
+          "Lone Wolf": 1,
+          "Trueshot Aura": 1,
+          "Mortal Shots": 4
+        },
+        {
+          "Improved Tracking": 5,
+          "Savage Strikes": 2,
+          "Survivalist": 3,
+          "Clever Traps": 2,
+          "Surefooted": 3,
+          "Predator's Edge": 5,
+          "Resourcefulness": 2,
+          "Expose Prey": 2,
+          "Strider Kick": 1,
+          "Lightning Reflexes": 5,
+          "Lacerating Strikes": 1
+        }
+      ],
+      "style": "近戰與遠程兩套構築",
+      "rotation": "近戰流看雙手武器與近戰天賦；遠程流以自動射擊及射擊技能為主，別混用單一武器排名。",
+      "research": "先確認實際使用技能，再選對應武器與權重。"
+    },
+    {
+      "id": "spec-9",
+      "key": "melee",
+      "label": "生存：純近戰",
+      "cls": "hunter",
+      "className": "獵人",
+      "spec": "生存",
+      "split": "16/10/25",
+      "talents": null,
+      "style": "以近戰技能為主；武器配置待查",
+      "rotation": "近戰流看雙手武器與近戰天賦；遠程流以自動射擊及射擊技能為主，別混用單一武器排名。",
+      "research": "先確認實際使用技能，再選對應武器與權重。"
+    },
+    {
+      "id": "spec-9",
+      "key": "weave_alt",
+      "label": "生存：另一近遠穿插構築",
+      "cls": "hunter",
+      "className": "獵人",
+      "spec": "生存",
+      "split": "15/10/26",
+      "talents": null,
+      "style": "穿插近戰與遠程；具體武器配置待查",
+      "rotation": "近戰流看雙手武器與近戰天賦；遠程流以自動射擊及射擊技能為主，別混用單一武器排名。",
+      "research": "先確認實際使用技能，再選對應武器與權重。"
+    },
+    {
+      "id": "spec-16",
+      "key": "general",
+      "label": "元素：法術輸出",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "元素",
+      "split": "35/5/11",
+      "talents": [
+        {
+          "Convection": 5,
+          "Concussion": 5,
+          "Elemental Alacrity": 3,
+          "Call of Flame": 3,
+          "Elemental Focus": 1,
+          "Trial by Fire": 2,
+          "Eye of the Storm": 3,
+          "Earthbound": 1,
+          "Elemental Reach": 2,
+          "Call of Thunder": 1,
+          "Lightning Overload": 3,
+          "Elemental Fury": 5,
+          "Lightning Mastery": 1
+        },
+        {
+          "Thundering Strikes": 5
+        },
+        {
+          "Tidal Focus": 5,
+          "Mindfulness": 3,
+          "Natural Grace": 2,
+          "Water Shield": 1
+        }
+      ],
+      "style": "自然傷害、命中與爆擊",
+      "rotation": "以閃電類法術與圖騰效益為核心；按目標數與法力使用閃電鏈。",
+      "research": "按單體及多目標技能比例、施法時間與法力計算。"
+    },
+    {
+      "id": "spec-16",
+      "key": "ele_raid",
+      "label": "元素：團本智力／圖騰流",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "元素",
+      "split": "31/9/11",
+      "talents": [
+        {
+          "Convection": 5,
+          "Concussion": 5,
+          "Elemental Alacrity": 3,
+          "Call of Flame": 3,
+          "Elemental Focus": 1,
+          "Trial by Fire": 1,
+          "Eye of the Storm": 3,
+          "Call of Thunder": 1,
+          "Lightning Overload": 3,
+          "Elemental Fury": 5,
+          "Lightning Mastery": 1
+        },
+        {
+          "Thundering Strikes": 5,
+          "Ancestral Knowledge": 4
+        },
+        {
+          "Tidal Focus": 5,
+          "Mindfulness": 3,
+          "Water Shield": 1,
+          "Totemic Focus": 2
+        }
+      ],
+      "style": "智力及圖騰耗魔",
+      "rotation": "以閃電類法術與圖騰效益為核心；按目標數與法力使用閃電鏈。",
+      "research": "按單體及多目標技能比例、施法時間與法力計算。"
+    },
+    {
+      "id": "spec-16",
+      "key": "ele_dungeon",
+      "label": "元素：五人副本",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "元素",
+      "split": "32/11/8",
+      "talents": null,
+      "style": "副本輸出與續航",
+      "rotation": "以閃電類法術與圖騰效益為核心；按目標數與法力使用閃電鏈。",
+      "research": "按單體及多目標技能比例、施法時間與法力計算。"
+    },
+    {
+      "id": "spec-16",
+      "key": "ele_mana",
+      "label": "元素：恢復混合",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "元素",
+      "split": "31/0/20",
+      "talents": null,
+      "style": "法力及治療支援",
+      "rotation": "以閃電類法術與圖騰效益為核心；按目標數與法力使用閃電鏈。",
+      "research": "按單體及多目標技能比例、施法時間與法力計算。"
+    },
+    {
+      "id": "spec-17",
+      "key": "twohand",
+      "label": "增強：雙手武器",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "增強",
+      "split": "8/39/4",
+      "talents": [
+        {
+          "Concussion": 5,
+          "Elemental Devastation": 3
+        },
+        {
+          "Thundering Strikes": 5,
+          "Ancestral Knowledge": 5,
+          "Mental Dexterity": 3,
+          "Elemental Weapons": 3,
+          "Shamanistic Focus": 1,
+          "Anticipation": 3,
+          "Flurry": 5,
+          "Stormstrike": 1,
+          "Improved Ghost Wolf": 2,
+          "Spirit Weapons": 1,
+          "Mental Quickness": 2,
+          "Improved Stormstrike": 2,
+          "Maelstrom Weapon": 5,
+          "Rage of the Farseer": 1
+        },
+        {
+          "Tidal Focus": 4
+        }
+      ],
+      "style": "雙手武器、近戰與混合屬性",
+      "rotation": "兼顧風怒及武器傷害；依天賦與觸發處理瞬發法術、圖騰及法力。",
+      "research": "武器DPS與速度、法術傷害依實際觸發與構築分開。"
+    },
+    {
+      "id": "spec-17",
+      "key": "enh_standard",
+      "label": "增強：標準混合流",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "增強",
+      "split": "12/35/4",
+      "talents": [
+        {
+          "Concussion": 5,
+          "Elemental Devastation": 3,
+          "Call of Flame": 3,
+          "Elemental Focus": 1
+        },
+        {
+          "Thundering Strikes": 5,
+          "Ancestral Knowledge": 4,
+          "Mental Dexterity": 3,
+          "Elemental Weapons": 3,
+          "Shamanistic Focus": 1,
+          "Flurry": 5,
+          "Stormstrike": 1,
+          "Improved Ghost Wolf": 2,
+          "Spirit Weapons": 1,
+          "Mental Quickness": 2,
+          "Improved Stormstrike": 2,
+          "Maelstrom Weapon": 5,
+          "Rage of the Farseer": 1
+        },
+        {
+          "Tidal Focus": 4
+        }
+      ],
+      "style": "雙手武器；火焰／法術比例",
+      "rotation": "兼顧風怒及武器傷害；依天賦與觸發處理瞬發法術、圖騰及法力。",
+      "research": "武器DPS與速度、法術傷害依實際觸發與構築分開。"
+    },
+    {
+      "id": "spec-17",
+      "key": "enh_aoe",
+      "label": "增強：範圍輸出流",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "增強",
+      "split": "17/34/0",
+      "talents": null,
+      "style": "雙手武器；多目標法術",
+      "rotation": "兼顧風怒及武器傷害；依天賦與觸發處理瞬發法術、圖騰及法力。",
+      "research": "武器DPS與速度、法術傷害依實際觸發與構築分開。"
+    },
+    {
+      "id": "spec-18",
+      "key": "general",
+      "label": "恢復：團隊治療",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "恢復",
+      "split": "0/10/41",
+      "talents": [
+        {},
+        {
+          "Thundering Strikes": 5,
+          "Ancestral Knowledge": 5
+        },
+        {
+          "Improved Healing Wave": 5,
+          "Tidal Focus": 5,
+          "Mindfulness": 3,
+          "Ancestral Healing": 3,
+          "Healing Focus": 3,
+          "Water Shield": 1,
+          "Tidal Mastery": 5,
+          "Restorative Totems": 5,
+          "Mana Tide Totem": 1,
+          "Healing Way": 3,
+          "Nature's Swiftness": 1,
+          "Purification": 5,
+          "Riptide": 1
+        }
+      ],
+      "style": "治療鏈、圖騰與法力",
+      "rotation": "依坦克單體及團隊群傷切換治療，保持需要的圖騰；規劃續航。",
+      "research": "按跳躍有效治療及戰鬥長度計算治療與回魔。"
+    },
+    {
+      "id": "spec-18",
+      "key": "resto_dungeon",
+      "label": "恢復：五人副本",
+      "cls": "shaman",
+      "className": "薩滿",
+      "spec": "恢復",
+      "split": "0/17/34",
+      "talents": [
+        {},
+        {
+          "Thundering Strikes": 5,
+          "Ancestral Knowledge": 5,
+          "Mental Dexterity": 3,
+          "Guardian Totems": 2,
+          "Improved Ghost Wolf": 2
+        },
+        {
+          "Improved Healing Wave": 5,
+          "Tidal Focus": 3,
+          "Mindfulness": 3,
+          "Ancestral Healing": 3,
+          "Healing Focus": 3,
+          "Water Shield": 1,
+          "Tidal Mastery": 5,
+          "Mana Tide Totem": 1,
+          "Healing Way": 3,
+          "Nature's Swiftness": 1,
+          "Purification": 5,
+          "Riptide": 1
+        }
+      ],
+      "style": "智力轉換及機動性",
+      "rotation": "依坦克單體及團隊群傷切換治療，保持需要的圖騰；規劃續航。",
+      "research": "按跳躍有效治療及戰鬥長度計算治療與回魔。"
+    },
+    {
+      "id": "spec-10",
+      "key": "mutilate",
+      "label": "截肢：雙匕首",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "刺殺",
+      "split": "31/19/1",
+      "talents": [
+        {
+          "Malice": 5,
+          "Ruthlessness": 3,
+          "Improved Slice and Dice": 3,
+          "Vigor": 1,
+          "Blood Splatter": 1,
+          "Lethality": 2,
+          "Vile Poisons": 3,
+          "Cold Blood": 1,
+          "Improved Poisons": 2,
+          "Relentless Strikes": 5,
+          "Venom": 1,
+          "Seal Fate": 3,
+          "Mutilate": 1
+        },
+        {
+          "Coup de Grace": 3,
+          "Efficient Strikes": 2,
+          "Puncturing Wounds": 3,
+          "Precision": 3,
+          "Endurance": 2,
+          "Composure": 2,
+          "Flawless Execution": 1,
+          "Aggression": 3
+        },
+        {
+          "Opportunity": 1
+        }
+      ],
+      "style": "匕首、能量、連擊點與毒藥",
+      "rotation": "由潛行起手，維持需要的增益與毒藥；按能量和連擊點施放終結技。",
+      "research": "主副手武器資格先檢查，分開計算毒藥觸發及能量收益。"
+    },
+    {
+      "id": "spec-10",
+      "key": "general",
+      "label": "其他構築（未驗證）",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "刺殺",
+      "split": null,
+      "talents": null,
+      "style": "匕首、能量、連擊點與毒藥",
+      "rotation": "由潛行起手，維持需要的增益與毒藥；按能量和連擊點施放終結技。",
+      "research": "主副手武器資格先檢查，分開計算毒藥觸發及能量收益。"
+    },
+    {
+      "id": "spec-10",
+      "key": "mutilate_alt",
+      "label": "刺殺：另一截肢構築",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "刺殺",
+      "split": "33/18/0",
+      "talents": null,
+      "style": "雙匕首；毒藥及連擊點",
+      "rotation": "由潛行起手，維持需要的增益與毒藥；按能量和連擊點施放終結技。",
+      "research": "主副手武器資格先檢查，分開計算毒藥觸發及能量收益。"
+    },
+    {
+      "id": "spec-11",
+      "key": "general",
+      "label": "邪惡攻擊／通用武器",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "戰鬥",
+      "split": "16/35/0",
+      "talents": [
+        {
+          "Malice": 5,
+          "Ruthlessness": 3,
+          "Improved Expose Armor": 2,
+          "Improved Slice and Dice": 3,
+          "Lethality": 2,
+          "Cold Blood": 1
+        },
+        {
+          "Coup de Grace": 3,
+          "Efficient Strikes": 2,
+          "Deflection": 1,
+          "Precision": 3,
+          "Improved Sprint": 2,
+          "Endurance": 2,
+          "Composure": 2,
+          "Flawless Execution": 1,
+          "Weapon Expertise": 2,
+          "Aggression": 3,
+          "Dual Wield Specialization": 2,
+          "Blade Flurry": 1,
+          "Hack and Slash": 5,
+          "Flash of Steel": 5,
+          "Adrenaline Rush": 1
+        },
+        {}
+      ],
+      "style": "主副手搭配、命中與攻擊事件",
+      "rotation": "穩定維持攻速增益，規劃能量和終結技；雙手各自塗毒。",
+      "research": "武器專精及主副手速度影響收益；白字命中不等於技能命中。"
+    },
+    {
+      "id": "spec-11",
+      "key": "backstab",
+      "label": "背刺：主手匕首",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "戰鬥",
+      "split": null,
+      "talents": null,
+      "style": "主副手搭配、命中與攻擊事件",
+      "rotation": "穩定維持攻速增益，規劃能量和終結技；雙手各自塗毒。",
+      "research": "武器專精及主副手速度影響收益；白字命中不等於技能命中。"
+    },
+    {
+      "id": "spec-11",
+      "key": "venom",
+      "label": "戰鬥：Venom 毒藥流",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "戰鬥",
+      "split": "21/30/0",
+      "talents": [
+        {
+          "Malice": 5,
+          "Ruthlessness": 3,
+          "Improved Expose Armor": 2,
+          "Improved Slice and Dice": 3,
+          "Lethality": 2,
+          "Cold Blood": 1,
+          "Vile Poisons": 4,
+          "Venom": 1
+        },
+        {
+          "Coup de Grace": 3,
+          "Efficient Strikes": 2,
+          "Deflection": 1,
+          "Precision": 3,
+          "Improved Sprint": 2,
+          "Endurance": 2,
+          "Composure": 2,
+          "Flawless Execution": 1,
+          "Weapon Expertise": 2,
+          "Aggression": 3,
+          "Dual Wield Specialization": 2,
+          "Blade Flurry": 1,
+          "Hack and Slash": 1,
+          "Flash of Steel": 5
+        },
+        {}
+      ],
+      "style": "毒藥收益與武器速度；不同於深戰鬥",
+      "rotation": "穩定維持攻速增益，規劃能量和終結技；雙手各自塗毒。",
+      "research": "武器專精及主副手速度影響收益；白字命中不等於技能命中。"
+    },
+    {
+      "id": "spec-12",
+      "key": "backstab",
+      "label": "背刺／伏擊：主手匕首",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "敏銳",
+      "split": null,
+      "talents": null,
+      "style": "潛行、爆發與連擊點",
+      "rotation": "規劃起手與爆發窗口；不同武器構築需用相應技能。",
+      "research": "先確認主手資格，按實際技能使用頻率計算武器傷害收益。"
+    },
+    {
+      "id": "spec-12",
+      "key": "hemo",
+      "label": "出血：非匕首亦可",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "敏銳",
+      "split": "12/8/31",
+      "talents": [
+        {
+          "Malice": 5,
+          "Ruthlessness": 3,
+          "Improved Slice and Dice": 3,
+          "Blood Splatter": 1
+        },
+        {
+          "Coup de Grace": 3,
+          "Efficient Strikes": 2,
+          "Precision": 3
+        },
+        {
+          "Setup": 3,
+          "Opportunity": 5,
+          "Dirty Deeds": 2,
+          "Camouflage": 3,
+          "Initiative": 3,
+          "Premeditation": 1,
+          "Serrated Blades": 3,
+          "Elusiveness": 2,
+          "Ghostly Strike": 1,
+          "Preparation": 1,
+          "Hemorrhage": 1,
+          "Boot Knife": 5,
+          "Death Mark": 1
+        }
+      ],
+      "style": "潛行、爆發與連擊點",
+      "rotation": "規劃起手與爆發窗口；不同武器構築需用相應技能。",
+      "research": "先確認主手資格，按實際技能使用頻率計算武器傷害收益。"
+    },
+    {
+      "id": "spec-12",
+      "key": "hemo_alt",
+      "label": "敏銳：流血變體",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "敏銳",
+      "split": "14/6/31",
+      "talents": [
+        {
+          "Malice": 5,
+          "Ruthlessness": 3,
+          "Improved Slice and Dice": 3,
+          "Blood Splatter": 1,
+          "Lethality": 2
+        },
+        {
+          "Coup de Grace": 3,
+          "Efficient Strikes": 2,
+          "Precision": 1
+        },
+        {
+          "Opportunity": 5,
+          "Dirty Deeds": 2,
+          "Camouflage": 3,
+          "Initiative": 3,
+          "Premeditation": 1,
+          "Serrated Blades": 3,
+          "Elusiveness": 2,
+          "Ghostly Strike": 1,
+          "Preparation": 1,
+          "Hemorrhage": 1,
+          "Boot Knife": 5,
+          "Death Mark": 1,
+          "Master of Deception": 3
+        }
+      ],
+      "style": "出血與流血；精準點數不同",
+      "rotation": "規劃起手與爆發窗口；不同武器構築需用相應技能。",
+      "research": "先確認主手資格，按實際技能使用頻率計算武器傷害收益。"
+    },
+    {
+      "id": "spec-12",
+      "key": "hemo_alt2",
+      "label": "敏銳：另一流血變體",
+      "cls": "rogue",
+      "className": "盜賊",
+      "spec": "敏銳",
+      "split": "15/5/31",
+      "talents": null,
+      "style": "出血與流血；逐項待查",
+      "rotation": "規劃起手與爆發窗口；不同武器構築需用相應技能。",
+      "research": "先確認主手資格，按實際技能使用頻率計算武器傷害收益。"
+    },
+    {
+      "id": "spec-13",
+      "key": "general",
+      "label": "戒律：護盾團隊治療",
+      "cls": "priest",
+      "className": "牧師",
+      "spec": "戒律",
+      "split": "31/20/0",
+      "talents": [
+        {
+          "Twin Disciplines": 5,
+          "Mental Strength": 5,
+          "Mental Agility": 3,
+          "Inner Focus": 1,
+          "Improved Power Word: Shield": 3,
+          "Meditation": 3,
+          "Soul Warding": 1,
+          "Penance": 1,
+          "Renewed Hope": 5,
+          "Divine Aegis": 3,
+          "Power Infusion": 1
+        },
+        {
+          "Twilight Focus": 3,
+          "Holy Specialization": 5,
+          "Divine Fury": 5,
+          "Inspiration": 3,
+          "Improved Healing": 3,
+          "Holy Binding": 1
+        },
+        {}
+      ],
+      "style": "護盾、治療、法力管理",
+      "rotation": "預判傷害，安排吸收與直接治療；不能把單純治療加成當作所有護盾的固定倍率。",
+      "research": "吸收量與有效治療分開，勿假定治療加成等比例增加護盾。"
+    },
+    {
+      "id": "spec-13",
+      "key": "disc_renew",
+      "label": "戒律：恢復術變體",
+      "cls": "priest",
+      "className": "牧師",
+      "spec": "戒律",
+      "split": "31/20/0",
+      "talents": [
+        {
+          "Twin Disciplines": 5,
+          "Mental Strength": 5,
+          "Mental Agility": 3,
+          "Inner Focus": 1,
+          "Improved Power Word: Shield": 3,
+          "Meditation": 3,
+          "Soul Warding": 1,
+          "Penance": 1,
+          "Renewed Hope": 5,
+          "Divine Aegis": 3,
+          "Power Infusion": 1
+        },
+        {
+          "Holy Specialization": 5,
+          "Divine Fury": 5,
+          "Inspiration": 3,
+          "Improved Healing": 3,
+          "Holy Binding": 1,
+          "Improved Renew": 3
+        },
+        {}
+      ],
+      "style": "護盾與恢復術；治療及吸收獨立",
+      "rotation": "預判傷害，安排吸收與直接治療；不能把單純治療加成當作所有護盾的固定倍率。",
+      "research": "吸收量與有效治療分開，勿假定治療加成等比例增加護盾。"
+    },
+    {
+      "id": "spec-13",
+      "key": "disc_threat",
+      "label": "戒律：降低仇恨變體",
+      "cls": "priest",
+      "className": "牧師",
+      "spec": "戒律",
+      "split": "34/17/0",
+      "talents": null,
+      "style": "護盾及治療仇恨管理",
+      "rotation": "預判傷害，安排吸收與直接治療；不能把單純治療加成當作所有護盾的固定倍率。",
+      "research": "吸收量與有效治療分開，勿假定治療加成等比例增加護盾。"
+    },
+    {
+      "id": "spec-14",
+      "key": "general",
+      "label": "神聖：團隊治療",
+      "cls": "priest",
+      "className": "牧師",
+      "spec": "神聖",
+      "split": "18/33/0",
+      "talents": [
+        {
+          "Twin Disciplines": 5,
+          "Mental Strength": 5,
+          "Inner Focus": 1,
+          "Improved Power Word: Shield": 3,
+          "Meditation": 3,
+          "Soul Warding": 1
+        },
+        {
+          "Improved Renew": 3,
+          "Holy Specialization": 5,
+          "Divine Fury": 5,
+          "Holy Nova": 1,
+          "Inspiration": 3,
+          "Improved Healing": 3,
+          "Holy Binding": 1,
+          "Litany of Light": 2,
+          "Spirit of Redemption": 1,
+          "Spiritual Guidance": 5,
+          "Spiritual Healing": 3,
+          "Prayer of Mending": 1
+        },
+        {}
+      ],
+      "style": "直接治療、群補與續航",
+      "rotation": "以目標掉血速度選治療，避免溢補與缺魔；依遭遇安排群補。",
+      "research": "依團隊傷害及溢補計算治療與回魔的邊際價值。"
+    },
+    {
+      "id": "spec-14",
+      "key": "holy_17",
+      "label": "神聖：17/34 治療變體",
+      "cls": "priest",
+      "className": "牧師",
+      "spec": "神聖",
+      "split": "17/34/0",
+      "talents": null,
+      "style": "直接治療與範圍治療",
+      "rotation": "以目標掉血速度選治療，避免溢補與缺魔；依遭遇安排群補。",
+      "research": "依團隊傷害及溢補計算治療與回魔的邊際價值。"
+    },
+    {
+      "id": "spec-14",
+      "key": "holy_20",
+      "label": "神聖：20/31 治療變體",
+      "cls": "priest",
+      "className": "牧師",
+      "spec": "神聖",
+      "split": "20/31/0",
+      "talents": null,
+      "style": "治療與續航",
+      "rotation": "以目標掉血速度選治療，避免溢補與缺魔；依遭遇安排群補。",
+      "research": "依團隊傷害及溢補計算治療與回魔的邊際價值。"
+    },
+    {
+      "id": "spec-15",
+      "key": "general",
+      "label": "暗影：團本輸出",
+      "cls": "priest",
+      "className": "牧師",
+      "spec": "暗影",
+      "split": "15/3/33",
+      "talents": [
+        {
+          "Twin Disciplines": 5,
+          "Silent Resolve": 3,
+          "Mental Strength": 4,
+          "Meditation": 3
+        },
+        {
+          "Twilight Focus": 3
+        },
+        {
+          "Shadow Focus": 5,
+          "Improved Mind Blast": 4,
+          "Improved Shadow Word: Pain": 2,
+          "Shadow Reach": 1,
+          "Mind Flay": 1,
+          "Improved Mind Flay": 2,
+          "Dark Inspiration": 5,
+          "Vampiric Embrace": 1,
+          "Shadow Weaving": 3,
+          "Silence": 1,
+          "Devouring Contagion": 2,
+          "Darkness": 5,
+          "Shadowform": 1
+        }
+      ],
+      "style": "暗影傷害與持續法術",
+      "rotation": "保持主要持續傷害，安排引導與填充法術；留意暗影形態與法力。",
+      "research": "命中及各技能可爆擊條件分開核對。"
+    },
+    {
+      "id": "spec-15",
+      "key": "shadow_alt",
+      "label": "暗影：團本變體",
+      "cls": "priest",
+      "className": "牧師",
+      "spec": "暗影",
+      "split": "14/3/34",
+      "talents": null,
+      "style": "暗影傷害與技能頻率",
+      "rotation": "保持主要持續傷害，安排引導與填充法術；留意暗影形態與法力。",
+      "research": "命中及各技能可爆擊條件分開核對。"
+    },
+    {
+      "id": "spec-19",
+      "key": "general",
+      "label": "秘法：秘火混合",
+      "cls": "mage",
+      "className": "法師",
+      "spec": "秘法",
+      "split": "32/16/3",
+      "talents": [
+        {
+          "Improved Channeling": 5,
+          "Arcane Subtlety": 2,
+          "Arcane Concentration": 5,
+          "Missile Barrage": 2,
+          "Arcane Impact": 3,
+          "Arcane Blast": 1,
+          "Arcane Meditation": 3,
+          "Arcane Wrath": 1,
+          "Presence of Mind": 1,
+          "Arcane Mind": 5,
+          "Arcane Instability": 3,
+          "Arcane Power": 1
+        },
+        {
+          "Incineration": 5,
+          "Accelerant": 2,
+          "Ignite": 5,
+          "Pyroblast": 1,
+          "Improved Fire Blast": 2,
+          "Heating Up": 1
+        },
+        {
+          "Precision": 3
+        }
+      ],
+      "style": "秘法傷害、智力與法力",
+      "rotation": "依戰鬥時間安排爆發與保魔，避免把短戰高耗魔循環當長戰最佳。",
+      "research": "短戰與長戰不同，智力及回魔效益依戰鬥時間計算。"
+    },
+    {
+      "id": "spec-19",
+      "key": "arc_pure",
+      "label": "秘法：純秘法流",
+      "cls": "mage",
+      "className": "法師",
+      "spec": "秘法",
+      "split": "38/10/3",
+      "talents": [
+        {
+          "Improved Channeling": 5,
+          "Arcane Subtlety": 2,
+          "Arcane Concentration": 5,
+          "Missile Barrage": 2,
+          "Arcane Impact": 3,
+          "Arcane Blast": 1,
+          "Arcane Meditation": 3,
+          "Arcane Wrath": 1,
+          "Presence of Mind": 1,
+          "Arcane Mind": 5,
+          "Arcane Instability": 3,
+          "Arcane Power": 1,
+          "Wand Specialization": 2,
+          "Arcane Geometry": 2,
+          "Improved Counterspell": 2
+        },
+        {
+          "Incineration": 5,
+          "Accelerant": 5
+        },
+        {
+          "Precision": 3
+        }
+      ],
+      "style": "秘法技能與法力管理",
+      "rotation": "依戰鬥時間安排爆發與保魔，避免把短戰高耗魔循環當長戰最佳。",
+      "research": "短戰與長戰不同，智力及回魔效益依戰鬥時間計算。"
+    },
+    {
+      "id": "spec-20",
+      "key": "general",
+      "label": "火法：團本火焰",
+      "cls": "mage",
+      "className": "法師",
+      "spec": "火焰",
+      "split": "16/32/3",
+      "talents": [
+        {
+          "Improved Channeling": 5,
+          "Arcane Subtlety": 2,
+          "Arcane Concentration": 5,
+          "Missile Barrage": 2,
+          "Arcane Blast": 1,
+          "Arcane Meditation": 1
+        },
+        {
+          "Incineration": 5,
+          "Accelerant": 5,
+          "Ignite": 5,
+          "Pyroblast": 1,
+          "Improved Fire Blast": 2,
+          "Improved Scorch": 3,
+          "Heating Up": 1,
+          "Master of Elements": 3,
+          "Critical Mass": 3,
+          "Fire Power": 3,
+          "Combustion": 1
+        },
+        {
+          "Precision": 3
+        }
+      ],
+      "style": "火焰傷害、命中與爆擊",
+      "rotation": "安排主要火系法術、觸發技能與爆發；依目標抗性調整。",
+      "research": "核對爆擊觸發及持續效果，不直接套用經典係數。"
+    },
+    {
+      "id": "spec-20",
+      "key": "fire_frost",
+      "label": "火法：冰火混合流",
+      "cls": "mage",
+      "className": "法師",
+      "spec": "火焰",
+      "split": "0/29/22",
+      "talents": null,
+      "style": "火焰與冰霜比例分開",
+      "rotation": "安排主要火系法術、觸發技能與爆發；依目標抗性調整。",
+      "research": "核對爆擊觸發及持續效果，不直接套用經典係數。"
+    },
+    {
+      "id": "spec-20",
+      "key": "fire_alt",
+      "label": "火法：Burning Soul 變體",
+      "cls": "mage",
+      "className": "法師",
+      "spec": "火焰",
+      "split": "14/34/3",
+      "talents": [
+        {
+          "Improved Channeling": 5,
+          "Arcane Subtlety": 2,
+          "Arcane Concentration": 5,
+          "Missile Barrage": 2
+        },
+        {
+          "Incineration": 5,
+          "Accelerant": 5,
+          "Ignite": 5,
+          "Pyroblast": 1,
+          "Improved Fire Blast": 2,
+          "Improved Scorch": 3,
+          "Heating Up": 1,
+          "Master of Elements": 3,
+          "Critical Mass": 3,
+          "Fire Power": 3,
+          "Combustion": 1,
+          "Burning Soul": 2
+        },
+        {
+          "Precision": 3
+        }
+      ],
+      "style": "火焰施法穩定性",
+      "rotation": "安排主要火系法術、觸發技能與爆發；依目標抗性調整。",
+      "research": "核對爆擊觸發及持續效果，不直接套用經典係數。"
+    },
+    {
+      "id": "spec-21",
+      "key": "general",
+      "label": "冰法：團本單體",
+      "cls": "mage",
+      "className": "法師",
+      "spec": "冰霜",
+      "split": "18/0/33",
+      "talents": [
+        {
+          "Wand Specialization": 2,
+          "Arcane Resilience": 3,
+          "Arcane Subtlety": 2,
+          "Magic Absorption": 2,
+          "Arcane Concentration": 5,
+          "Arcane Geometry": 1,
+          "Arcane Meditation": 3
+        },
+        {},
+        {
+          "Improved Frostbolt": 5,
+          "Precision": 3,
+          "Ice Shards": 5,
+          "Improved Blizzard": 1,
+          "Ice Lance": 1,
+          "Arctic Reach": 2,
+          "Ice Block": 1,
+          "Shatter": 3,
+          "Improved Cone of Cold": 3,
+          "Cold Snap": 1,
+          "Fingers of Frost": 2,
+          "Winter's Chill": 5,
+          "Ice Barrier": 1
+        }
+      ],
+      "style": "冰霜傷害與觸發管理",
+      "rotation": "使用冰霜主力法術與適用觸發；別將凍結控制等同首領可受控。",
+      "research": "首領免疫控制與觸發條件分開，不假設目標可凍結。"
+    },
+    {
+      "id": "spec-21",
+      "key": "frost_aoe",
+      "label": "冰法：五人副本範圍流",
+      "cls": "mage",
+      "className": "法師",
+      "spec": "冰霜",
+      "split": "9/5/37",
+      "talents": null,
+      "style": "暴風雪與群體傷害",
+      "rotation": "使用冰霜主力法術與適用觸發；別將凍結控制等同首領可受控。",
+      "research": "首領免疫控制與觸發條件分開，不假設目標可凍結。"
+    },
+    {
+      "id": "spec-21",
+      "key": "frost_single",
+      "label": "冰法：另一單體流",
+      "cls": "mage",
+      "className": "法師",
+      "spec": "冰霜",
+      "split": "14/5/32",
+      "talents": null,
+      "style": "單體技能與觸發",
+      "rotation": "使用冰霜主力法術與適用觸發；別將凍結控制等同首領可受控。",
+      "research": "首領免疫控制與觸發條件分開，不假設目標可凍結。"
+    },
+    {
+      "id": "spec-22",
+      "key": "general",
+      "label": "痛苦：團本 Wrack 引導流",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "痛苦",
+      "split": "35/11/5",
+      "talents": [
+        {
+          "Suppression": 5,
+          "Improved Corruption": 5,
+          "Improved Drains": 3,
+          "Improved Bane of Agony": 2,
+          "Pandemic": 3,
+          "Malevolence": 5,
+          "Nightfall": 2,
+          "Siphon Life": 1,
+          "Soul Siphon": 3,
+          "Shadow Mastery": 5,
+          "Wrack": 1
+        },
+        {
+          "Demonic Embrace": 5,
+          "Demonic Aegis": 2,
+          "Fel Vitality": 3,
+          "Demonic Sacrifice": 1
+        },
+        {
+          "Improved Shadow Bolt": 5
+        }
+      ],
+      "style": "暗影持續傷害與生命分流",
+      "rotation": "維持適用詛咒及DoT，按法力使用生命分流；顧及生存。",
+      "research": "依覆蓋率、跳數及生命分流成本評估法傷與續航。"
+    },
+    {
+      "id": "spec-22",
+      "key": "aff_dungeon",
+      "label": "痛苦：五人副本暗影箭流",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "痛苦",
+      "split": "30/0/21",
+      "talents": [
+        {
+          "Improved Life Tap": 2,
+          "Suppression": 5,
+          "Improved Corruption": 5,
+          "Improved Bane of Agony": 1,
+          "Amplify Curse": 1,
+          "Pandemic": 3,
+          "Malevolence": 5,
+          "Nightfall": 2,
+          "Siphon Life": 1,
+          "Shadow Mastery": 5
+        },
+        {},
+        {
+          "Improved Shadow Bolt": 5,
+          "Bane": 5,
+          "Cataclysm": 2,
+          "Ruin": 5,
+          "Shadowburn": 1,
+          "Agonizing Flames": 3
+        }
+      ],
+      "style": "移動戰、暗影箭；非 Wrack 團本流",
+      "rotation": "維持適用詛咒及DoT，按法力使用生命分流；顧及生存。",
+      "research": "依覆蓋率、跳數及生命分流成本評估法傷與續航。"
+    },
+    {
+      "id": "spec-22",
+      "key": "aff_raid_alt",
+      "label": "痛苦：團本續航變體",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "痛苦",
+      "split": "37/11/3",
+      "talents": null,
+      "style": "持續傷害與生命分流",
+      "rotation": "維持適用詛咒及DoT，按法力使用生命分流；顧及生存。",
+      "research": "依覆蓋率、跳數及生命分流成本評估法傷與續航。"
+    },
+    {
+      "id": "spec-23",
+      "key": "general",
+      "label": "惡魔：火焰流",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "惡魔學識",
+      "split": "2/31/18",
+      "talents": [
+        {
+          "Suppression": 1,
+          "Improved Corruption": 1
+        },
+        {
+          "Improved Imp": 3,
+          "Unholy Power": 5,
+          "Fel Vitality": 3,
+          "Demonic Energies": 2,
+          "Demonic Sacrifice": 1,
+          "Master Summoner": 2,
+          "Decimation": 2,
+          "Demonic Brand": 3,
+          "Soul Link": 1,
+          "Demonic Knowledge": 3,
+          "Master Demonologist": 5,
+          "Demonic Pact": 1
+        },
+        {
+          "Bane": 5,
+          "Aftermath": 5,
+          "Ruin": 5,
+          "Agonizing Flames": 3
+        }
+      ],
+      "style": "寵物與自身法術效益",
+      "rotation": "選擇符合構築的惡魔，安排寵物輸出、詛咒及法術；寵物繼承須另外計算。",
+      "research": "寵物繼承、攻擊頻率及存活率納入評估。"
+    },
+    {
+      "id": "spec-23",
+      "key": "demo_shadow",
+      "label": "惡魔：暗影流",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "惡魔學識",
+      "split": "2/31/18",
+      "talents": [
+        {
+          "Suppression": 1,
+          "Improved Corruption": 1
+        },
+        {
+          "Unholy Power": 5,
+          "Fel Vitality": 3,
+          "Demonic Energies": 2,
+          "Demonic Sacrifice": 1,
+          "Master Summoner": 2,
+          "Decimation": 2,
+          "Demonic Brand": 3,
+          "Soul Link": 1,
+          "Demonic Knowledge": 3,
+          "Master Demonologist": 5,
+          "Demonic Pact": 1,
+          "Improved Sayaad": 3
+        },
+        {
+          "Bane": 5,
+          "Ruin": 5,
+          "Agonizing Flames": 3,
+          "Improved Shadow Bolt": 5
+        }
+      ],
+      "style": "犧牲小鬼、保留魅魔；暗影收益",
+      "rotation": "選擇符合構築的惡魔，安排寵物輸出、詛咒及法術；寵物繼承須另外計算。",
+      "research": "寵物繼承、攻擊頻率及存活率納入評估。"
+    },
+    {
+      "id": "spec-24",
+      "key": "general",
+      "label": "毀滅：犧牲惡魔",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "毀滅",
+      "split": "5/11/35",
+      "talents": [
+        {
+          "Suppression": 5
+        },
+        {
+          "Demonic Embrace": 5,
+          "Demonic Aegis": 2,
+          "Fel Vitality": 3,
+          "Demonic Sacrifice": 1
+        },
+        {
+          "Destructive Reach": 2,
+          "Bane": 5,
+          "Cataclysm": 3,
+          "Aftermath": 5,
+          "Ruin": 5,
+          "Shadowburn": 1,
+          "Agonizing Flames": 3,
+          "Conflagrate": 1,
+          "Bane of Havoc": 1,
+          "Fire and Brimstone": 3,
+          "Shadow and Flame": 5,
+          "Incinerate": 1
+        }
+      ],
+      "style": "火焰／暗影直傷與爆擊",
+      "rotation": "按構築使用火焰或暗影主力技能；依觸發及詛咒安排爆發。",
+      "research": "依構築分開傷害學派、命中、爆擊與施法時間。"
+    },
+    {
+      "id": "spec-24",
+      "key": "dest_sayaad",
+      "label": "毀滅：魅魔流",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "毀滅",
+      "split": "14/4/33",
+      "talents": null,
+      "style": "保留魅魔；本體與寵物分開",
+      "rotation": "按構築使用火焰或暗影主力技能；依觸發及詛咒安排爆發。",
+      "research": "依構築分開傷害學派、命中、爆擊與施法時間。"
+    },
+    {
+      "id": "spec-24",
+      "key": "dest_imp",
+      "label": "毀滅：小鬼流",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "毀滅",
+      "split": "14/6/31",
+      "talents": null,
+      "style": "保留小鬼；寵物收益",
+      "rotation": "按構築使用火焰或暗影主力技能；依觸發及詛咒安排爆發。",
+      "research": "依構築分開傷害學派、命中、爆擊與施法時間。"
+    },
+    {
+      "id": "spec-24",
+      "key": "dest_sac_alt",
+      "label": "毀滅：犧牲續航變體",
+      "cls": "warlock",
+      "className": "術士",
+      "spec": "毀滅",
+      "split": "7/11/33",
+      "talents": [
+        {
+          "Improved Corruption": 5,
+          "Improved Life Tap": 2
+        },
+        {
+          "Demonic Embrace": 5,
+          "Demonic Aegis": 2,
+          "Fel Vitality": 3,
+          "Demonic Sacrifice": 1
+        },
+        {
+          "Bane": 5,
+          "Cataclysm": 3,
+          "Aftermath": 5,
+          "Ruin": 5,
+          "Shadowburn": 1,
+          "Agonizing Flames": 3,
+          "Conflagrate": 1,
+          "Bane of Havoc": 1,
+          "Fire and Brimstone": 3,
+          "Shadow and Flame": 5,
+          "Incinerate": 1
+        }
+      ],
+      "style": "犧牲惡魔；生命分流",
+      "rotation": "按構築使用火焰或暗影主力技能；依觸發及詛咒安排爆發。",
+      "research": "依構築分開傷害學派、命中、爆擊與施法時間。"
+    },
+    {
+      "id": "spec-25",
+      "key": "general",
+      "label": "平衡：團本法力續航",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "平衡",
+      "split": "38/0/13",
+      "talents": null,
+      "style": "秘法、自然與月蝕／日蝕構築",
+      "rotation": "11/25平衡天賦改動後應重配；按日月蝕、持續傷害與法力安排施法。",
+      "research": "依11/25後機制重新估算不同法術比例及爆擊收益。"
+    },
+    {
+      "id": "spec-25",
+      "key": "balance_mana",
+      "label": "平衡：法力充足變體",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "平衡",
+      "split": "41/0/10",
+      "talents": null,
+      "style": "11/23 舊點法；11/25 日月蝕更新待重驗",
+      "rotation": "11/25平衡天賦改動後應重配；按日月蝕、持續傷害與法力安排施法。",
+      "research": "依11/25後機制重新估算不同法術比例及爆擊收益。"
+    },
+    {
+      "id": "spec-26",
+      "key": "general",
+      "label": "野性貓：純貓輸出",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "野性貓",
+      "split": "9/32/10",
+      "talents": [
+        {
+          "Genesis": 5,
+          "Nature's Majesty": 2,
+          "Nature's Reach": 2
+        },
+        {
+          "Ferocity": 5,
+          "Furor": 3,
+          "Feral Swiftness": 2,
+          "Shredding Attacks": 3,
+          "Savage Fury": 2,
+          "Feral Charge": 1,
+          "Sharpened Claws": 2,
+          "Predatory Strikes": 3,
+          "Predatory Discipline": 1,
+          "Blood Frenzy": 2,
+          "Leader of the Pack": 1,
+          "Natural Instinct": 2,
+          "Rend and Tear": 4,
+          "Shifting Power": 1
+        },
+        {
+          "Heart of the Wild": 5,
+          "Naturalist": 5
+        }
+      ],
+      "style": "武器DPS、能量與連擊點",
+      "rotation": "維持適用持續效果，避免能量溢出；武器原始攻速不是貓形態攻速。",
+      "research": "武器面板速度不等於形態攻速；核對形態武器DPS轉換。"
+    },
+    {
+      "id": "spec-26",
+      "key": "cat_no_lotp",
+      "label": "野性貓：隊伍已有獸群領袖",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "野性貓",
+      "split": "9/32/10",
+      "talents": [
+        {
+          "Genesis": 5,
+          "Nature's Majesty": 2,
+          "Nature's Reach": 2
+        },
+        {
+          "Ferocity": 5,
+          "Furor": 3,
+          "Feral Swiftness": 2,
+          "Shredding Attacks": 3,
+          "Savage Fury": 2,
+          "Feral Charge": 1,
+          "Sharpened Claws": 2,
+          "Predatory Strikes": 3,
+          "Predatory Discipline": 1,
+          "Blood Frenzy": 2,
+          "Natural Instinct": 2,
+          "Rend and Tear": 5,
+          "Shifting Power": 1
+        },
+        {
+          "Heart of the Wild": 5,
+          "Naturalist": 5
+        }
+      ],
+      "style": "純貓輸出；Rend and Tear 變體",
+      "rotation": "維持適用持續效果，避免能量溢出；武器原始攻速不是貓形態攻速。",
+      "research": "武器面板速度不等於形態攻速；核對形態武器DPS轉換。"
+    },
+    {
+      "id": "spec-27",
+      "key": "general",
+      "label": "野性熊：純熊坦克",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "野性熊",
+      "split": "9/32/10",
+      "talents": [
+        {
+          "Genesis": 5,
+          "Nature's Majesty": 2,
+          "Nature's Reach": 2
+        },
+        {
+          "Ferocity": 5,
+          "Feral Swiftness": 2,
+          "Feral Instinct": 3,
+          "Thick Hide": 3,
+          "Savage Fury": 2,
+          "Feral Charge": 1,
+          "Sharpened Claws": 2,
+          "Predatory Strikes": 3,
+          "Lacerate": 1,
+          "Blood Frenzy": 1,
+          "Leader of the Pack": 1,
+          "Natural Instinct": 2,
+          "Rend and Tear": 5,
+          "Primal Bite": 1
+        },
+        {
+          "Heart of the Wild": 5,
+          "Naturalist": 5
+        }
+      ],
+      "style": "護甲、耐力、敏捷與武器DPS",
+      "rotation": "熊形態承傷與怒氣優先，按目標數使用仇恨技能；保留生存手段。",
+      "research": "護甲與耐力的生存收益分開；核對形態武器DPS轉換。"
+    },
+    {
+      "id": "spec-27",
+      "key": "bear_deep",
+      "label": "野性熊：深野性坦克",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "野性熊",
+      "split": "0/41/10",
+      "talents": null,
+      "style": "純熊生存及仇恨",
+      "rotation": "熊形態承傷與怒氣優先，按目標數使用仇恨技能；保留生存手段。",
+      "research": "護甲與耐力的生存收益分開；核對形態武器DPS轉換。"
+    },
+    {
+      "id": "spec-27",
+      "key": "bear_cat",
+      "label": "野性熊：貓熊混合",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "野性熊",
+      "split": "8/33/10",
+      "talents": null,
+      "style": "同場坦克與輸出；權重獨立",
+      "rotation": "熊形態承傷與怒氣優先，按目標數使用仇恨技能；保留生存手段。",
+      "research": "護甲與耐力的生存收益分開；核對形態武器DPS轉換。"
+    },
+    {
+      "id": "spec-28",
+      "key": "general",
+      "label": "恢復：團本治療",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "恢復",
+      "split": "11/0/40",
+      "talents": [
+        {
+          "Genesis": 5,
+          "Moonglow": 3,
+          "Nature's Majesty": 2,
+          "Nature's Splendor": 1
+        },
+        {},
+        {
+          "Nature's Focus": 5,
+          "Heart of the Wild": 5,
+          "Naturalist": 5,
+          "Reflection": 3,
+          "Gift of Nature": 5,
+          "Bloom": 1,
+          "Improved Rejuvenation": 3,
+          "Swiftmend": 1,
+          "Nature's Swiftness": 1,
+          "Living Spirit": 3,
+          "Improved Tranquility": 2,
+          "Improved Regrowth": 5,
+          "Wild Growth": 1
+        }
+      ],
+      "style": "持續治療、直接治療及法力",
+      "rotation": "預判傷害安排HoT，按緊急程度補直接治療，管理啟動及續航。",
+      "research": "按有效跳數、溢補及法力消耗評估權重。"
+    },
+    {
+      "id": "spec-28",
+      "key": "tree_dungeon",
+      "label": "恢復：五人副本",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "恢復",
+      "split": "11/0/40",
+      "talents": [
+        {
+          "Genesis": 5,
+          "Moonglow": 3,
+          "Nature's Majesty": 2,
+          "Nature's Splendor": 1
+        },
+        {},
+        {
+          "Nature's Focus": 5,
+          "Heart of the Wild": 5,
+          "Naturalist": 5,
+          "Reflection": 3,
+          "Gift of Nature": 5,
+          "Bloom": 1,
+          "Improved Rejuvenation": 3,
+          "Swiftmend": 1,
+          "Nature's Swiftness": 1,
+          "Living Spirit": 3,
+          "Improved Regrowth": 5,
+          "Wild Growth": 1,
+          "Subtlety": 2
+        }
+      ],
+      "style": "降低仇恨而非強化寧靜",
+      "rotation": "預判傷害安排HoT，按緊急程度補直接治療，管理啟動及續航。",
+      "research": "按有效跳數、溢補及法力消耗評估權重。"
+    }
+  ],
+  "source": "https://www.wofwforever.com/en/guides/",
+  "note": "既有攻略參考配點；非已驗證最優，需以新版客戶端核對。"
+}
