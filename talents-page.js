@@ -42,7 +42,8 @@ function mapBuild(cls,profile){
  if(sum(ranks)!==51)issues.push("新版對應總點數 "+sum(ranks)+"/51");
  return {ranks,issues,complete:!issues.length};
 }
-if(typeof module!=="undefined"&&module.exports)module.exports={LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints};
+function validateSnapshot(d){return !!d&&d.format==="zephras-talents/1"&&d.build==="1.60.1.71139"&&Array.isArray(d.classes)&&CLASSES.every(k=>validateClass(d.classes.find(c=>String(c.token).toLowerCase()===k)));}
+if(typeof module!=="undefined"&&module.exports)module.exports={LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
 if(typeof document!=="undefined"){
 const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;},add=(p,...xs)=>{p.append(...xs);return p;},link=(text,url)=>{const a=el("a",text);a.href=url;a.target="_blank";a.rel="noopener noreferrer";return a;};
 const options=(e,rows,value)=>{e.replaceChildren(...rows.map(([v,t])=>new Option(t,v)));if(rows.some(x=>x[0]===value))e.value=value;};
@@ -75,10 +76,14 @@ function render(){const cls=getClass(),p=getProfile(),o=$("overview"),l=$("level
  }
 }
 async function loadJSON(url){const res=await fetch(url,{signal:AbortSignal.timeout(12000)});if(!res.ok)throw Error("HTTP "+res.status);return res.json();}
+function snapshotStatus(source){$("status").textContent=db?"客戶端資料 1.60.1.71139 已載入（"+source+"）；舊構築將逐項核對。":"客戶端資料未載入，完整天賦樹與逐級點法暫不可用。可使用原始資料入口或本機匯入。";$("dataFallback").hidden=!!db;}
 async function init(){mode=q.get("mode")==="level"?"level":"build";level=levelAt(q.get("level")||10);classSel.onchange=()=>{selected=null;syncSelectors();render();};specSel.onchange=()=>{selected=null;syncSelectors();render();};buildSel.onchange=()=>{selected=null;render();};$("buildMode").onclick=()=>{mode="build";selected=null;render();};$("levelMode").onclick=()=>{mode="level";selected=null;render();};
  try{catalog=await loadJSON("talent-builds.json");syncSelectors();render();}catch(e){$("status").textContent="構築資料載入失敗："+e.message;}
- for(const url of ["talent-client.json",DATA_URL]){try{const d=await loadJSON(url);if(d.format!=="zephras-talents/1"||d.build!=="1.60.1.71139"||!CLASSES.every(k=>validateClass(d.classes.find(c=>c.token.toLowerCase()===k))))throw Error("資料格式或前置條件不完整");db=d;break;}catch(e){}}
- $("status").textContent=db?"客戶端資料 1.60.1.71139 已載入；舊構築將逐項核對。":"客戶端資料未載入，逐級點法暫不可用；仍可查看參考構築及外部來源。";render();
+ let source="";const upload=$("clientImport");
+ upload.onchange=async()=>{const file=upload.files?.[0];if(!file)return;try{if(file.size>5*1024*1024)throw Error("檔案超過5MB");const raw=await file.text(),d=JSON.parse(raw);if(!validateSnapshot(d))throw Error("版本、格式或九職業資料不完整");db=d;try{localStorage.setItem("gt-talent-client-71139",raw);}catch(e){}snapshotStatus("本機匯入");render();}catch(e){$("status").textContent="匯入失敗："+e.message;}finally{upload.value="";}};
+ try{const cached=JSON.parse(localStorage.getItem("gt-talent-client-71139")||"null");if(validateSnapshot(cached)){db=cached;source="本機快取";}}catch(e){}
+ for(const url of ["talent-client.json",DATA_URL]){if(db)break;try{const d=await loadJSON(url);if(!validateSnapshot(d))throw Error("資料格式或前置條件不完整");db=d;source=url==="talent-client.json"?"網站快照":"公開來源";}catch(e){}}
+ snapshotStatus(source);render();
 }
 init();
 }
