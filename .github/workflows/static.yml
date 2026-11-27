@@ -41,6 +41,51 @@ jobs:
             rm -f talent-client.tmp
             echo "::warning::Talent snapshot unavailable; page will show fallback and existing profiles."
           fi
+      - name: Map client talent icons to original WoW textures
+        run: |
+          if test -f talent-client.json && curl --fail --location --connect-timeout 10 --max-time 90 'https://github.com/wowdev/wow-listfile/releases/latest/download/community-listfile.csv' -o /tmp/wow-listfile.csv; then
+            python3 - <<'PY'
+          import json, re
+          from pathlib import Path
+          d=json.loads(Path('talent-client.json').read_text())
+          wanted={str(t.get('icon')) for c in d['classes'] for t in c['talents']}
+          icons={}
+          with open('/tmp/wow-listfile.csv', encoding='utf-8-sig', errors='replace') as f:
+              for line in f:
+                  key,sep,value=line.strip().partition(';')
+                  if key not in wanted: continue
+                  m=re.search(r'(?:^|[/\\\\])icons[/\\\\]([a-z0-9_]+)\\.blp
+        run: node tests/talents-page.test.cjs
+      - name: Report actual talent data availability
+        run: |
+          if test -f talent-client.json; then
+            echo '### Talent snapshot: available; real-data tests ran' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '### Talent snapshot: unavailable; real-data tests skipped' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Site deployed in fallback mode. Do not mark 459 leveling steps as verified.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload entire repository
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+, value, re.I)
+                  if m: icons[key]=m.group(1).lower()
+          for c in d['classes']:
+              for t in c['talents']:
+                  name=icons.get(str(t.get('icon')))
+                  if name: icons[str(c['token']).lower()+':'+t['name']]=name
+          Path('talent-icons.json').write_text(json.dumps(icons, ensure_ascii=False))
+          print('Mapped texture IDs:',sum(k.isdigit() for k in icons))
+          PY
+          else
+            echo "::warning::Original texture mapping unavailable; fallback symbols remain."
+          fi
       - name: Check independent talent page and leveling routes
         run: node tests/talents-page.test.cjs
       - name: Report actual talent data availability
