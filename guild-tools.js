@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V19.7 beta · 2026-11-27
+/* 墓鐘資料庫 V19.8 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -357,7 +357,7 @@ function material(){
 }
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
 function optimizer(){
- title("V19.7 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
+ title("V19.8 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
  const id=getSpec(),baseSpec=bySpec.get(id);if(!baseSpec)return;const s={...baseSpec,slots:expandCandidateSlots(baseSpec)};
  const out=node("div"),slot=select([...s.slots].map(([k])=>[k,k])),current=inp("0","number"),target=inp("留空＝不限制","number"),result=node("div");
  current.value="0";current.min="0";current.step="0.1";target.min="0";target.step="0.1";const talentHit=inp("0","number");talentHit.value="0";talentHit.min="0";talentHit.step="0.1";
@@ -768,7 +768,7 @@ function gearCatalogView(spec){
  });return d;
 }
 function audit(){
- title("V19.7 · 跨甲 BiS 裝備、武器與準備資料總覽","跨甲以實際效益為優先；不因護甲較低而排除合法裝備。優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V19.8 · 跨甲 BiS 裝備、武器與準備資料總覽","跨甲以實際效益為優先；不因護甲較低而排除合法裝備。優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID（可用空格分隔）"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),acq=select([["","全部取得方式"],["聲望","聲望"],["世界掉落","世界掉落"],["製作","專業製作"],["裝綁","裝備綁定／拍賣場"],["任務","任務"],["商人","商人／兌換"],["其他","其他（含副本）"]]),out=node("div");acq.id="gt-acquisition-filter";acq.setAttribute("aria-label","取得方式");
  const model=savedModel(spec.id);
@@ -871,11 +871,19 @@ function combineOfficialBlue(seed,live){
  for(const p of live||[])if(validOfficialPost(p)&&["machine","title-only","pending"].includes(p.translationStatus))map.set(p.key,p);
  return [...map.values()].sort((a,b)=>(b.updatedAt||b.date).localeCompare(a.updatedAt||a.date));
 }
+function blueCheckpointText(d,now=Date.now()){
+ const check=d?.lastCheck,at=Date.parse(check?.at||"");
+ const date=v=>new Date(v).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"});
+ const published=Number.isFinite(Date.parse(d?.lastPublished||""))?"｜公告資料最後變動："+date(d.lastPublished):"｜尚無自動新增公告";
+ if(!Number.isFinite(at)||!["ok","partial"].includes(check.status))return "尚無已發布的抓取紀錄"+published+"；請查同步執行紀錄。";
+ const counts=Object.entries(check.regions||{}).filter(([k,v])=>["us","eu"].includes(k)&&Number.isInteger(v?.read)&&Number.isInteger(v?.attempted)).map(([k,v])=>k.toUpperCase()+" "+v.read+"/"+v.attempted).join("、");
+ return "最近發布的抓取紀錄："+date(at)+"（台灣時間）｜"+(check.status==="partial"?"部分抽查未成功":"抽查主題均讀取成功")+(counts?"｜"+counts:"")+published+(now-at>7*3600000?"｜紀錄已逾7小時，請檢查排程或發布狀態。":"｜紀錄最多每6小時更新，非即時排程狀態。");
+}
 function renderBlueBoard(host){
- const board=node("section",undefined,"gt-blue-board");board.dataset.release="19.0";board.id="gt-blue-board";
+ const board=node("section",undefined,"gt-blue-board");board.dataset.release="19.8";board.id="gt-blue-board";
  const sourceURL="https://us.forums.blizzard.com/en/wow/c/wow-forever/346";
- add(board,node("h3","永恆官方藍帖"),node("p","V19.0 · 暴雪官方直連","gt-muted"),node("p","只追蹤暴雪官方永恆論壇；每10分鐘排程檢查（可能延遲）。人工整理與機器翻譯分開標示；每則公告獨立收合。","gt-muted"));
- const src=node("div",undefined,"gt-blue-source");add(src,link("暴雪美服永恆論壇",sourceURL),link("暴雪歐服永恆論壇","https://eu.forums.blizzard.com/en/wow/c/wow-forever/359"));board.append(src);const syncStatus=node("p","官方歷史公告已載入；正在檢查自動更新資料。","gt-muted");syncStatus.id="blue-sync-status";board.append(syncStatus);let entries=combineOfficialBlue(bluePosts,[]);
+ add(board,node("h3","永恆官方藍帖"),node("p","V19.8 · 暴雪官方直連","gt-muted"),node("p","只追蹤暴雪官方永恆論壇；每10分鐘排程抽查（可能延遲，非完整論壇掃描）。人工整理與機器翻譯分開標示；每則公告獨立收合。","gt-muted"));
+ const src=node("div",undefined,"gt-blue-source");add(src,link("暴雪美服永恆論壇",sourceURL),link("暴雪歐服永恆論壇","https://eu.forums.blizzard.com/en/wow/c/wow-forever/359"),link("藍帖同步執行紀錄","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/actions/workflows/official-blue.yml"));board.append(src);const syncStatus=node("p","官方歷史公告已載入；正在檢查自動更新資料。","gt-muted");syncStatus.id="blue-sync-status";board.append(syncStatus);let entries=combineOfficialBlue(bluePosts,[]);
  const filter=node("div",undefined,"gt-blue-filters"),q=inp("職業、技能、日期"),category=select([["","全部"],...Array.from(new Set(bluePosts.flatMap(p=>p.sections.map(x=>x.category)))).map(x=>[x,x])]),count=node("p",undefined,"gt-muted"),out=node("div");q.id="blue-query";category.id="blue-category";count.setAttribute("role","status");out.id="blue-list";
  add(filter,field("搜尋公告",q),field("分類",category));add(board,filter,count,out);
  const expanded=new Set();
@@ -896,7 +904,7 @@ function renderBlueBoard(host){
   if(!list.length)out.append(node("p","沒有符合搜尋的公告。","gt-muted"));
  }
  q.addEventListener("input",draw);category.addEventListener("change",draw);host.append(board);draw();
- fetch("official-blue-live.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json();}).then(d=>{if(!board.isConnected)return;if(d.format!==1||!Array.isArray(d.posts))throw Error("format");entries=combineOfficialBlue(bluePosts,d.posts);for(const cat of new Set(entries.flatMap(p=>p.sections.map(s=>s.category))))if(!Array.from(category.options).some(o=>o.value===cat))category.add(new Option(cat,cat));syncStatus.textContent=d.lastPublished?"自動資料最後變動："+new Date(d.lastPublished).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+"（台灣時間；不是最後檢查時間）":"尚無自動收錄的新公告。";draw();}).catch(()=>{if(board.isConnected)syncStatus.textContent="自動資料暫未取得；目前顯示已整理的官方歷史公告。";});
+ fetch("official-blue-live.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json();}).then(d=>{if(!board.isConnected)return;if(d.format!==1||!Array.isArray(d.posts))throw Error("format");entries=combineOfficialBlue(bluePosts,d.posts);for(const cat of new Set(entries.flatMap(p=>p.sections.map(s=>s.category))))if(!Array.from(category.options).some(o=>o.value===cat))category.add(new Option(cat,cat));syncStatus.textContent=blueCheckpointText(d);draw();}).catch(()=>{if(board.isConnected)syncStatus.textContent="自動資料暫未取得；目前顯示已整理的官方歷史公告。";});
 }
 function renderBlueMode(){
  cleanupFrame();restoreLegacy();active="v12";panel.replaceChildren();renderBlueBoard(panel);
