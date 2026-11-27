@@ -13,6 +13,23 @@ const re=new RegExp("(?<![A-Za-z])(?:"+pairs.map(([k])=>escape(k)).join("|")+")(
 function text(s){return String(s??"").replace(re,m=>lookup.get(m.toLowerCase())||m);}
 function item(id,raw){if(names[String(id)])return names[String(id)];if(localItems[String(id)])return localItems[String(id)]+"（參考譯名）";const original=String(raw||"");return /^[A-Za-z]/.test(original)?text(original)+"（譯名待核）":original;}
 function spell(name){return spellNames[name]||null;}
-g.GTLocale={text,item,spell,officialItemCount:Object.keys(names).length,officialSpellCount:Object.keys(spellNames).length,build:imported.build||""};
+function effect(raw){
+ const s=String(raw||"").trim();
+ const rules=[
+ [/^Reduces the cast time of your Wrath and Starfire spells by ([\d.]+) sec and the Mana cost of your Wrath spell by ([\d.]+)%\.$/i,(_,a,b)=>"憤怒及星火術的施法時間縮短"+a+"秒；憤怒的法力消耗降低"+b+"%。"],
+ [/^Increases the periodic damage and healing done by your spells and abilities by ([\d.]+)%\.$/i,(_,a)=>"法術及技能造成的週期性傷害與治療提高"+a+"%。"],
+ [/^Reduces the Mana cost of your damaging spells by ([\d.]+)%\.$/i,(_,a)=>"傷害法術的法力消耗降低"+a+"%。"],
+ [/^Increases your critical strike chance with spells and melee attacks by ([\d.]+)%\.$/i,(_,a)=>"法術與近戰攻擊的致命一擊機率提高"+a+"%。"],
+ [/^Increases the range of your offensive Balance spells by ([\d.]+)% and improves your chance to hit by ([\d.]+)%\.$/i,(_,a,b)=>"攻擊型平衡法術的射程增加"+a+"%，命中機率提高"+b+"%。"],
+ [/^Increases the critical strike damage bonus of your Arcane and Nature spells by ([\d.]+)%\.$/i,(_,a)=>"秘法與自然法術的致命一擊額外傷害提高"+a+"%。"],
+ [/^Increases your chance to dodge by ([\d.]+)%\.$/i,(_,a)=>"閃躲機率提高"+a+"%。"],
+ [/^Increases your chance to hit by ([\d.]+)%\.$/i,(_,a)=>"命中機率提高"+a+"%。"],
+ [/^Increases your chance to parry by ([\d.]+)%\.$/i,(_,a)=>"招架機率提高"+a+"%。"],
+ [/^Increases your (Strength|Agility|Stamina|Intellect|Spirit|Armor) by ([\d.]+)%\.$/i,(_,a,b)=>({strength:"力量",agility:"敏捷",stamina:"耐力",intellect:"智力",spirit:"精神",armor:"護甲"}[a.toLowerCase()])+"提高"+b+"%。"]
+ ];
+ for(const [pattern,translate] of rules){const m=s.match(pattern);if(m)return translate(...m)+"（參考譯文）";}
+ return null;
+}
+g.GTLocale={text,item,spell,effect,officialItemCount:Object.keys(names).length,officialSpellCount:Object.keys(spellNames).length,build:imported.build||""};
 if(typeof module!=="undefined")module.exports=g.GTLocale;
 })(globalThis);
