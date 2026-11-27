@@ -57,7 +57,12 @@ const server=http.createServer((req,res)=>{
     await full.locator('select:has(option[value="live"])').selectOption("all");
     await full.locator("article").first().waitFor({state:"visible"});
     assert.ok(await full.locator("article").count()>0,"restoration Druid gear catalog not empty");
+    const coverage=full.locator('select:has(option[value="new"])');
+    await coverage.selectOption("new");
+    await full.locator("article").first().waitFor({state:"visible"});
+    assert.ok((await full.locator("article").first().innerText()).includes("尚未納入本站候選"));
     await full.getByRole("button",{name:"設為同部位比較基準"}).first().click();
+    assert.equal(await coverage.inputValue(),"");
     await full.getByRole("button",{name:"清除比較基準"}).waitFor({state:"visible"});
     await full.getByRole("button",{name:"清除比較基準"}).click();
     const audit=page.locator(".gt-catalog-audit");
