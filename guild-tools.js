@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V17.8 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V17.9 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -91,6 +91,7 @@ function chooseBuild(id,key){if(!rogueProfiles[id]?.some(p=>p[0]===key))return;b
 function feralSpec(id){return id==="spec-26"||id==="spec-27";}
 function feralWeaponMode(id){return feralSpec(id)?(buildFor(id)==="feral_onehand"?"onehand":"twohand"):"";}
 for(const id of ["spec-26","spec-27"])rogueProfiles[id].push(["feral_onehand","單手＋持有型副手（替代比較）"]);
+function isTwoHand(type){return /雙手|two.hand|法杖|長柄|staff|staves|polearm/i.test(type||"");}
 function skillGate(id,x){
  const build=variantFor(id)?.[4]||buildFor(id),slot=x.slot||"",type=x.type||"";
  if(feralSpec(id)&&!/遠程|遠距|聖物|塑像|relic|idol|ranged/i.test(slot+" "+type)){
@@ -100,14 +101,17 @@ function skillGate(id,x){
   if(off){if(mode==="twohand")return "野性雙手構築不裝副手";if(!held||/盾牌|shield|匕首|dagger|拳套|拳刃|fist|單手|one.hand/i.test(type))return "野性不雙持、不裝盾牌；僅比較持有型副手";return "";}
   if(main||two||one){if(/劍|斧|sword|axe|盾牌|shield/i.test(type))return "德魯伊武器資格不符";if(mode==="twohand"&&!two)return "野性預設雙手武器構築；單手請切換替代比較";if(mode==="onehand"&&(two||!one))return "單手替代比較需合法單手主武器";return "";}
  }
- const main=/主手|單手武器|雙手武器/.test(slot)&&!/副手|遠程/.test(slot);
- const off=/副手|盾牌/.test(slot);
- const two=/雙手|two.hand/i,shield=/盾牌|shield/i;
+ const off=/副手|盾牌|off.hand/i.test(slot);
+ const ranged=/遠程|遠距|魔杖|聖物|塑像|圖騰|聖契|ranged|relic/i.test(slot);
+ const main=/主手|單手|雙手|近戰|^武器$|main.hand/i.test(slot)&&!off&&!ranged;
+ const shield=/盾牌|shield/i;
+ if(off&&(isTwoHand(type)||/主手限定|主手武器|main.hand/i.test(type)))return "副手不能使用雙手或主手限定武器";
+ if(main&&shield.test(type))return "盾牌不能作主手武器";
  if(build==="dual"&&off&&(shield.test(type)||/持有|副手物品|off.hand frill|held in off.hand|法器|書籍/i.test(type)))return "雙持構築的副手需為近戰武器，不能使用盾牌或施法副手";
  if(build==="shield"&&off&&!shield.test(type))return "此盾坦構築要求盾牌；非盾牌或類型未確認";
- if((build==="shield"||build==="dual")&&two.test(type))return "此構築不使用雙手武器";
+ if((build==="shield"||build==="dual")&&isTwoHand(type))return "此構築不使用雙手武器";
  if(["twohand","weaving"].includes(build)&&off)return "雙手武器構築不使用副手";
- if(["twohand","weaving"].includes(build)&&main&&!two.test(type))return "雙手武器構築要求雙手武器；類型未確認";
+ if(["twohand","weaving"].includes(build)&&main&&!isTwoHand(type))return "雙手武器構築要求雙手武器；類型未確認";
  if(!((main&&["backstab","mutilate"].includes(build))||(off&&build==="mutilate")))return "";
  if(/匕首|dagger/i.test(type))return "";
  return "核心技能要求匕首；目前物品類型「"+(type||"未標示")+"」不符合或尚未確認";
@@ -271,10 +275,11 @@ function specPicker(){return {value:getSpec()};}
 function specLabel(){const id=getSpec();return node("p","目前專精："+(bySpec.get(id)?.name||"尚未選擇")+(id?" ｜ "+(rogueProfiles[id]?.find(p=>p[0]===buildFor(id))?.[1]||""):""),"gt-muted");}
 function title(t,desc){panel.replaceChildren(node("h3",t),node("p",desc,"gt-muted"));}
 function guide(){title("V16.6 · 天賦與實戰手法","全 28 專精研究重點與多來源天賦查證。團本前 PvE；非已驗證的唯一最佳點法。");const out=node("div");const render=id=>{const s=bySpec.get(id),g=guides[Number(id.split("-")[1])-1];out.replaceChildren();const c=box(out,s.name,g[0]);splitView(id,out);if(feralSpec(id)){const f=box(out,"野性武器專項查證","預設雙手；單手＋持有型副手獨立比較，未取得完整組合前不視為BiS。");add(f,link("貓形態團本前配裝參考","https://foreverbis.net/druid/feral-cat/alliance/"),node("p",""),link("熊形態團本前配裝參考","https://foreverbis.net/druid/feral-bear/alliance/"));}if(variantFor(id)||casterFeralTalentBuilds[id])selectedTalentView(id,out);else if(referenceTalent(id)){plateTalentView(id,out);hunterShamanTalentView(id,out);rogueTalentView(id,out);}const builds=box(out,"此專精所有已收錄構築","切換上方構築即可使用各自的武器限制與本機權重；沒有逐項資料的構築不借用其他配置。");for(const [key,label] of rogueProfiles[id]||[]){const v=extraProfiles[id]?.find(x=>x[0]===key);add(builds,button((key===buildFor(id)?"目前：":"切換：")+label+(v?" · "+v[2]:""),()=>{chooseBuild(id,key);syncBuild();show("v8");}),node("p",v?v[3]+(variantTalentBuilds[id+":"+key]?"（有逐項參考）":"（逐項待補）"):"基準構築；請核對點數與版本","gt-muted"));}const research=talentResearch[Number(id.split("-")[1])-1];if(research){const analysis=box(out,"天賦與裝備收益研究",research[0]);add(analysis,node("p","需核對核心技能／天賦："+research[1]),node("p",research[2]),node("p","研究清單：非已驗證天賦點法、係數或數值權重。","gt-muted"),link("11/26 客戶端天賦資料（1.60.1.71139）","https://wowforevertalents.com/"),node("p",""),link("11/24 團本前構築與配裝","https://www.zockify.com/forever/bis/"),node("p",""),link("11/25 客戶端配裝參考","https://foreverbis.net/"));}add(c,node("p",g[1]),node("h4","構築與手法查證"),link("11/26 客戶端天賦樹（METAMMO）","https://metammo.com/wow-forever/talents"),node("p",""),link("11/25 天賦樹（The Forever Era）","https://theforeverera.com/en/talents/"),node("p",""),link("ForeverSpec 天賦計算器","https://foreverspec.com/talent-calculator/"),node("p",""),node("p","先依職責選擇滿等 PvE 天賦，再以遊戲內技能、最新熱修正及相同構築的實測確認優先序。"),link("ForeverSpec 滿等構築與版本更新","https://foreverspec.com/"),node("p",""),link("11/24 Zockify 全專精團本前配裝與構築","https://www.zockify.com/forever/bis/"),node("p",""),link("11/25 Forever BiS 客戶端資料與配裝","https://foreverbis.net/"),node("p",""),link("60.tools 全專精配裝與天賦","https://www.60.tools/bis"),node("p",""),link("AltGearer 屬性優先級（非完整BiS）","https://altgearer.com/forever/bis/"),node("p",""),link("Azeroth DB 天賦計算器與技能資料","https://azeroth-db.github.io/"),node("p",""),link("WoWGuildHub 天賦與技能資料","https://wowguildhub.com/wow-forever/guide"),node("p",""),link("永恆職業指南／天賦與手法", "https://nossuary.com/guides/wow-forever/"+g[2]+"/"),node("p","另以官方熱修正、Icy Veins 與遊戲內技能說明交叉核對。","gt-muted"),link("Icy Veins 永恆職業指南","https://www.icy-veins.com/wow-forever/class-guides"));if(id==="spec-12"){add(c,node("h4","構築機制與裝備連動"),node("p","背刺與伏擊需要主手匕首；出血可用其他武器，但匕首係數為145%，一般武器100%。伺機而動5/5使背刺、伏擊、絞喉、截肢傷害增加20%。這些是技能係數，不可直接當成敏捷或攻強權重。"),link("永恆敏銳天賦與技能","https://azerothprime.com/en/forever/classes/rogue/subtlety/talents"),node("p",""),link("ForeverSpec 敏銳構築","https://foreverspec.com/classes/rogue/subtlety/"));}if(id==="spec-25")add(c,node("p","11/25：平衡天賦改名、星火術天賦降為2點、日月蝕增加憤怒爆擊，舊配置須重查。"),link("官方11/25熱修正","https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-25-2026"));};const p=specPicker(render);add(panel,specLabel(),out);render(p.value);}
+function sourceGroup(source){return String(source||"來源待查").split(/\s*[－—–]\s*|\s+-\s+/)[0].trim()||"來源待查";}
 function drops(){title("V15 · 掉落反查與刷裝路線","以網站既有候選裝備為範圍，按來源、專精、部位及順位查詢。順位不是掉率；來源未經逐件交叉驗證。");
-const q=inp("裝備、首領、副本、任務、物品 ID（空格分隔）"),sp={value:getSpec()},slot=select([...new Set([...bySpec.values()].flatMap(s=>[...s.slots.keys()]))].sort().map(x=>[x,x]),"所有部位"),source=select([...new Set([...byItem.values()].map(x=>x.source.split("－")[0].trim()))].sort().map(v=>[v,v]),"所有取得來源"),rank=select([["0","不限順位"],["1","第一順位"],["3","前三順位"]]),mode=select([["items","裝備清單"],["routes","依來源整理"]]),out=node("div");
-let limit=40;function draw(){out.replaceChildren();const terms=q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);const rows=[...byItem.values()].map(x=>({...x,matched:x.uses.filter(u=>(!sp.value||u.id===sp.value)&&allowed(u.id,{...x,slot:u.slot})&&(!slot.value||u.slot===slot.value)&&(!Number(rank.value)||(u.rank>0&&u.rank<=Number(rank.value))))})).filter(x=>x.matched.length&&(!source.value||x.source.split("－")[0].trim()===source.value)&&terms.every(t=>[x.name,x.source,x.type,x.id,...x.matched.map(u=>u.name+" "+u.slot)].join(" ").toLowerCase().includes(t)));
-const groups=new Map();for(const x of rows){const k=x.source.split("－")[0].trim();if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x);}
+const q=inp("裝備、首領、副本、任務、物品 ID（空格分隔）"),sp={value:getSpec()},slot=select([...new Set([...bySpec.values()].flatMap(s=>[...s.slots.keys()]))].sort().map(x=>[x,x]),"所有部位"),source=select([...new Set([...byItem.values()].map(x=>sourceGroup(x.source)))].sort().map(v=>[v,v]),"所有取得來源"),rank=select([["0","不限順位"],["1","第一順位"],["3","前三順位"]]),mode=select([["items","裝備清單"],["routes","依來源整理"]]),out=node("div");
+let limit=40;function draw(){out.replaceChildren();const terms=q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);const rows=[...byItem.values()].map(x=>({...x,matched:x.uses.filter(u=>(!sp.value||u.id===sp.value)&&allowed(u.id,{...x,slot:u.slot})&&(!slot.value||u.slot===slot.value)&&(!Number(rank.value)||(u.rank>0&&u.rank<=Number(rank.value))))})).filter(x=>x.matched.length&&(!source.value||sourceGroup(x.source)===source.value)&&terms.every(t=>[x.name,x.source,x.type,x.id,...x.matched.map(u=>u.name+" "+u.slot)].join(" ").toLowerCase().includes(t)));
+const groups=new Map();for(const x of rows){const k=sourceGroup(x.source);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x);}
 out.append(node("p",rows.length+" 件符合條件的物品 · "+groups.size+" 個來源分類（依原卡片文字）","gt-muted"));
 function card(x){const c=node("article",undefined,"gt-card");add(c,link(x.name,x.url),node("p",x.source),node("small",x.type+" · ID "+x.id),node("p",Object.entries(x.stats).map(([k,v])=>k+" "+v).join(" · "),"gt-muted"),node("p",x.matched.map(u=>u.name+" / "+u.slot+" #"+u.rank+(u.review?"（適用性待複核）":"")).join("、")),node("p",x.evidence||"缺少證據文字，請查證","gt-muted"));return c;}
 if(mode.value==="routes"){const sorted=[...groups].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0],"zh-Hant"));for(const [name,items] of sorted.slice(0,limit)){const d=node("details",undefined,"gt-card");d.append(node("summary",name+"｜"+items.length+" 件候選"));for(const x of items)d.append(card(x));out.append(d);}if(sorted.length>limit)out.append(button("顯示更多來源",()=>{limit+=40;draw();}));}else{rows.sort((a,b)=>Math.min(...a.matched.map(u=>u.rank||999))-Math.min(...b.matched.map(u=>u.rank||999))||a.name.localeCompare(b.name,"zh-Hant"));for(const x of rows.slice(0,limit))out.append(card(x));if(rows.length>limit)out.append(button("顯示更多裝備",()=>{limit+=40;draw();}));}
@@ -440,19 +445,19 @@ function weaponSetView(spec,model){
  d.append(out);draw();return d;
 }
 function audit(){
- title("V17.8 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V17.9 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
- const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
+ const q=inp("搜尋裝備、部位、來源或物品 ID（可用空格分隔）"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const model=savedModel(spec.id);
  const slots=[...spec.slots].map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).map(x=>model?{...x,model:modelScore(x,model.weights,model.hitBySlot?.[name])}:x).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||(model?(Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total):0)||(a.rank||999)-(b.rank||999))}));
  const excluded=[...spec.slots.values()].flat().filter(x=>!allowed(spec.id,x));
  if(feralWeaponMode(spec.id)==="twohand"){for(let i=slots.length-1;i>=0;i--){if(/副手|盾牌|單手|主手/.test(slots[i].name)&&!slots[i].items.length)slots.splice(i,1);}}
  const all=slots.flatMap(x=>x.items),sourceMissing=x=>!x.source||/待查|待核|未知|未確認/.test(x.source),evidenceMissing=x=>!x.evidence,missing=x=>sourceMissing(x)||evidenceMissing(x)||!!x.review||!!x.model?.incomplete;
- const populated=slots.filter(x=>x.items.length),firsts=slots.map(x=>x.items.find(i=>!i.review)).filter(Boolean);
+ const populated=slots.filter(x=>x.items.length),firsts=slots.map(x=>x.items.find(i=>!i.review&&!i.model?.incomplete)).filter(Boolean);
  const metrics=node("div",undefined,"gt-bis-summary");
  for(const [v,label] of [[populated.length+"/"+slots.length,"已有候選部位"],[firsts.filter(x=>!missing(x)).length+"/"+slots.length,"優先候選有來源及證據文字"],[all.length,"候選裝備筆數"],[all.filter(evidenceMissing).length,"缺證據文字"],[all.filter(sourceMissing).length,"來源待查"],[all.filter(missing).length,"需補資料候選"]]){const c=node("div",undefined,"gt-bis-metric");add(c,node("strong",String(v)),node("small",label));metrics.append(c);}
  const progress=node("div",undefined,"gt-bis-progress"),bar=node("span");bar.style.width=(slots.length?100*firsts.filter(x=>!missing(x)).length/slots.length:0)+"%";progress.append(bar);progress.setAttribute("role","progressbar");progress.setAttribute("aria-label","優先候選來源及證據文字完整度");progress.setAttribute("aria-valuenow",String(Math.round(slots.length?100*firsts.filter(x=>!missing(x)).length/slots.length:0)));
- function status(x){if(x.review)return node("span","適用性待複核","gt-bis-status gt-bis-review");return node("span",sourceMissing(x)?"來源待查":evidenceMissing(x)?"待補證據":"有來源與證據文字 · 待複核","gt-bis-status "+(sourceMissing(x)?"gt-bis-missing":evidenceMissing(x)?"gt-bis-review":"gt-bis-present"));}
+ function status(x){if(x.model?.incomplete)return node("span","計分資料不足","gt-bis-status gt-bis-review");if(x.review)return node("span","適用性待複核","gt-bis-status gt-bis-review");return node("span",sourceMissing(x)?"來源待查":evidenceMissing(x)?"待補證據":"有來源與證據文字 · 待複核","gt-bis-status "+(sourceMissing(x)?"gt-bis-missing":evidenceMissing(x)?"gt-bis-review":"gt-bis-present"));}
  function statGroup(label,entries,weapon=false){
   if(!entries.length)return null;
   const wrap=node("div"),grid=node("div",undefined,"gt-stat-group"+(weapon?" gt-stat-weapon":""));
@@ -475,8 +480,8 @@ function audit(){
   if(stats.childElementCount)c.append(stats);return c;
  }
  function evidenceView(x){const d=node("details");add(d,node("summary","來源證據與備註"),node("p",x.evidence||"未提供證據文字","gt-muted"));if(x.note)add(d,node("p",x.note,"gt-muted"));return d;}
- function draw(){out.replaceChildren();const term=q.value.trim().toLowerCase(),grid=node("div",undefined,"gt-bis-grid");let count=0;
- for(const slot of slots){const first=slot.items.find(x=>!x.review&&!x.model?.incomplete)||slot.items[0];const matches=slot.items.filter(x=>(mode.value!=="missing"||missing(x))&&[slot.name,x.name,x.source,x.id].join(" ").toLowerCase().includes(term));if(!matches.length&&(slot.items.length||term))continue;count++;
+ function draw(){out.replaceChildren();const term=q.value.trim().toLowerCase(),terms=term.split(/\s+/).filter(Boolean),grid=node("div",undefined,"gt-bis-grid");let count=0;
+ for(const slot of slots){const first=slot.items.find(x=>!x.review&&!x.model?.incomplete)||slot.items[0];const matches=slot.items.filter(x=>(mode.value!=="missing"||missing(x))&&terms.every(t=>[slot.name,x.name,x.source,x.id,x.type].join(" ").toLowerCase().includes(t)));if(!matches.length&&(slot.items.length||term))continue;count++;
  const c=node("article",undefined,"gt-bis-slot");c.append(node("h4",slot.name));if(!first){c.append(node("span","尚無候選","gt-bis-status gt-bis-missing"));grid.append(c);continue;}
  const featured=matches.includes(first)?first:matches[0];c.append(node("small",featured.review?"適用性待複核 · 原順位 "+featured.rank:model?"依本機權重比較 · 原順位 "+featured.rank:(featured.rank?"舊版候選 #"+featured.rank+" · 非構築BiS":"候選順位未標示"),"gt-muted"));add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+slots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));}
@@ -500,7 +505,7 @@ function talentHub(){
  if(!getSpec()){panel.append(node("p","請先在上方選擇職業及專精。"));return;}
  const frame=node("iframe");frame.title="天賦流派與野外練等";frame.style.cssText="display:block;width:100%;height:950px;border:0;border-radius:8px;background:#0e131c";
  fitEmbedded(frame);
- frame.src=talentPageURL(true)+"&v=17.8";
+ frame.src=talentPageURL(true)+"&v=17.9";
  add(panel,frame);
 }
 const renderers={audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
@@ -537,7 +542,7 @@ function renderBlueMode(){
  cleanupFrame();restoreLegacy();active="v12";panel.replaceChildren();
  const frame=node("iframe");frame.title="繁體中文官方藍帖";frame.style.cssText="display:block;width:100%;height:900px;border:0;border-radius:8px;background:#0e131c";
  fitEmbedded(frame);
- frame.src="blue-posts.html?embed=1&v=17.8";
+ frame.src="blue-posts.html?embed=1&v=17.9";
  panel.append(frame);
 }
 function switchMode(next,record=true){
