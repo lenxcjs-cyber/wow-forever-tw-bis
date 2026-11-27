@@ -49,6 +49,19 @@ const server=http.createServer((req,res)=>{
   assert.equal(buildCount,catalog.length,"all profile options accessible");
   assert.equal(await page.title(),"墓鐘資料庫");
   console.log("PASS: actual homepage class/spec/build selection",seen.size,buildCount);
+  if(fs.existsSync(path.join(root,"gear-catalog.json"))){
+    await classes.selectOption(classFor["spec-28"]);await spec.selectOption("spec-28");
+    await page.locator('#guild-tools button[data-tab="audit"]').click();
+    const full=page.locator(".gt-full-gear");
+    await full.locator("summary").first().click();
+    await full.locator('select:has(option[value="live"])').selectOption("all");
+    await full.locator("article").first().waitFor({state:"visible"});
+    assert.ok(await full.locator("article").count()>0,"restoration Druid gear catalog not empty");
+    await full.getByRole("button",{name:"設為同部位比較基準"}).first().click();
+    await full.getByRole("button",{name:"清除比較基準"}).waitFor({state:"visible"});
+    await full.getByRole("button",{name:"清除比較基準"}).click();
+    console.log("PASS: real catalog for restoration Druid and same-slot comparison controls");
+  }
   await classes.selectOption(classFor["spec-26"]);await spec.selectOption("spec-26");
   await build.waitFor({state:"visible"});await build.selectOption("general");
   await page.locator('#guild-tools button[data-tab="audit"]').click();
