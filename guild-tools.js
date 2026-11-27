@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V20.9 beta · 2026-11-27
+/* 墓鐘資料庫 V21.0 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -360,7 +360,7 @@ function material(){
 }
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
 function optimizer(){
- title("V20.9 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
+ title("V21.0 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
  const id=getSpec(),baseSpec=bySpec.get(id);if(!baseSpec)return;const s={...baseSpec,slots:expandCandidateSlots(baseSpec)};
  const out=node("div"),slot=select([...s.slots].map(([k])=>[k,k])),current=inp("0","number"),target=inp("留空＝不限制","number"),result=node("div");
  current.value="0";current.min="0";current.step="0.1";target.min="0";target.step="0.1";const talentHit=inp("0","number");talentHit.value="0";talentHit.min="0";talentHit.step="0.1";
@@ -939,7 +939,7 @@ function auditWeaponSlot(name,type=""){
  }
  return "";
 }
-function auditWeaponGroups(slots){
+function auditWeaponGroups(slots,compare=()=>0){
  const common=[],groups={two:[],main:[],off:[]},seen={two:new Set(),main:new Set(),off:new Set()};
  for(const slot of slots){
   if(!auditWeaponSlot(slot.name)){common.push(slot);continue;}
@@ -948,11 +948,19 @@ function auditWeaponGroups(slots){
    if(!kind||seen[kind].has(id))continue;seen[kind].add(id);groups[kind].push(x);
   }
  }
+ for(const items of Object.values(groups))items.sort(compare);
  return {common,groups,modes:[...(groups.two.length?["two"]:[]),...(groups.main.length||groups.off.length?["one"]:[])]};
 }
 function auditWeaponVisible(partition,mode){
  const {common,groups}=partition,selected=mode==="two"?[["雙手武器",groups.two]]:[["主手武器",groups.main],["副手物品",groups.off]];
  return [...common,...selected.filter(([,items])=>items.length).map(([name,items])=>({name,items}))].sort((a,b)=>auditSlotOrder(a.name)-auditSlotOrder(b.name));
+}
+function auditWeaponPreference(modes,stored){return modes.includes(stored)?stored:modes[0]||"";}
+function auditOtherWeaponMatches(partition,mode,match){
+ const other=partition.modes.find(m=>m!==mode);
+ if(!other)return {mode:"",count:0};
+ const names=other==="two"?[["雙手武器",partition.groups.two]]:[["主手武器",partition.groups.main],["副手物品",partition.groups.off]];
+ return {mode:other,count:names.reduce((n,[slot,items])=>n+items.filter(x=>match(x,slot)).length,0)};
 }
 function audit(){
  title("天賦與 BiS 裝備","合法跨甲；候選尚未經完整實戰模擬。");
@@ -961,11 +969,16 @@ function audit(){
  const saved=savedModel(spec.id),effective=effectiveGearWeights(spec.id,saved?.weights||{}),model=saved&&Object.values(effective).some(v=>v>0)?{...saved,weights:effective}:null;
  const workspace=node("div",undefined,"gt-build-workspace"),left=node("section",undefined,"gt-build-column"),right=node("section",undefined,"gt-build-column"),gearScroll=node("div",undefined,"gt-gear-scroll"),gearFilters=node("div",undefined,"gt-gear-filters"),jump=select([["","跳至裝備部位"]]),compact=select([["full","完整屬性"],["compact","精簡裝備列表"]]);
  const candidateSlots=expandCandidateSlots(spec);
- const slots=[...candidateSlots].sort((a,b)=>auditSlotOrder(a[0])-auditSlotOrder(b[0])).map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).map(x=>model?{...x,model:modelScore(x,model.weights,model.hitBySlot?.[name])}:x).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||(model?(Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total):0)||Number(!!b.priority)-Number(!!a.priority)||(a.rank||999)-(b.rank||999))}));
+ const compare=(a,b)=>Number(!!a.review)-Number(!!b.review)||(model?(Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total):0)||Number(!!b.priority)-Number(!!a.priority)||(a.rank||999)-(b.rank||999);
+ const slots=[...candidateSlots].sort((a,b)=>auditSlotOrder(a[0])-auditSlotOrder(b[0])).map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).map(x=>model?{...x,model:modelScore(x,model.weights,model.hitBySlot?.[name])}:x).sort(compare)}));
  const excluded=[...candidateSlots.values()].flat().filter(x=>!allowed(spec.id,x));
  if(feralWeaponMode(spec.id)==="twohand"){for(let i=slots.length-1;i>=0;i--){if(/副手|盾牌|單手|主手/.test(slots[i].name)&&!slots[i].items.length)slots.splice(i,1);}}
- const partition=auditWeaponGroups(slots),weaponMode=select(partition.modes.map(m=>[m,m==="two"?"雙手武器":"單手＋副手（或雙持）"]));
+ const partition=auditWeaponGroups(slots,compare),weaponMode=select(partition.modes.map(m=>[m,m==="two"?"雙手武器":"單手＋副手（或雙持）"]));
+ const weaponModeKey="gt-weapon-view-v1:"+spec.id+":"+buildFor(spec.id);
+ let storedMode="";try{storedMode=localStorage.getItem(weaponModeKey)||"";}catch(e){}
+ weaponMode.value=auditWeaponPreference(partition.modes,storedMode);
  weaponMode.id="gt-gear-weapon-mode";
+ function chooseWeaponMode(value){if(!partition.modes.includes(value))return;weaponMode.value=value;try{localStorage.setItem(weaponModeKey,value);}catch(e){}draw();}
  const all=slots.flatMap(x=>x.items),sourceMissing=x=>!x.source||/待查|待核|未知|未確認|衝突/.test(x.source+" "+(x.availability||"")),evidenceMissing=x=>!x.evidence,missing=x=>sourceMissing(x)||evidenceMissing(x)||!!x.review||!!x.model?.incomplete;
  const populated=slots.filter(x=>x.items.length),firsts=slots.map(x=>x.items.find(i=>!i.review&&!i.model?.incomplete)).filter(Boolean);
  const metrics=node("div",undefined,"gt-bis-summary");
@@ -995,11 +1008,12 @@ function audit(){
  }
  function evidenceView(x){const d=node("details");add(d,node("summary","來源與備註"),node("p",x.evidence||"未提供證據文字","gt-muted"));if(x.externalCandidate)add(d,node("p",[x.acquisition,x.bond,x.availability].filter(Boolean).join("｜"),"gt-muted"));const ref=communityMatch(spec.id,buildFor(spec.id),x);if(ref)add(d,node("p","外部同ID／手位推薦："+(ref.known?"來源有記錄":"取得待查")+"（11/25；非本站已驗證BiS）","gt-muted"));if(x.note)add(d,node("p",x.note,"gt-muted"));for(const [i,url] of (x.sourceRefs||[]).entries())add(d,link("外部查證來源 "+(i+1),url),node("p",""));return d;}
  function draw(){out.replaceChildren();const term=q.value.trim().toLowerCase(),terms=term.split(/\s+/).filter(Boolean),grid=node("div",undefined,"gt-bis-grid");let count=0;
- const visibleSlots=auditWeaponVisible(partition,weaponMode.value);for(const slot of visibleSlots){const first=slot.items.find(x=>!x.review&&!x.model?.incomplete)||slot.items[0];const matches=slot.items.filter(x=>(mode.value!=="missing"||missing(x))&&acquisitionMatches(x,acq.value)&&auditMatches(x,slot.name,terms));if(!matches.length&&(slot.items.length||term||acq.value||mode.value==="missing"))continue;count++;
+ const match=(x,slot)=>(mode.value!=="missing"||missing(x))&&acquisitionMatches(x,acq.value)&&auditMatches(x,slot,terms);
+ const visibleSlots=auditWeaponVisible(partition,weaponMode.value);for(const slot of visibleSlots){const first=slot.items.find(x=>!x.review&&!x.model?.incomplete)||slot.items[0];const matches=slot.items.filter(x=>match(x,slot.name));if(!matches.length&&(slot.items.length||term||acq.value||mode.value==="missing"))continue;count++;
  const c=node("article",undefined,"gt-bis-slot");c.dataset.slot=slot.name;c.append(node("h4",slot.name));if(!first){c.append(node("span","尚無候選","gt-bis-status gt-bis-missing"));grid.append(c);continue;}
  const featured=matches.includes(first)?first:matches[0];add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
- add(out,node("p","顯示 "+count+" / "+visibleSlots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));jump.replaceChildren(new Option("跳至裝備部位",""),...Array.from(grid.children).map(c=>new Option(c.dataset.slot,c.dataset.slot)));gearScroll.scrollTop=0;}
- const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);acq.addEventListener("change",draw);weaponMode.addEventListener("change",draw);
+ add(out,node("p","顯示 "+count+" / "+visibleSlots.length+" 個已列部位","gt-muted"));if(term||acq.value||mode.value==="missing"){const other=auditOtherWeaponMatches(partition,weaponMode.value,match);if(other.count){const hint=node("div",undefined,"gt-other-weapon-matches");add(hint,node("span","另一種武器配置另有 "+other.count+" 件符合條件。"),button(other.mode==="two"?"查看雙手武器":"查看單手＋副手",()=>chooseWeaponMode(other.mode)));out.append(hint);}}out.append(grid);if(!count)out.append(node("p","沒有符合條件的候選。"));jump.replaceChildren(new Option("跳至裝備部位",""),...Array.from(grid.children).map(c=>new Option(c.dataset.slot,c.dataset.slot)));gearScroll.scrollTop=0;}
+ const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);acq.addEventListener("change",draw);weaponMode.addEventListener("change",()=>chooseWeaponMode(weaponMode.value));
  const frame=node("iframe",undefined,"gt-build-talent-frame");frame.title="並排天賦流派";frame.src=talentPageURL(true)+"&layout=workspace&v=20.4";frame.loading="lazy";
  const leftHead=node("div",undefined,"gt-build-column-head"),rightHead=node("div",undefined,"gt-build-column-head");
  add(leftHead,node("h4","天賦流派"),link("獨立開啟天賦",talentPageURL(false)));
