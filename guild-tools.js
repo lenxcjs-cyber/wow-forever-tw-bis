@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V18.2 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V18.3 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -467,7 +467,7 @@ function communityEvidenceView(spec,slots){
  return d;
 }
 function audit(){
- title("V18.2 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V18.3 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID（可用空格分隔）"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const model=savedModel(spec.id);
@@ -527,7 +527,7 @@ function talentHub(){
  if(!getSpec()){panel.append(node("p","請先在上方選擇職業及專精。"));return;}
  const frame=node("iframe");frame.title="天賦流派與野外練等";frame.style.cssText="display:block;width:100%;height:950px;border:0;border-radius:8px;background:#0e131c";
  fitEmbedded(frame);
- frame.src=talentPageURL(true)+"&v=18.2";
+ frame.src=talentPageURL(true)+"&v=18.3";
  add(panel,frame);
 }
 const renderers={audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
@@ -560,12 +560,35 @@ if(pickerArea)pickerArea.before(modeBar);else root.prepend(modeBar);
 const fallbackControls=[];
 if(!pickerArea&&mainSpec){let p=mainSpec.parentElement;while(p&&p!==root&&!p.contains(root)&&p.querySelectorAll("select").length<2)p=p.parentElement;if(p&&p!==root&&!p.contains(root))fallbackControls.push(p);else for(const e of [$("#class-select"),mainSpec])if(e)fallbackControls.push(e.closest("label")||e);}
 function setModeHidden(e,hidden){if(!e)return;if(hidden){if(!e.hasAttribute("data-gt-mode-hidden")){e.dataset.gtModeHidden=e.style.getPropertyValue("display");e.dataset.gtModePriority=e.style.getPropertyPriority("display");}e.style.setProperty("display","none","important");}else if(e.hasAttribute("data-gt-mode-hidden")){const v=e.dataset.gtModeHidden,p=e.dataset.gtModePriority;if(v)e.style.setProperty("display",v,p);else e.style.removeProperty("display");delete e.dataset.gtModeHidden;delete e.dataset.gtModePriority;}}
+const bluePosts=[{"key":"203","date":"2026-11-25","title":"線上修正－11月25日","author":"Kaivax","translated":"https://exwind.net/zhTW/post/blue/203/","url":"https://us.forums.blizzard.com/en/wow/t/wow-forever-hotfixes-november-25-2026/2403040/1","sections":[{"category":"職業","title":"德魯伊、獵人及術士修正","body":"颶風最後一次傷害正常結算；修正獵人與術士寵物普通近戰爆擊率異常。平衡德魯伊天賦調整請參閱完整官方原文。"},{"category":"團本與物品","title":"地城與裝備修正","body":"哈卡的化身生成問題已修復，黑劍 Blackblade of Shahram 的加速增益只給武器持有人；律法聖契現可影響命令審判。"},{"category":"專業與附魔","title":"揭露附魔觸發修正","body":"範圍法術改成每波判定一次，而非每個目標分別觸發；引導法術不再全程受到該附魔影響。"}]},{"key":"194","date":"2026-11-23","title":"線上修正－11月23日","author":"Kaivax","translated":"https://exwind.net/zhTW/post/blue/194/","url":"https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-23-2026","sections":[{"category":"團本與物品","title":"世界增益與武器觸發","body":"切換區域不再移除世界增益，進入團本仍會移除。修正部分技能造成過多武器觸發的問題。"},{"category":"專業與附魔","title":"烹飪、工程與製皮修正","body":"數種蚌肉料理的進食效果及分類已校正；工程學迫擊砲重載配方與部分製皮圖樣的學習問題修復。"},{"category":"職業","title":"野性德魯伊套裝與其他職業修正","body":"Feralheart 四件套裝修正為5秒內每秒恢復4點能量；另有暗影牧師、毀滅術士及致死打擊天賦修正。"}]},{"key":"192","date":"2026-11-20","title":"線上修正－11月20日","author":"Kaivax","translated":"https://exwind.net/zhTW/post/blue/192/","url":"https://us.forums.blizzard.com/en/wow/t/wow-forever-hotfixes-november-25-2026/2403040/1","sections":[{"category":"職業","title":"戰鬥盜賊及惡魔術士","body":"戰鬥盜賊的戳刺可透過劍刃亂舞攻擊另一目標；取消惡魔庇護天賦後不再保留效果。每小時同一地城最多重置進入5次；雷暴三件套回能改為3%機率恢復18點。"}]},{"key":"190","date":"2026-11-19","title":"線上修正－11月19日","author":"Kaivax","translated":"https://exwind.net/zhTW/post/blue/190/","url":"https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-19-2026","sections":[{"category":"職業","title":"懲戒騎士雙手武器專精","body":"裝備雙手武器時，雙手武器專精正確強化所有神聖傷害。"}]},{"key":"179","date":"2026-11-13","title":"線上修正－11月13日","author":"Kaivax","translated":"https://exwind.net/zhTW/post/blue/179/","url":"https://us.forums.blizzard.com/en/wow/t/wow-forever-hotfixes-november-25-2026/2403040/1","sections":[{"category":"職業","title":"命令審判及風怒圖騰","body":"命令審判計為近戰攻擊，其他審判仍為遠程攻擊。風怒圖騰的近戰技能觸發規則修正，副手打擊不觸發。"},{"category":"職業","title":"恢復德魯伊、法師及聖騎士熱修","body":"野性痊癒不再允許移動施法，治療係數調高至6.6%；冰霜新星的傷害解除規則修正；命令審判按近戰攻擊處理。"}]},{"key":"local-5","date":"2026-11-13","title":"技能訓練費用退款","author":"Kaivax","translated":null,"url":null,"sections":[{"category":"客服與系統","title":"技能訓練費用退款","body":"受11月9日伺服器異常影響而遺失已購技能的玩家，可檢查遊戲信箱是否收到退款。"}]},{"key":"local-7","date":"2026-11-10","title":"拍賣場最低寄售金額調整","author":"Kaivax","translated":null,"url":null,"sections":[{"category":"客服與系統","title":"拍賣場最低寄售金額調整","body":"最低寄售金額下調至1銅幣，另修正部分郵件寄件人及送達時間異常。"}]},{"key":"local-8","date":"2026-11-08","title":"地城擊殺經驗值提高","author":"Kaivax","translated":null,"url":null,"sections":[{"category":"練等","title":"地城擊殺經驗值提高","body":"地城擊殺經驗值較先前提高50%。"}]},{"key":"199","date":"2026-11-25","title":"平衡德魯伊調整－11月25日","author":"Kaivax","translated":"https://exwind.net/zhTW/post/blue/199/","url":null,"sections":[{"category":"職業","title":"平衡德魯伊天賦重整","body":"強化星火術上限降至2點，月怒改為夢境；梟獸形態增加10%秘法與自然傷害。舊版配點須重新核對，尤其曾投入3點以上強化星火術的角色。"}]},{"key":"202","date":"2026-11-25","title":"奧特蘭克山谷調整－11月25日","author":"Kaivax","translated":"https://exwind.net/zhTW/post/blue/202/","url":null,"sections":[{"category":"戰場","title":"奧特蘭克山谷目標與聲望調整","body":"長時間對戰的額外聲望門檻改為20分鐘；擊敗中尉、佔領墓地及礦坑的聲望獎勵提高。"}]}];
+function renderBlueBoard(host){
+ const board=node("section",undefined,"gt-blue-board");board.dataset.release="18.3";board.id="gt-blue-board";
+ const sourceURL="https://exwind.net/zhTW/blue/forever/";
+ add(board,node("h3","永恆官方藍帖"),node("p","V18.3 · 首頁直接閱讀 · 不使用外部嵌入框","gt-muted"),node("p","繁體中文選錄摘要，最近核對 2026/11/27；非即時同步。每則公告可獨立展開或收合。","gt-muted"));
+ const src=node("div",undefined,"gt-blue-source");add(src,link("EXWIND 永恆服最新藍帖",sourceURL),link("暴雪官方繁中熱修全文","https://worldofwarcraft.blizzard.com/zh-tw/news/24315281"));board.append(src);
+ const filter=node("div",undefined,"gt-blue-filters"),q=inp("職業、技能、日期"),category=select([["","全部"],...Array.from(new Set(bluePosts.flatMap(p=>p.sections.map(x=>x.category)))).map(x=>[x,x])]),count=node("p",undefined,"gt-muted"),out=node("div");q.id="blue-query";category.id="blue-category";count.setAttribute("role","status");out.id="blue-list";
+ add(filter,field("搜尋公告",q),field("分類",category));add(board,filter,count,out);
+ const expanded=new Set();
+ function draw(){
+  for(const d of out.querySelectorAll("details")){if(d.open)expanded.add(d.dataset.postKey);else expanded.delete(d.dataset.postKey);}
+  out.replaceChildren();
+  const terms=q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const list=bluePosts.slice().sort((a,b)=>b.date.localeCompare(a.date)).filter(p=>(!category.value||p.sections.some(x=>x.category===category.value))&&terms.every(t=>[p.title,p.author,p.date,...p.sections.flatMap(x=>[x.category,x.title,x.body])].join(" ").toLowerCase().includes(t)));
+  count.textContent="顯示 "+list.length+" 篇公告";
+  for(const p of list){
+   const article=node("article"),d=node("details"),head=node("summary"),meta=node("div"),body=node("div",undefined,"gt-blue-body");d.dataset.postKey=p.key;
+   add(meta,node("div",p.title,"gt-blue-title"),node("div","永恆服 · "+p.date+" · "+[...new Set(p.sections.map(x=>x.category))].join("／")+(p.author?" · "+p.author:""),"gt-blue-meta"));head.append(meta);
+   body.append(node("p","公會繁中摘要（非官方全文）","gt-muted"));
+   for(const section of p.sections)add(body,node("h4",section.title),node("p",section.body));
+   const links=node("div",undefined,"gt-blue-source");links.append(link(p.translated?"閱讀 EXWIND 繁中全文":"EXWIND 永恆藍帖列表",p.translated||sourceURL));if(p.url)links.append(link("閱讀官方原文",p.url));body.append(links);
+   add(d,head,body);d.open=expanded.has(p.key);d.addEventListener("toggle",()=>{if(!d.isConnected)return;if(d.open)expanded.add(p.key);else expanded.delete(p.key);});article.append(d);out.append(article);
+  }
+  if(!list.length)out.append(node("p","沒有符合搜尋的公告。","gt-muted"));
+ }
+ q.addEventListener("input",draw);category.addEventListener("change",draw);host.append(board);draw();
+}
 function renderBlueMode(){
- cleanupFrame();restoreLegacy();active="v12";panel.replaceChildren();
- const frame=node("iframe");frame.title="繁體中文官方藍帖";frame.style.cssText="display:block;width:100%;height:900px;border:0;border-radius:8px;background:#0e131c";
- fitEmbedded(frame);
- frame.src="blue-posts.html?embed=1&v=18.2";
- panel.append(frame);
+ cleanupFrame();restoreLegacy();active="v12";panel.replaceChildren();renderBlueBoard(panel);
 }
 function switchMode(next,record=true){
  if(!["class","blue"].includes(next))return;
