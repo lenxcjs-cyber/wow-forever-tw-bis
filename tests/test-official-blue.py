@@ -19,6 +19,9 @@ class Tests(unittest.TestCase):
         text="Damage increased to 10 percent for the ability.\nMana cost reduced by 5 percent.\n"+"Long "*60
         facts=blue.selected_facts(text);self.assertEqual(len(facts),2)
         self.assertLessEqual(sum(len(x.split()) for x in facts),25)
+    def test_class_mentions(self):
+        self.assertEqual(blue.class_mentions("Druid and Mages", "Warriors, warlock; damage to hunters"),["warrior","hunter","mage","warlock","druid"])
+        self.assertEqual(blue.class_mentions("A damaged item", "A rogueish object and priesthood"),[])
     def test_checkpoint(self):
         from datetime import timedelta
         stamp=datetime(2026,11,27,12,tzinfo=timezone.utc)
