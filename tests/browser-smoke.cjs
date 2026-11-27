@@ -68,7 +68,13 @@ const server=http.createServer((req,res)=>{
   assert.equal(await bf.locator("iframe").count(),0,"no external frame before user action");
   await bf.locator("#posts details.post-toggle > summary").first().click();
   assert.equal(await bf.locator("#posts details.post-toggle[open]").count(),1);
-  await bf.locator("#collapse-posts").click();
+  assert.equal(await bf.locator("#expand-posts, #collapse-posts").count(),0);
+  await bf.locator("#posts details.post-toggle > summary").nth(1).click();
+  assert.equal(await bf.locator("#posts details.post-toggle[open]").count(),2);
+  await bf.locator("#posts details.post-toggle > summary").first().click();
+  assert.equal(await bf.locator("#posts details.post-toggle[open]").count(),1);
+  assert.equal(await bf.locator("#posts details.post-toggle").nth(1).getAttribute("open"),"");
+  await bf.locator("#posts details.post-toggle > summary").nth(1).click();
   assert.equal(await bf.locator("#posts details[open]").count(),0);
   await bf.locator("#live-source summary").click();
   await bf.locator("#live-source iframe").waitFor({state:"attached"});
