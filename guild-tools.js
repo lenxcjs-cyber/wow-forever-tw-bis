@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V19.9 beta · 2026-11-27
+/* 墓鐘資料庫 V20.0 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -357,7 +357,7 @@ function material(){
 }
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
 function optimizer(){
- title("V19.9 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
+ title("V20.0 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
  const id=getSpec(),baseSpec=bySpec.get(id);if(!baseSpec)return;const s={...baseSpec,slots:expandCandidateSlots(baseSpec)};
  const out=node("div"),slot=select([...s.slots].map(([k])=>[k,k])),current=inp("0","number"),target=inp("留空＝不限制","number"),result=node("div");
  current.value="0";current.min="0";current.step="0.1";target.min="0";target.step="0.1";const talentHit=inp("0","number");talentHit.value="0";talentHit.min="0";talentHit.step="0.1";
@@ -637,6 +637,51 @@ function catalogArmorPlan(spec,records,prof,weights,options={}){
  });
  return {groups,total:groups.reduce((n,g)=>n+g.picks.reduce((a,p)=>a+p.score.total,0),0),filled:groups.reduce((n,g)=>n+g.picks.length,0),expected:catalogArmorGroups.reduce((n,g)=>n+g[1],0)};
 }
+// Compare an armor-set constraint against the unconstrained additive armor plan.
+function catalogSetName(x){return typeof x.item_set==="string"?x.item_set.trim():"";}
+function catalogSetPools(spec,records,prof,weights,options={}){
+ const pools=new Map(catalogArmorGroups.map(([slot])=>[slot,[]])),seen=new Set();
+ for(const x of records){
+  const slot=gearSlotNames[x.slot],id=String(x.id??"");
+  if(!id||seen.has(id)||!pools.has(slot)||!catalogSourceRecorded(x)||!gearCatalogEligible(spec,x,prof)||Number(x.quality||0)<Number(options.minQuality||0))continue;
+  if(options.excludeEffects&&(catalogSetName(x)||x.effects||x.other_stats))continue;
+  const score=catalogWeightScore(x,weights);if(!score.used||!Number.isFinite(score.total))continue;
+  seen.add(id);pools.get(slot).push({item:x,score});
+ }
+ for(const rows of pools.values())rows.sort((a,b)=>b.score.total-a.score.total||Number(a.item.id)-Number(b.item.id));
+ return pools;
+}
+function catalogSetCounts(picks){
+ const counts=new Map();
+ for(const p of picks){const name=catalogSetName(p.item);if(name)counts.set(name,(counts.get(name)||0)+1);}
+ return [...counts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+}
+function catalogSetOptions(pools){
+ const names=new Map();
+ for(const [slot,rows] of pools){const max=catalogArmorGroups.find(g=>g[0]===slot)[1],local=new Map();
+  for(const p of rows){const name=catalogSetName(p.item);if(name)local.set(name,(local.get(name)||0)+1);}
+  for(const [name,count] of local)names.set(name,(names.get(name)||0)+Math.min(count,max));
+ }
+ return [...names].filter(([,n])=>n>=2).sort((a,b)=>a[0].localeCompare(b[0]));
+}
+function catalogSetAlternative(pools,name,minimum){
+ if(!name||!Number.isInteger(minimum)||minimum<2||minimum>14)return null;
+ let states=new Map([[0,{total:0,picks:[]}]]);
+ for(const [slot,capacity] of catalogArmorGroups){
+  const rows=pools.get(slot)||[],yes=rows.filter(p=>catalogSetName(p.item)===name),no=rows.filter(p=>catalogSetName(p.item)!==name&&p.score.total>0);
+  const next=new Map();
+  for(let count=0;count<=Math.min(capacity,yes.length);count++){
+   const chosen=[...yes.slice(0,count),...no.slice(0,capacity-count)].map(p=>({...p,slot}));
+   const score=chosen.reduce((sum,p)=>sum+p.score.total,0);
+   for(const [oldCount,prev] of states){const total=prev.total+score,key=oldCount+count,existing=next.get(key);
+    if(!existing||total>existing.total)next.set(key,{total,picks:[...prev.picks,...chosen]});
+   }
+  }
+  states=next;
+ }
+ const feasible=[...states].filter(([count])=>count>=minimum).sort((a,b)=>b[1].total-a[1].total||b[0]-a[0]);
+ return feasible.length?{count:feasible[0][0],...feasible[0][1]}:null;
+}
 const catalogDpsKeys={"主手":"主手DPS","副手":"副手DPS","雙手武器":"雙手DPS","遠程":"遠程DPS"};
 function catalogWeaponScore(x,position,weights){
  const score=catalogWeightScore(x,weights);
@@ -743,6 +788,24 @@ function catalogArmorPlanView(spec){
     const w=node("section",undefined,"gt-card gt-catalog-weapon-plan");add(w,node("h4","武器與遠程／聖物"),node("p",weapon.melee?weapon.melee.kind+"｜"+weapon.melee.total.toFixed(2):"沒有可計分的合法近戰武器組合；保留空位","gt-muted"),node("p","武器DPS採用已儲存的對應手位權重；缺少或僅有估算DPS的武器在需要DPS權重時排除。盾牌、持有型副手、聖物不計武器DPS；形態轉換及觸發尚未模擬。","gt-muted"));
     for(const {item:x,position,score} of [...(weapon.melee?.picks||[]),...weapon.extra])add(w,node("p",position+"｜"+score.total.toFixed(2)),link(zhItem(x)+"（"+gearType(x)+"）","https://www.wowhead.com/forever/tw/item="+x.id),node("p",score.parts.map(v=>v.label+" "+v.value+" × "+v.weight).join("；")||"無已計分屬性","gt-muted"),node("p",x.source_summary||"來源待查"));
     rows.append(w);
+    const setPanel=node("section",undefined,"gt-card gt-catalog-set-plan"),baseline=plan.groups.flatMap(g=>g.picks.map(p=>({...p,slot:g.slot}))),setCounts=catalogSetCounts(baseline);
+    add(setPanel,node("h4","套裝件數與散件取捨"),node("p",setCounts.length?"目前防具方案："+setCounts.map(([n,c])=>zhDisplay(n)+" "+c+" 件").join("；"):"目前防具方案未包含已標記套裝。","gt-muted"),node("p","僅依客戶端套裝名稱辨識，名稱相同不保證套裝ID一致。指定最低件數可找出面板分數最高的防具替代方案；套裝效果不自動計分。","gt-muted"));
+    const pools=catalogSetPools(spec,data.items,data.prof,weights,options),sets=catalogSetOptions(pools);
+    if(sets.length){
+     const setSelect=select(sets.map(([n,c])=>[n,zhDisplay(n)+"（最多 "+c+" 件）"])),target=select([]),detail=node("div");
+     function targets(){const count=sets.find(([n])=>n===setSelect.value)?.[1]||2;target.replaceChildren(...Array.from({length:count-1},(_,i)=>new Option((i+2)+" 件",String(i+2))));target.value=String(Math.min(4,count));}
+     function compare(){
+      const result=catalogSetAlternative(pools,setSelect.value,Number(target.value));detail.replaceChildren();
+      if(!result){detail.append(node("p","未找到符合件數要求的方案。"));return;}
+      const delta=plan.total-result.total,baseIds=new Set(baseline.map(p=>String(p.item.id))),newIds=new Set(result.picks.map(p=>String(p.item.id)));
+      add(detail,node("p","替代防具："+result.count+" 件指定套裝｜面板分 "+result.total.toFixed(2)+"｜相較散件方案差額 "+delta.toFixed(2)+"；套裝額外收益至少需補足此差額才可能更佳。","gt-muted"));
+      for(const p of result.picks.filter(p=>!baseIds.has(String(p.item.id))))add(detail,node("p","加入 "+p.slot+"｜"+zhItem(p.item)+"｜"+p.score.total.toFixed(2)),link("物品資料","https://www.wowhead.com/forever/tw/item="+p.item.id));
+      for(const p of baseline.filter(p=>!newIds.has(String(p.item.id))))detail.append(node("p","移除 "+p.slot+"｜"+zhItem(p.item)+"｜"+p.score.total.toFixed(2),"gt-muted"));
+      if(result.picks.every(p=>baseIds.has(String(p.item.id)))&&baseline.every(p=>newIds.has(String(p.item.id))))detail.append(node("p","原方案已符合指定套裝件數。"));
+     }
+     setSelect.addEventListener("change",()=>{targets();compare();});target.addEventListener("change",compare);add(setPanel,field("指定防具套裝",setSelect),field("最低套裝件數",target),detail);targets();compare();
+    }else setPanel.append(node("p","此篩選條件下沒有至少兩件的已標記套裝候選。","gt-muted"));
+    rows.append(setPanel);
    }
    quality.addEventListener("change",draw);effect.addEventListener("change",draw);draw();
   }catch(e){started=false;out.replaceChildren(node("p","裝備目錄暫時無法讀取，收合後重試。"));}
@@ -780,7 +843,7 @@ function gearCatalogView(spec){
  });return d;
 }
 function audit(){
- title("V19.9 · 跨甲 BiS 裝備、武器與準備資料總覽","跨甲以實際效益為優先；不因護甲較低而排除合法裝備。優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V20.0 · 跨甲 BiS 裝備、武器與準備資料總覽","跨甲以實際效益為優先；不因護甲較低而排除合法裝備。優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID（可用空格分隔）"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),acq=select([["","全部取得方式"],["聲望","聲望"],["世界掉落","世界掉落"],["製作","專業製作"],["裝綁","裝備綁定／拍賣場"],["任務","任務"],["商人","商人／兌換"],["其他","其他（含副本）"]]),out=node("div");acq.id="gt-acquisition-filter";acq.setAttribute("aria-label","取得方式");
  const model=savedModel(spec.id);
