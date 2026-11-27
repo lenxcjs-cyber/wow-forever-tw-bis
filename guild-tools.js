@@ -495,13 +495,55 @@ function expandCandidateSlots(spec){
   let keys=expandedSlot(p.kind,result);if(!keys.length){keys=[p.kind];result.set(p.kind,[]);}
   for(const slot of keys){
    const items=result.get(slot),idx=items.findIndex(x=>String(x.id)===String(p.id)),old=idx>=0?items[idx]:null;
-   const x={...(old||{}),id:String(p.id),name:p.name,url:"https://foreverbis.net/item/"+p.id+"/",slot,type:p.type,stats:p.stats,wm:p.wm||{},rank:0,source:p.source,evidence:p.refs.join(" ｜ "),note:p.reason,review:old?.review||"",acquisition:p.tag,bond:p.bond,availability:p.availability,sourceRefs:p.refs,externalCandidate:true,priority:spec.id==="spec-26"&&p.id===19323&&feralWeaponMode(spec.id)==="twohand"};
+   const x={...(old||{}),id:String(p.id),name:p.name,url:"https://foreverbis.net/item/"+p.id+"/",slot,type:p.type,stats:p.stats,wm:p.wm||{},rank:0,source:p.source,evidence:p.refs.join(" ｜ "),note:p.reason,review:"",acquisition:p.tag,bond:p.bond,availability:p.availability,sourceRefs:p.refs,externalCandidate:true,priority:spec.id==="spec-26"&&p.id===19323&&feralWeaponMode(spec.id)==="twohand"};
    if(idx>=0)items[idx]=x;else items.push(x);
   }
  }
  return result;
 }
 function acquisitionType(x){if(x.acquisition)return x.acquisition;const s=String(x.source||"");if(/聲望|崇拜|尊敬|崇敬|reputation/i.test(s))return "聲望";if(/世界掉落|world drop/i.test(s))return "世界掉落";if(/製作|鍛造|製皮|裁縫|工程|crafted/i.test(s))return "製作";if(/裝備綁定|裝綁|拍賣|BoE/i.test(s))return "裝綁";if(/任務|quest/i.test(s))return "任務";if(/商人|購買|兌換|vendor/i.test(s))return "商人";return "其他";}
+const gearCatalogClasses=["Warrior","Paladin","Hunter","Rogue","Priest","Shaman","Mage","Warlock","Druid"],gearClassBits=[1,2,3,4,5,7,8,9,11];
+const gearSlotNames={"Head":"頭部","Neck":"頸部","Shoulder":"肩部","Back":"背部","Chest":"胸部","Robe":"胸部","Wrist":"手腕","Hands":"手部","Waist":"腰部","Legs":"腿部","Feet":"腳部","Finger":"戒指","Trinket":"飾品","One-Hand":"主手","Main Hand":"主手","Off Hand":"副手","Held In Off-hand":"副手","Shield":"副手","Two-Hand":"雙手武器","Ranged":"遠程","Thrown":"遠程","Relic":"聖物"};
+const gearStatNames={strength:"力量",agility:"敏捷",stamina:"耐力",intellect:"智力",spirit:"精神",attack_power:"攻擊強度",ranged_attack_power:"遠程攻強",hit:"命中（來源單位）",crit:"爆擊（來源單位）",haste:"急速（來源單位）",spell_power:"法術能量",healing:"治療",spell_damage:"法術傷害",mp5:"每5秒法力",armor:"護甲",bonus_armor:"額外護甲",defense:"防禦",dodge:"閃躲",parry:"招架",block:"格擋",block_value:"格擋值"};
+function gearClassIndex(id){return Math.floor((Number(id.split("-")[1])-1)/3);}
+function gearType(x){const map={"Dagger":"匕首","Fist Weapon":"拳套","Staff":"法杖","Polearm":"長柄武器","Shield":"盾牌","Miscellaneous":"持有型副手","Idol":"塑像","Totem":"圖騰","Libram":"聖契","Cloth":"布甲","Leather":"皮甲","Mail":"鎖甲","Plate":"鎧甲"};if(x.slot==="Held In Off-hand")return "持有型副手";if(x.slot==="Shield")return "盾牌";return (x.slot==="Two-Hand"?"雙手":x.slot==="Main Hand"?"主手限定":x.slot==="One-Hand"?"單手":"")+(map[x.subclass]||x.subclass||"");}
+function gearCatalogEligible(spec,x,prof){
+ const index=gearClassIndex(spec.id),cls=gearCatalogClasses[index],bit=1<<(gearClassBits[index]-1),p=prof[cls]||prof[cls?.toLowerCase()];
+ if(!p||!gearSlotNames[x.slot]||Number(x.required_level||0)>60||!["Weapon","Armor"].includes(x.item_class))return false;
+ const mask=Number(x.class_mask??-1);if(mask!==-1&&mask!==0&&!(mask&bit))return false;
+ if(x.item_class==="Weapon"&&!p.weapons?.includes(x.subclass)&&!(cls==="Druid"&&/Polearm/i.test(x.subclass)))return false;
+ if(x.item_class==="Armor"&&["Cloth","Leather","Mail","Plate","Shield"].includes(x.subclass)&&!(p.armor?.[x.subclass]!==undefined&&Number(p.armor[x.subclass])<=60))return false;
+ if(x.item_class==="Armor"&&["Idol","Libram","Totem"].includes(x.subclass)&&!({Druid:"Idol",Paladin:"Libram",Shaman:"Totem"}[cls]===x.subclass))return false;
+ const candidate={slot:gearSlotNames[x.slot],type:gearType(x)};
+ // Generic one-hand weapons may also be usable in off-hand; check both without inventing a dual-wield permission.
+ return allowed(spec.id,candidate)||(x.slot==="One-Hand"&&allowed(spec.id,{...candidate,slot:"副手"})&&["dual","mutilate","backstab","hemo"].includes(variantFor(spec.id)?.[4]||buildFor(spec.id)));
+}
+function gearCatalogTags(x){const src=String(x.source_summary||""),rep=String(x.required_reputation||""),bond=String(x.bonding||"");const tags=[];if(/world.drop/i.test(src))tags.push("世界掉落");if(/equip|BoE|裝備綁定/i.test(bond))tags.push("裝綁");if(/craft/i.test(src))tags.push("製作");if(rep||/reputation|exalted|revered|honored/i.test(src))tags.push("聲望");if(/quest/i.test(src))tags.push("任務");if(/vendor/i.test(src))tags.push("商人");if(/drop/i.test(src)&&!tags.includes("世界掉落"))tags.push("掉落");return tags.length?tags:["待查"];}
+let gearCatalogPromise=null;
+function loadGearCatalog(){
+ if(!gearCatalogPromise)gearCatalogPromise=(async()=>{const read=async url=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),18000);try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw Error("HTTP "+r.status);return await r.json();}finally{clearTimeout(t);}};
+ let d;try{d=await read("gear-catalog.json");}catch(e){const base="https://gblaku.github.io/wow-forever-kb/api/";const [items,prof,meta]=await Promise.all([read(base+"items.json"),read(base+"proficiency.json"),read(base+"meta.json")]);d={items,prof,meta};}
+ if(!Array.isArray(d.items)||!d.prof||!d.meta||!d.meta.client_build)throw Error("資料格式不符");return d;
+ })().catch(e=>{gearCatalogPromise=null;throw e;});return gearCatalogPromise;
+}
+function gearCatalogView(spec){
+ const d=node("details",undefined,"gt-card gt-full-gear");add(d,node("summary","全來源裝備資料庫（世界掉落、裝綁、聲望、製作、任務及副本）"),node("p","依本專精的職業資格和構築武器規則查詢；來源含經典推定，不代表全部已開放。預設只顯示來源記載為永恆客戶端且有取得記錄的物品；不是 BiS 排名。","gt-muted"));
+ const status=node("p","展開後載入裝備資料。","gt-muted"),out=node("div");add(d,link("完整資料 API 與來源說明","https://github.com/gBlaku/wow-forever-kb#data-api"),status,out);
+ let started=false;
+ d.addEventListener("toggle",async()=>{if(!d.open||started)return;started=true;status.textContent="正在讀取裝備資料…";
+ try{const data=await loadGearCatalog();if(!d.isConnected)return;
+ const eligible=data.items.filter(x=>gearCatalogEligible(spec,x,data.prof)),q=inp("名稱、物品ID、來源、屬性"),sl=select([["","全部部位"],...Array.from(new Set(Object.values(gearSlotNames))).map(v=>[v,v])]),kind=select([["","全部取得方式"],...["世界掉落","裝綁","製作","聲望","任務","商人","掉落","待查"].map(v=>[v,v])]),scope=select([["live","客戶端資料＋取得記錄"],["all","含經典推定及來源待查"]]),sort=select([["item_level","物品等級"],["dps","武器DPS"],...Object.entries(gearStatNames).map(([k,v])=>[k,v])]),list=node("div");let limit=40;
+ status.textContent="來源版本："+data.meta.client_build+"｜"+eligible.length+" 件符合初步裝備資格（含待查）";
+ function draw(){list.replaceChildren();const terms=q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);const rows=eligible.filter(x=>(scope.value==="all"||(!Number(x.estimated)&&String(x.source_summary||"").trim()))&&(!sl.value||gearSlotNames[x.slot]===sl.value)&&(!kind.value||gearCatalogTags(x).includes(kind.value))&&terms.every(t=>[x.name,x.id,x.source_summary,x.required_reputation,gearType(x),gearCatalogTags(x).join(" "),gearSlotNames[x.slot],...Object.keys(gearStatNames).filter(k=>x[k]).map(k=>gearStatNames[k])].join(" ").toLowerCase().includes(t))).sort((a,b)=>Number(b[sort.value]||0)-Number(a[sort.value]||0)||Number(b.item_level||0)-Number(a.item_level||0)||a.id-b.id);
+ list.append(node("p",rows.length+" 件候選；依單項數值排序，非專精BiS。","gt-muted"));
+ for(const x of rows.slice(0,limit)){const c=node("article",undefined,"gt-card");add(c,link(x.name+"（ID "+x.id+"）","https://www.wowhead.com/forever/item="+x.id),node("p",gearSlotNames[x.slot]+"｜"+gearType(x)+"｜"+gearCatalogTags(x).join("・")+"｜"+(Number(x.estimated)?"經典推定":"客戶端資料；取得狀態待逐件確認"),"gt-muted"),node("p",x.source_summary||"取得來源待查"));
+ const stats=Object.entries(gearStatNames).filter(([k])=>Number(x[k])).map(([k,v])=>v+" "+x[k]);if(x.dps)stats.unshift("武器DPS "+x.dps);if(stats.length)c.append(node("p",stats.join(" · ")));if(x.effects)c.append(node("p",String(x.effects),"gt-muted"));if(x.required_reputation)c.append(node("p","聲望條件："+x.required_reputation,"gt-muted"));list.append(c);}
+ if(rows.length>limit)list.append(button("顯示更多40件",()=>{limit+=40;draw();}));if(!rows.length)list.append(node("p","沒有符合條件的裝備。"));
+ }
+ for(const e of [q,sl,kind,scope,sort])e.addEventListener(e===q?"input":"change",()=>{limit=40;draw();});add(out,field("搜尋",q),field("部位",sl),field("來源",kind),field("資料範圍",scope),field("排序（非BiS）",sort),list);draw();
+ }catch(e){started=false;status.textContent="資料來源暫時無法讀取；收合後再次展開可重試，原有候選不受影響。";out.replaceChildren(link("開啟外部完整裝備查詢","https://gblaku.github.io/wow-forever-kb/"));}
+ });return d;
+}
 function audit(){
  title("V18.5 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
@@ -516,7 +558,7 @@ function audit(){
  const metrics=node("div",undefined,"gt-bis-summary");
  for(const [v,label] of [[populated.length+"/"+slots.length,"已有候選部位"],[firsts.filter(x=>!missing(x)).length+"/"+slots.length,"優先候選有來源及證據文字"],[all.length,"候選裝備筆數"],[all.filter(evidenceMissing).length,"缺證據文字"],[all.filter(sourceMissing).length,"來源待查"],[all.filter(missing).length,"需補資料候選"]]){const c=node("div",undefined,"gt-bis-metric");add(c,node("strong",String(v)),node("small",label));metrics.append(c);}
  const progress=node("div",undefined,"gt-bis-progress"),bar=node("span");bar.style.width=(slots.length?100*firsts.filter(x=>!missing(x)).length/slots.length:0)+"%";progress.append(bar);progress.setAttribute("role","progressbar");progress.setAttribute("aria-label","優先候選來源及證據文字完整度");progress.setAttribute("aria-valuenow",String(Math.round(slots.length?100*firsts.filter(x=>!missing(x)).length/slots.length:0)));
- function status(x){if(x.externalCandidate)return node("span",x.priority?"外部攻略首選 · 取得狀態待核":"跨來源候選 · 非已驗證BiS","gt-bis-status gt-bis-present");if(x.model?.incomplete)return node("span","計分資料不足","gt-bis-status gt-bis-review");if(x.review)return node("span","適用性待複核","gt-bis-status gt-bis-review");return node("span",sourceMissing(x)?"來源待查":evidenceMissing(x)?"待補證據":"有來源與證據文字 · 待複核","gt-bis-status "+(sourceMissing(x)?"gt-bis-missing":evidenceMissing(x)?"gt-bis-review":"gt-bis-present"));}
+ function status(x){if(x.model?.incomplete)return node("span","計分資料不足","gt-bis-status gt-bis-review");if(x.externalCandidate)return node("span",x.priority?"外部攻略首選 · 取得狀態待核":"跨來源候選 · 非已驗證BiS","gt-bis-status gt-bis-present");if(x.model?.incomplete)return node("span","計分資料不足","gt-bis-status gt-bis-review");if(x.review)return node("span","適用性待複核","gt-bis-status gt-bis-review");return node("span",sourceMissing(x)?"來源待查":evidenceMissing(x)?"待補證據":"有來源與證據文字 · 待複核","gt-bis-status "+(sourceMissing(x)?"gt-bis-missing":evidenceMissing(x)?"gt-bis-review":"gt-bis-present"));}
  function statGroup(label,entries,weapon=false){
   if(!entries.length)return null;
   const wrap=node("div"),grid=node("div",undefined,"gt-stat-group"+(weapon?" gt-stat-weapon":""));
@@ -544,7 +586,7 @@ function audit(){
  const c=node("article",undefined,"gt-bis-slot");c.append(node("h4",slot.name));if(!first){c.append(node("span","尚無候選","gt-bis-status gt-bis-missing"));grid.append(c);continue;}
  const featured=matches.includes(first)?first:matches[0];c.append(node("small",featured.priority&&!model?"外部攻略首選｜非本站實戰模擬":featured.review?"適用性待複核 · 原順位 "+featured.rank:model?"依本機權重比較 · 原順位 "+featured.rank:(featured.rank?"舊版候選 #"+featured.rank+" · 非構築BiS":"候選順位未標示"),"gt-muted"));add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+slots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));}
- const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);acq.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),bisReasonView(spec),excludedDetails,...(spec.id==="spec-26"&&feralWeaponMode(spec.id)==="twohand"?[catWeaponResearch(spec)]:[]),communityEvidenceView(spec,slots),metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]),field("篩選",mode),field("取得方式",acq),field("搜尋",q),out);draw();attachLegacy(spec);
+ const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);acq.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),bisReasonView(spec),excludedDetails,...(spec.id==="spec-26"&&feralWeaponMode(spec.id)==="twohand"?[catWeaponResearch(spec)]:[]),communityEvidenceView(spec,slots),gearCatalogView(spec),metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]),field("篩選",mode),field("取得方式",acq),field("搜尋",q),out);draw();attachLegacy(spec);
 }
 function talentPageURL(embedded=false){
  const id=getSpec(),p=new URLSearchParams();
