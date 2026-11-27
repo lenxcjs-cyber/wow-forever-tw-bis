@@ -72,6 +72,9 @@ for(const p of catalog.profiles){
  assert.equal(new Set(g.skills.map(row=>row[1])).size,g.skills.length,p.id+" duplicate core skills");
 }
 for(const g of Object.values(skills.specs))coreCount+=g.skills.length;
-assert.equal(coreCount,176);
+assert.equal(coreCount,177);
 assert.equal(Object.values(skills.common).flat().length,38);
-console.log("PASS: 28 spec skill guides, 176 core entries, 38 class utility entries, every build mapped");
+console.log("PASS: 28 spec skill guides, 177 core entries, 38 class utility entries, every build mapped");
+
+assert.ok(!skills.specs["spec-26"].skills.some(x=>x[1]==="Primal Bite"));
+assert.ok(skills.specs["spec-27"].skills.some(x=>x[1]==="Primal Bite"));
