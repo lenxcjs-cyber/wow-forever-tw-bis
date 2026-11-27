@@ -22,9 +22,15 @@ assert.equal(score(x,w,{base:4,talent:3,cap:9}).total,50.5);
 assert.equal(score(x,w,{base:9,talent:3,cap:9}).parts["命中機率"],0);
 assert.equal(score(x,w,{}).parts["命中機率"],6);
 assert.equal(score({...x,wm:{}},w).incomplete,true);
-for(const name of ["rogueTalentBuilds","plateTalentBuilds","hunterShamanTalentBuilds"]){
+for(const name of ["rogueTalentBuilds","plateTalentBuilds","hunterShamanTalentBuilds","casterFeralTalentBuilds","variantTalentBuilds"]){
  const match=src.match(new RegExp("const "+name+"=(.*?);"));
  assert.ok(match,name);
  for(const [id,trees] of Object.entries(JSON.parse(match[1])))assert.equal(trees.flatMap(t=>Object.values(t)).reduce((a,b)=>a+b,0),51,id);
 }
-console.log("PASS: syntax, 12 weapon rules, 4 scoring cases, 15 talent totals");
+const registry=new Function(section("const rogueProfiles=","function syncWeaponCards")+";return {skillGate,buildChoice,rogueProfiles,extraProfiles};")();
+assert.equal(Object.keys(registry.rogueProfiles).length,28);
+for(const [id,profiles] of Object.entries(registry.rogueProfiles))assert.equal(new Set(profiles.map(p=>p[0])).size,profiles.length,id);
+for(const entries of Object.values(registry.extraProfiles))for(const v of entries)assert.equal(v[2].split("/").reduce((a,b)=>a+Number(b),0),51,v[0]);
+registry.buildChoice["spec-10"]="mutilate_alt";assert.ok(registry.skillGate("spec-10",{slot:"主手",type:"單手劍"}));
+registry.buildChoice["spec-5"]="pal_dungeon";assert.ok(registry.skillGate("spec-5",{slot:"副手",type:"單手劍"}));
+console.log("PASS: syntax, weapon gates, scoring, 45 detailed talent totals and all registered variants");
