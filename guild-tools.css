@@ -76,3 +76,6 @@
 #guild-tools .gt-stat-chip.gt-stat-magic{border-left:2px solid #a7a0cb}
 #guild-tools .gt-bis-alt .gt-stat-warning{color:#f2c47d;background:#2a251d;padding:8px;border-radius:5px;margin:0}
 @media(max-width:360px){#guild-tools .gt-stat-weapon{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Blue-post mode must never expose old class equipment panels. */
+html.gt-blue-mode section.spec{display:none!important}
