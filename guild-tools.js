@@ -730,7 +730,7 @@ function validOfficialPost(p){
 }
 function combineOfficialBlue(seed,live){
  const map=new Map(seed.filter(validOfficialPost).map(p=>[p.key,p]));
- for(const p of live||[])if(validOfficialPost(p)&&["machine","pending"].includes(p.translationStatus))map.set(p.key,p);
+ for(const p of live||[])if(validOfficialPost(p)&&["machine","title-only","pending"].includes(p.translationStatus))map.set(p.key,p);
  return [...map.values()].sort((a,b)=>(b.updatedAt||b.date).localeCompare(a.updatedAt||a.date));
 }
 function renderBlueBoard(host){
@@ -750,7 +750,7 @@ function renderBlueBoard(host){
   for(const p of list){
    const article=node("article"),d=node("details"),head=node("summary"),meta=node("div"),body=node("div",undefined,"gt-blue-body");d.dataset.postKey=p.key;
    add(meta,node("div",p.title,"gt-blue-title"),node("div","永恆服 · "+p.date+" · "+[...new Set(p.sections.map(x=>x.category))].join("／")+(p.author?" · "+p.author:""),"gt-blue-meta"));head.append(meta);
-   body.append(node("p",p.translationStatus==="pending"?"官方公告已偵測 · 翻譯待處理":p.translationStatus==="machine"?"機器繁中重點 · 未人工校對 · 非全文":"公會繁中改動整理（非官方全文）","gt-muted"));if(p.updatedAt)body.append(node("p","官方更新時間："+new Date(p.updatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+"（台灣時間）"+(p.revision?"｜修訂版":""),"gt-muted"));
+   body.append(node("p",p.translationStatus==="pending"?"官方公告已偵測 · 翻譯待處理":p.translationStatus==="machine"?"機器繁中重點 · 未人工校對 · 非全文":p.translationStatus==="title-only"?"機器繁中標題 · 內文待整理":"公會繁中改動整理（非官方全文）","gt-muted"));if(p.updatedAt)body.append(node("p","官方更新時間："+new Date(p.updatedAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+"（台灣時間）"+(p.revision?"｜修訂版":""),"gt-muted"));
    for(const section of p.sections){add(body,node("h4",section.title),node("p",section.body));if(section.impact)add(body,node("p","配裝／遊玩提醒："+section.impact,"gt-blue-impact"));}
    const links=node("div",undefined,"gt-blue-source");links.append(link("閱讀暴雪官方原文",p.url||sourceURL));body.append(links);
    add(d,head,body);d.open=expanded.has(p.key);d.addEventListener("toggle",()=>{if(!d.isConnected)return;if(d.open)expanded.add(p.key);else expanded.delete(p.key);});article.append(d);out.append(article);
