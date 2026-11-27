@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V16.9 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V17.0 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -371,8 +371,65 @@ function modelScore(x,weights,hit={}){
  return {total:Object.values(parts).reduce((a,b)=>a+b,0),parts,incomplete:!!weight&&!Number.isFinite(wd)};
 }
 
+// Pair scoring uses a shared hit budget, not per-slot hit caps.
+function weaponPosition(x){
+ const slot=String(x.slot||""),type=String(x.type||"");
+ if(/遠程|遠距|魔杖|聖物|圖騰|聖契|塑像|relic|ranged/i.test(slot+" "+type))return "";
+ if(/雙手|two.hand/i.test(type))return /副手|off.hand/i.test(slot)?"":"two";
+ if(/副手|盾牌|off.hand/i.test(slot))return /主手限定|主手武器|main.hand/i.test(type)?"":"off";
+ if(/主手|單手|近戰武器|main.hand/i.test(slot)&&!/盾牌|shield|副手物品|持有|法器/i.test(type))return "main";
+ return "";
+}
+function weaponSets(items,eligible,kind){
+ const pools={two:[],main:[],off:[]},seen=new Set();
+ for(const x of items){if(!eligible(x))continue;const pos=weaponPosition(x);if(!pos)continue;const k=pos+":"+x.id;if(seen.has(k))continue;seen.add(k);pools[pos].push(x);}
+ const rows=[];
+ if(!["dual","shield","mutilate","backstab","hemo"].includes(kind))for(const x of pools.two)rows.push({items:[x],kind:"雙手武器"});
+ if(!["twohand","weaving"].includes(kind))for(const main of pools.main)for(const off of pools.off){
+  // Unknown unique-equipped limits: do not recommend two copies of the same ID.
+  if(main.id===off.id)continue;
+  if(/盾牌|shield|副手物品|持有|法器|off.hand frill/i.test(off.type||"")&&["dual","mutilate","backstab","hemo"].includes(kind))continue;
+  rows.push({items:[main,off],kind:/盾牌|shield/i.test(off.type||"")?"主手＋盾牌":"主手＋副手"});
+ }
+ return rows;
+}
+function weaponSetScore(items,weights,hit={}){
+ const parts={};let incomplete=false,rawHit=0;
+ for(const x of items){const result=modelScore(x,weights,{});incomplete||=result.incomplete;for(const [k,v] of Object.entries(result.parts))if(k!=="命中機率")parts[k]=(parts[k]||0)+v;
+ if(Number.isFinite(x.stats?.["命中機率"]))rawHit+=x.stats["命中機率"];}
+ const base=(Number.isFinite(hit.base)?Math.max(0,hit.base):0)+(Number.isFinite(hit.talent)?Math.max(0,hit.talent):0);
+ const usable=Number.isFinite(hit.cap)?Math.min(rawHit,Math.max(0,hit.cap-base)):rawHit;
+ parts["命中機率"]=usable*(weights["命中機率"]||0);
+ return {total:Object.values(parts).reduce((a,b)=>a+b,0),parts,incomplete,rawHit,usable};
+}
+function weaponSetView(spec,model){
+ const d=node("details",undefined,"gt-card");d.open=true;d.append(node("summary","武器組合比較｜雙手 vs 主副手"));
+ const id=spec.id,kind=variantFor(id)?.[4]||buildFor(id),rows=weaponSets([...spec.slots.values()].flat(),x=>allowed(id,x),kind);
+ const out=node("div"),base=inp("0","number"),talent=inp("0","number"),cap=inp("留空＝不設上限","number");
+ for(const e of [base,talent,cap]){e.min="0";e.step="0.1";}base.value="0";talent.value="0";
+ let limit=10;
+ const note=node("p","僅使用本站候選及已知武器資格；同ID不重複配戴，未驗證唯一裝備群組、武器速度觸發、套裝與其他特殊效果。非整套BiS。","gt-muted");
+ function draw(){
+  out.replaceChildren();if(!rows.length){out.append(node("p","尚無符合目前構築的完整武器組合。"));return;}
+  if(!model){out.append(node("p","尚未儲存此構築的權重，不產生武器組合分數或新排名。以下依既有候選順序供查證。","gt-muted"));}
+  const hit={base:Math.max(0,Number(base.value)||0),talent:Math.max(0,Number(talent.value)||0),cap:cap.value===""?null:Math.max(0,Number(cap.value)||0)};
+  const list=rows.map(r=>({...r,review:r.items.some(x=>!!x.review),score:model?weaponSetScore(r.items,model.weights,hit):null}));
+  if(model)list.sort((a,b)=>Number(a.review)-Number(b.review)||Number(a.score.incomplete)-Number(b.score.incomplete)||b.score.total-a.score.total);
+  out.append(node("p","符合條件的武器組合："+list.length+" 組","gt-muted"));
+  for(const [i,r] of list.slice(0,limit).entries()){
+   const c=box(out,r.kind+(r.review?" · 適用性待複核":""),r.score?"試算分："+r.score.total.toFixed(2)+(r.score.incomplete?"（缺武器DPS）":"")+"；有效命中 "+r.score.usable+"/"+r.score.rawHit+"%":"候選組合 "+(i+1)+"（未排名）");
+   for(const x of r.items)add(c,link(x.name,x.url),node("p",x.source,"gt-muted"),...(x.review?[node("p",x.review,"gt-muted")]:[]));
+   if(r.score){const details=node("details");details.append(node("summary","查看合計屬性分數"));for(const [k,v] of Object.entries(r.score.parts))if(v)details.append(node("p",k+"："+v.toFixed(2)));c.append(details);}
+  }
+  if(list.length>limit)out.append(button("顯示更多武器組合",()=>{limit+=10;draw();}));
+ }
+ add(d,note,button("設定／匯入本構築權重",()=>show("v14")));
+ if(model)add(d,node("p","命中以整組共同門檻計算；其他裝備命中不含這組武器。","gt-muted"),field("其他裝備命中 (%)",base),field("額外天賦命中 (%)",talent),field("自訂命中目標 (%)",cap));
+ for(const e of [base,talent,cap])e.addEventListener("input",()=>{limit=10;draw();});
+ d.append(out);draw();return d;
+}
 function audit(){
- title("V16.9 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V17.0 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const model=savedModel(spec.id);
@@ -411,7 +468,7 @@ function audit(){
  const c=node("article",undefined,"gt-bis-slot");c.append(node("h4",slot.name));if(!first){c.append(node("span","尚無候選","gt-bis-status gt-bis-missing"));grid.append(c);continue;}
  const featured=matches.includes(first)?first:matches[0];c.append(node("small",featured.review?"適用性待複核 · 原順位 "+featured.rank:model?"依本機權重比較 · 原順位 "+featured.rank:(featured.rank?"舊版候選 #"+featured.rank+" · 非構築BiS":"候選順位未標示"),"gt-muted"));add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+slots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));}
- const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),excludedDetails,metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),field("篩選",mode),field("搜尋",q),out);draw();attachLegacy(spec);
+ const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),excludedDetails,metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),weaponSetView(spec,model),field("篩選",mode),field("搜尋",q),out);draw();attachLegacy(spec);
 }
 function talentPageURL(embedded=false){
  const id=getSpec(),p=new URLSearchParams();
