@@ -307,3 +307,9 @@ assert.equal(expansion.catalogSetTradeoff(Infinity,97,12),null);
 const exportText=expansion.catalogPlanText({spec:"狂暴",build:"dual",version:"1.60",source:"test",filter:"不限品質",label:"測試",total:97,omitted:["命中機率"]},[{slot:"頭部",name:"測試\n頭盔",item:{id:302,source_summary:"World drop"},score:{total:20}}]);
 assert.ok(exportText.includes("非實戰BiS"));assert.ok(exportText.includes("頭部｜測試 頭盔｜ID 302｜20.00｜World drop"));assert.ok(exportText.includes("未計權重：命中機率"));
 console.log("PASS: net set benefit comparison and shareable gear plan export");
+
+const auditHelpers=new Function(section("function auditSlotOrder(","function audit(")+";return {auditSlotOrder,auditMatches};")();
+assert.deepEqual(["遠程武器","頭部","副手","主手","戒指"].sort((a,b)=>auditHelpers.auditSlotOrder(a)-auditHelpers.auditSlotOrder(b)),["頭部","戒指","主手","副手","遠程武器"]);
+assert.equal(auditHelpers.auditMatches({name:"Example",id:123,stats:{"敏捷":20},wm:{"武器DPS":10}},"主手",["敏捷","123"]),true);
+assert.equal(auditHelpers.auditMatches({name:"Example",stats:{"敏捷":20}},"主手",["智力"]),false);
+console.log("PASS: ordered equipment slots and multi-term stat search");
