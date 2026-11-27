@@ -49,10 +49,25 @@ const server=http.createServer((req,res)=>{
     await verifyWeaponView();
     if(await weaponMode.isVisible()){
      await weaponMode.selectOption("one");await verifyWeaponView();
+     await page.locator('#guild-tools button[data-tab="audit"]').click();
+     assert.equal(await weaponMode.inputValue(),"one","per-build weapon view should persist");
+
      assert.equal(await page.locator('.gt-bis-slot[data-slot="雙手武器"]').count(),0);
      await weaponMode.selectOption("two");await verifyWeaponView();
      assert.equal(await page.locator('.gt-bis-slot[data-slot="副手物品"], .gt-bis-slot[data-slot="主手武器"]').count(),0);
      assert.equal(await page.locator('#gt-gear-slot-jump option[value="副手物品"]').count(),0);
+     const other=page.locator(".gt-bis-slot[data-slot='雙手武器'] .gt-bis-name").first();
+     if(await other.count()){
+      const href=await other.getAttribute("href"),match=href?.match(/(?:item\/|item=)(\d+)/);
+      if(match){
+       await weaponMode.selectOption("one");
+       await page.locator(".gt-gear-filters input").fill(match[1]);
+       await page.locator(".gt-other-weapon-matches").getByRole("button",{name:"查看雙手武器"}).click();
+       assert.equal(await weaponMode.inputValue(),"two");
+       assert.ok(await page.locator(".gt-bis-slot[data-slot='雙手武器']").count());
+       await page.locator(".gt-gear-filters input").fill("");
+      }
+     }
     }
     await page.locator(".gt-audit-research > summary").waitFor({state:"visible"});
     assert.equal(await page.locator(".gt-audit-research").getAttribute("open"),null);
