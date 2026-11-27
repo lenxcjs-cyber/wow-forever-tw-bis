@@ -64,6 +64,18 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator("section.spec:visible").count(),0);
   const bf=page.frameLocator('iframe[title="繁體中文官方藍帖"]');
   await bf.locator("#posts article").first().waitFor({state:"visible"});
+  assert.equal(await bf.locator("#posts details.post-toggle[open]").count(),0,"posts initially collapsed");
+  assert.equal(await bf.locator("iframe").count(),0,"no external frame before user action");
+  await bf.locator("#posts details.post-toggle > summary").first().click();
+  assert.equal(await bf.locator("#posts details.post-toggle[open]").count(),1);
+  await bf.locator("#collapse-posts").click();
+  assert.equal(await bf.locator("#posts details[open]").count(),0);
+  await bf.locator("#live-source summary").click();
+  await bf.locator("#live-source iframe").waitFor({state:"attached"});
+  assert.equal(await bf.locator("#live-source iframe").getAttribute("src"),"https://exwind.net/zhTW/blue/forever/");
+  await bf.locator("#live-source summary").click();
+  await bf.locator("#live-source iframe").waitFor({state:"detached"});
+  console.log("PASS: collapsed posts and user-triggered EXWIND reader lifecycle (external requests blocked in test)");
   await bf.locator("#q").fill("德魯伊 2026-11-25");
   assert.ok(await bf.locator("#posts article").count()>0);
   await bf.locator("#q").fill("no-such-post-123");
