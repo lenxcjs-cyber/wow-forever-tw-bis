@@ -51,6 +51,7 @@ const server=http.createServer((req,res)=>{
   await classes.selectOption(classFor["spec-26"]);await spec.selectOption("spec-26");
   await build.waitFor({state:"visible"});await build.selectOption("general");
   await page.locator('#guild-tools button[data-tab="audit"]').click();
+  assert.equal(await page.locator(".gt-cat-evidence details").count(),5);
   const slots=await page.locator(".gt-bis-slot h4").allTextContents();
   assert.ok(slots.length,"feral candidate cards missing");
   assert.ok(!slots.some(x=>/副手|單手/.test(x)),"feral invalid slot: "+slots.join(","));
@@ -62,12 +63,19 @@ const server=http.createServer((req,res)=>{
   await build.selectOption("feral_onehand");
   await tf.locator("#overview").getByText("單手＋持有型副手（替代比較）",{exact:false}).first().waitFor({state:"visible"});
   assert.equal(await tf.locator("#treeArea .talent").count(),0,"alternative must not borrow another build");
+  if(fs.existsSync(path.join(root,"talent-community.json"))){
+   await tf.locator("#levelMode").click();
+   await tf.locator("#levelList .levelrow").first().waitFor({state:"visible"});
+   assert.equal(await tf.locator("#levelList .levelrow").count(),60);
+   assert.ok(await tf.locator("#treeArea .talent").count()>30);
+   console.log("PASS: imported Druid leveling route, talent grid and 60-level controls");
+  }
   console.log("PASS: embedded talent exact-match and safe missing-build mode");
   await page.locator("#gt-mode-blue").click();
   for(const selector of ["#class-select","#spec-select","#gt-build-bar","#guild-tools .gt-tabs"]){assert.equal(await page.locator(selector).isVisible(),false,selector);}
   assert.equal(await page.locator("section.spec:visible").count(),0);
   const bf=page.locator("#gt-blue-board");
-  assert.equal(await bf.getAttribute("data-release"),"18.3");
+  assert.equal(await bf.getAttribute("data-release"),"18.4");
   assert.equal(await page.locator("iframe").count(),0,"no homepage iframe in blue mode");
   await bf.locator("#blue-list article").first().waitFor({state:"visible"});
   assert.equal(await bf.locator("#blue-list details[open]").count(),0,"posts initially collapsed");
