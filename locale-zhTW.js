@@ -11,7 +11,7 @@ const pairs=Object.entries(terms).sort((a,b)=>b[0].length-a[0].length);
 const lookup=new Map(pairs.map(([k,v])=>[k.toLowerCase(),v]));
 const re=new RegExp("(?<![A-Za-z])(?:"+pairs.map(([k])=>escape(k)).join("|")+")(?![A-Za-z])","gi");
 function text(s){return String(s??"").replace(re,m=>lookup.get(m.toLowerCase())||m);}
-function item(id,raw){if(names[String(id)])return names[String(id)];if(localItems[String(id)])return localItems[String(id)]+"（參考譯名）";const original=String(raw||"");return /^[A-Za-z]/.test(original)?text(original)+"（譯名待核）":original;}
+function item(id,raw){if(names[String(id)])return names[String(id)];const original=String(raw||"");if(/[\u3400-\u9fff]/.test(original)&&!/^\s*[A-Za-z]/.test(original))return text(original);if(localItems[String(id)])return localItems[String(id)]+"（參考譯名）";return /^[A-Za-z]/.test(original)?text(original)+"（譯名待核）":original;}
 function spell(name){return spellNames[name]||null;}
 function effect(raw){
  const s=String(raw||"").trim();
