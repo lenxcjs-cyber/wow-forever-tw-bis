@@ -135,3 +135,24 @@ html.gt-blue-mode section.spec{display:none!important}
 #guild-tools .gt-item-icon{flex:0 0 36px;width:36px;height:36px;border:1px solid #54647a;border-radius:5px;overflow:hidden;background:#101923}
 #guild-tools .gt-item-icon[hidden]{display:none!important}
 #guild-tools .gt-item-icon img{display:block;width:100%;height:100%;object-fit:cover}
+
+/* V21.1: compact top navigation and optional equipment toolbar. */
+#guild-tools .gt-section-label[hidden],#guild-tools .gt-gear-filters[hidden]{display:none!important}
+#guild-tools .gt-tabs{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px;margin:6px 0 8px}
+#guild-tools .gt-nav-primary,#guild-tools .gt-nav-more-body{display:flex;flex-wrap:wrap;gap:6px}
+#guild-tools .gt-tabs button,#guild-tools .gt-nav-more>summary{box-sizing:border-box;min-height:34px;padding:6px 10px!important;font-size:13px;line-height:1.4;border-radius:6px}
+#guild-tools .gt-nav-more{min-width:0;margin:0;padding:0;background:transparent}
+#guild-tools .gt-nav-more>summary{cursor:pointer;color:#b8cbe2;border:1px solid #405873;background:#111c29}
+#guild-tools .gt-nav-more-body{padding-top:6px}
+#guild-tools .gt-panel:not(:empty){padding-top:6px;margin-top:6px}
+.gt-unified{padding:10px;margin:8px 0 14px}
+.gt-unified>#guild-tools{margin-top:6px;padding-top:6px}
+#guild-tools #gt-build-bar .gt-field{margin:4px 0 6px}
+#guild-tools #gt-build-bar select{min-height:36px;padding:5px 8px}
+#guild-tools .gt-build-workspace{margin-top:6px}
+#guild-tools .gt-gear-head-actions{display:flex;flex-wrap:wrap;gap:5px}
+#guild-tools .gt-build-column-head{padding:7px 10px}
+#guild-tools .gt-gear-filters .gt-field span{font-size:11px}
+#guild-tools .gt-gear-filters input,#guild-tools .gt-gear-filters select{min-height:32px}
+#guild-tools .gt-other-weapon-matches{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px;font-size:12px}
+@media(max-width:600px){#guild-tools .gt-tabs{gap:5px}#guild-tools .gt-nav-more-body{gap:5px}.gt-unified{padding:8px}}
