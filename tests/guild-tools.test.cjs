@@ -221,7 +221,10 @@ assert.equal(expansion.catalogSourceRecorded({estimated:1,source_summary:"World 
 assert.equal(expansion.catalogSourceRecorded({source_summary:" "}),false);
 assert.equal(expansion.catalogSourceRecorded({source_summary:"World drop"}),true);
 assert.equal(expansion.validGearCatalog({items:[],prof:{},meta:{client_build:"x"}}),false);
-assert.equal(expansion.validGearCatalog({items:[{}],prof:{},meta:{client_build:"x"}}),true);
+assert.equal(expansion.validGearCatalog({items:[{}],prof:{},meta:{client_build:"x"}}),false);
+const completeProf=Object.fromEntries(["Warrior","Paladin","Hunter","Rogue","Priest","Shaman","Mage","Warlock","Druid"].map(k=>[k,{}]));
+assert.equal(expansion.validGearCatalog({items:[{}],prof:completeProf,meta:{client_build:"x"}}),true);
+assert.equal(expansion.validGearCatalog({items:[{}],prof:completeProf,meta:{client_build:" "}}),false);
 assert.equal(expansion.catalogSlotCheck({slot:"主手",type:"雙手錘"},{slot:"Two-Hand"}),true);
 assert.equal(expansion.catalogSlotCheck({slot:"主手",type:"單手錘"},{slot:"Two-Hand"}),false);
 assert.equal(expansion.catalogSlotCheck({slot:"副手",type:"匕首"},{slot:"One-Hand"}),true);
@@ -230,3 +233,13 @@ assert.equal(expansion.catalogSlotCheck({slot:"胸部"},{slot:"Robe"}),true);
 assert.equal(expansion.catalogSlotCheck({slot:"戒指2"},{slot:"Trinket"}),false);
 assert.equal(expansion.catalogSlotCheck({slot:"特殊"},{slot:"Head"}),null);
 console.log("PASS: missing candidate discovery, catalog validation and slot mismatch checks");
+
+// A generic dagger may be equipped in either hand for a dual-dagger build; main-hand-only may not.
+const daggerRecord={item_class:"Weapon",slot:"One-Hand",subclass:"Dagger"};
+assert.equal(expansion.gearCatalogEligible({id:"spec-10"},daggerRecord,rogue,"主手"),true);
+assert.equal(expansion.gearCatalogEligible({id:"spec-10"},daggerRecord,rogue,"副手"),true);
+assert.equal(expansion.gearCatalogEligible({id:"spec-10"},{...daggerRecord,slot:"Main Hand"},rogue,"副手"),false);
+assert.equal(expansion.gearCatalogEligible({id:"spec-13"},daggerRecord,priest,"副手"),false);
+assert.equal(expansion.gearCatalogEligible({id:"spec-13"},daggerRecord,priest,"主手"),true);
+assert.deepEqual(expansion.candidateCatalogCheck({stats:{"攻擊強度":30,"治療加成":20,"命中機率":2}},{attack_power:35,healing:20,hit:5}).differences,[{label:"攻擊強度",old:30,current:35}]);
+console.log("PASS: hand-specific catalog eligibility, complete proficiency validation and expanded stat audits");
