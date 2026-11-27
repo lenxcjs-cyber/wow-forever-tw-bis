@@ -69,6 +69,17 @@ jobs:
           if test -f talent-icons.json; then
             node -e 'const d=require("./talent-icons.json");console.log("Original texture IDs mapped:",Object.keys(d).filter(k=>/^[0-9]+$/.test(k)).length)'
           fi
+      - name: Map version-matched original equipment icons
+        run: |
+          dir="$RUNNER_TEMP/item-appearance"
+          mkdir -p "$dir"
+          python3 tests/test-item-icons.py
+          if test -s /tmp/wow-listfile.csv && curl -fsSL --connect-timeout 8 --max-time 40 'https://wago.tools/db2/ItemAppearance/csv?build=1.60.1.71139' -o "$dir/ItemAppearance.csv" && curl -fsSL --connect-timeout 8 --max-time 40 'https://wago.tools/db2/ItemModifiedAppearance/csv?build=1.60.1.71139' -o "$dir/ItemModifiedAppearance.csv" && python3 scripts/map-item-icons.py "$dir" /tmp/wow-listfile.csv item-icons.json 1.60.1.71139; then
+            echo "Original item icon map generated"
+          else
+            rm -f item-icons.json
+            echo "::warning::Item icon mapping unavailable; equipment names remain usable."
+          fi
       - name: Check independent talent page and leveling routes
         run: node tests/talents-page.test.cjs
       - name: Report actual talent data availability
