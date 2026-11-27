@@ -93,3 +93,15 @@ for(const x of ["斯坦索姆－瑞文戴爾","斯坦索姆 - 瑞文戴爾","斯
 assert.equal(sourceGroup("LBRS-Boss"),"LBRS-Boss");
 for(const [id,slot,type,ok] of [["spec-1","主手 / 單手武器","法杖",true],["spec-2","副手","法杖",false],["spec-12","武器","單手劍",false],["spec-12","主手","匕首",true],["spec-3","主手","盾牌",false],["spec-17","雙手武器","法杖",true]])assert.equal(!registry.skillGate(id,{slot,type}),ok,id+type);
 console.log("PASS: cross-class weapon classification and source normalization");
+
+const externalRef=new Function(section("function isTwoHand(","function skillGate(")+section("const communityBiS=","function communityEvidenceView(")+";return {communityBiS,communityMatch};")();
+assert.equal(Object.keys(externalRef.communityBiS).length,28);
+for(const [id,ref] of Object.entries(externalRef.communityBiS)){assert.ok(ref.picks.length);for(const p of ref.picks){assert.ok(/^\d+$/.test(p.id));assert.equal(typeof p.known,"boolean");assert.ok(registry.rogueProfiles[id].some(b=>ref.builds.includes(b[0])));}}
+assert.equal(externalRef.communityMatch("spec-9","melee",{id:"18738",slot:"遠程"}),null);
+assert.equal(externalRef.communityMatch("spec-12","backstab",{id:"12590",slot:"主手",type:"匕首"}).slot,"主手");
+assert.equal(externalRef.communityMatch("spec-12","backstab",{id:"12590",slot:"副手",type:"匕首"}).slot,"副手");
+assert.equal(externalRef.communityMatch("spec-12","hemo",{id:"12590",slot:"主手",type:"匕首"}),null);
+assert.equal(externalRef.communityMatch("spec-26","general",{id:"18420",slot:"主手",type:"雙手錘"}).id,"18420");
+assert.equal(externalRef.communityMatch("spec-26","feral_onehand",{id:"18420",slot:"主手",type:"雙手錘"}),null);
+assert.equal(externalRef.communityMatch("spec-7","pet",{id:"13023",slot:"遠程",type:"弓"}).known,false);
+console.log("PASS: 28-spec external evidence, slot identity, source uncertainty and build separation");
