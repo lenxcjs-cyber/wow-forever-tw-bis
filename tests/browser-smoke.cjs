@@ -20,7 +20,7 @@ const server=http.createServer((req,res)=>{
   browser=await chromium.launch({headless:true,...(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{}),args:["--no-sandbox"]});
   const page=await browser.newPage({viewport:{width:1366,height:900}});
   page.setDefaultTimeout(10000);
-  const errors=[];page.on("pageerror",e=>errors.push(e.message));
+  const errors=[];page.on("pageerror",e=>{errors.push(e.message);console.error("Browser page error:",e.message);});
   await page.route("**/*",route=>route.request().url().startsWith(origin+"/")?route.continue():route.abort());
   // Isolate UI behavior from actual external icon availability with explicit test fixtures.
   await page.route("**/item-icons.json",route=>route.fulfill({json:{build:"1.60.1.71139",items:{"19323":"fixture_mace","252484":"fixture_missing"}}}));
@@ -29,6 +29,18 @@ const server=http.createServer((req,res)=>{
   await page.goto(origin+"/index.html");
   await page.locator("#gt-mode-class").waitFor({state:"visible"});
   await page.locator("#class-select").waitFor({state:"visible"});
+  const history=page.locator(".gt-legacy-history");
+  assert.equal(await history.count(),1,"legacy homepage version notes should be archived");
+  assert.equal(await history.getAttribute("open"),null);
+  for(const label of ["V6 修正法系與物理裝備混排","全專精資料稽核","V8–V14 功能試用版"]){
+   assert.ok((await history.textContent()).includes(label),"missing archived note "+label);
+   assert.equal(await history.getByText(label,{exact:false}).first().isVisible(),false);
+  }
+  await history.locator("summary").click();
+  assert.ok(await history.getByText("全專精資料稽核",{exact:false}).first().isVisible());
+  await history.locator("summary").click();
+  console.log("PASS: legacy V6/V7/V8–V14 homepage banners archived with original text");
+
   const spec=page.locator("#spec-select"),build=page.locator("#gt-build-select"),classes=page.locator("#class-select");
   const moreNav=page.locator(".gt-nav-more");
   assert.equal(await moreNav.getAttribute("open"),null);
