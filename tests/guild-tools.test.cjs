@@ -361,7 +361,7 @@ assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Reputation vend
 assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Drop",bonding:"Binds when picked up"},{boeOnly:true}),false);
 console.log("PASS: source constraints for reputation and BoE equipment plans");
 
-const weaponDisplay=new Function(section("function auditSlotOrder(","function audit(")+";return {auditWeaponGroups,auditWeaponVisible};")();
+const weaponDisplay=new Function(section("function auditSlotOrder(","function audit(")+";return {auditWeaponGroups,auditWeaponVisible,auditWeaponPreference,auditOtherWeaponMatches};")();
 const mixedSlots=[{name:"頭部",items:[{id:1,type:"布甲"}]},{name:"主手",items:[{id:2,type:"法杖"},{id:3,type:"單手錘"}]},{name:"雙手武器",items:[{id:2,type:"法杖"}]},{name:"副手物品",items:[{id:4,type:"持有型副手"}]},{name:"遠程武器",items:[{id:5,type:"魔杖"}]}];
 const partition=weaponDisplay.auditWeaponGroups(mixedSlots);
 assert.deepEqual(partition.modes,["two","one"]);
@@ -372,3 +372,14 @@ assert.deepEqual(twoSlots.flatMap(s=>s.items.map(x=>x.id)),[1,2,5]);
 assert.deepEqual(oneSlots.flatMap(s=>s.items.map(x=>x.id)),[1,3,4,5]);
 assert.deepEqual(weaponDisplay.auditWeaponGroups([{name:"雙手武器",items:[{id:1,type:"法杖"}]},{name:"副手",items:[]}]).modes,["two"]);
 console.log("PASS: exclusive two-hand and one-hand/offhand display groups, dedup and ranged preservation");
+
+assert.equal(weaponDisplay.auditWeaponPreference(["two","one"],"one"),"one");
+assert.equal(weaponDisplay.auditWeaponPreference(["two"],"one"),"two");
+assert.equal(weaponDisplay.auditWeaponPreference([],"one"),"");
+assert.deepEqual(weaponDisplay.auditOtherWeaponMatches(partition,"two",x=>x.id===4),{mode:"one",count:1});
+assert.deepEqual(weaponDisplay.auditOtherWeaponMatches(partition,"one",x=>x.id===2),{mode:"two",count:1});
+const sortedPartition=weaponDisplay.auditWeaponGroups([{name:"主手",items:[{id:1,type:"法杖",rank:9}]},{name:"雙手武器",items:[{id:2,type:"法杖",rank:1}]}],(a,b)=>a.rank-b.rank);
+assert.equal(sortedPartition.groups.two[0].id,2);
+assert.equal(expansion.catalogWeaponPlan({id:"spec-1"},wpItems,wp,{"雙手DPS":1},{weaponMode:"one"}).melee,null);
+assert.equal(expansion.catalogWeaponPlan({id:"spec-2"},wpItems,wp,{"主手DPS":2,"副手DPS":1},{weaponMode:"two"}).melee,null);
+console.log("PASS: weapon mode preference, hidden-mode search, merged rank and illegal configuration exclusion");
