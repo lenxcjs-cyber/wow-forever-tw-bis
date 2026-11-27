@@ -14,7 +14,8 @@ function text(s){return String(s??"").replace(re,m=>lookup.get(m.toLowerCase())|
 function item(id,raw){if(names[String(id)])return names[String(id)];const original=String(raw||"");if(/[\u3400-\u9fff]/.test(original)&&!/^\s*[A-Za-z]/.test(original))return text(original);if(localItems[String(id)])return localItems[String(id)]+"（參考譯名）";return /^[A-Za-z]/.test(original)?text(original)+"（譯名待核）":original;}
 function spell(name){return spellNames[name]||null;}
 function effect(raw){
- const s=String(raw||"").trim();
+ const s=String(raw||"").trim().replace(/\s+/g," ");
+ const official=imported.effects?.[s];if(official)return official;
  const rules=[
  [/^Reduces the cast time of your Wrath and Starfire spells by ([\d.]+) sec and the Mana cost of your Wrath spell by ([\d.]+)%\.$/i,(_,a,b)=>"憤怒及星火術的施法時間縮短"+a+"秒；憤怒的法力消耗降低"+b+"%。"],
  [/^Increases the periodic damage and healing done by your spells and abilities by ([\d.]+)%\.$/i,(_,a)=>"法術及技能造成的週期性傷害與治療提高"+a+"%。"],
@@ -30,6 +31,6 @@ function effect(raw){
  for(const [pattern,translate] of rules){const m=s.match(pattern);if(m)return translate(...m)+"（參考譯文）";}
  return null;
 }
-g.GTLocale={text,item,spell,effect,officialItemCount:Object.keys(names).length,officialSpellCount:Object.keys(spellNames).length,build:imported.build||""};
+g.GTLocale={text,item,spell,effect,officialItemCount:Object.keys(names).length,officialSpellCount:Object.keys(spellNames).length,officialEffectCount:Object.keys(imported.effects||{}).length,build:imported.build||""};
 if(typeof module!=="undefined")module.exports=g.GTLocale;
 })(globalThis);
