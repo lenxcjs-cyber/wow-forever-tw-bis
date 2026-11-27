@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V16.7 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V16.9 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -218,6 +218,30 @@ const guides=[
 const root=$("#guild-tools");if(!root)return;
 const tabs=[["v8","天賦流派"],["v9","掉落反查"],["v10","收集進度"],["v11","團本準備"],["v12","官方藍帖"],["v13","配方材料"],["v14","配裝試算"],["audit","BiS 資料稽核"]];
 const nav=node("div",undefined,"gt-tabs"),panel=node("div",undefined,"gt-panel");
+// Move the real legacy section, not a clone: preserve recipe controls, IDs and original item nodes.
+let legacyMount=null;
+function restoreLegacy(){
+ if(!legacyMount)return;
+ const {sec,anchor}=legacyMount;legacyMount=null;
+ sec.classList.remove("gt-legacy-in-audit","gt-legacy-show-items");
+ if(anchor.parentNode){anchor.parentNode.insertBefore(sec,anchor);anchor.remove();}
+}
+function attachLegacy(spec){
+ const sec=spec?.sec;if(!sec||!sec.parentNode||sec.contains(root)||root.contains(sec))return;
+ const d=node("details",undefined,"gt-card gt-legacy-details");
+ const toggle=node("input");toggle.type="checkbox";
+ toggle.addEventListener("change",()=>sec.classList.toggle("gt-legacy-show-items",toggle.checked));
+ add(d,node("summary","武器搭配、附魔與消耗品（舊版資料備查）"),node("p","保留原始武器組合、附魔、消耗品及估算權重。這些是舊版參考，尚未依目前構築重算，不可視為已驗證BiS。","gt-muted"),button("前往配方材料與採買清單",()=>show("v13")),add(node("label",undefined,"gt-check"),toggle,node("span","同時顯示原始裝備卡片（預設隱藏，避免重複）")));
+ const anchor=document.createComment("gt-legacy-position");
+ sec.before(anchor);legacyMount={sec,anchor};
+ sec.classList.add("gt-legacy-in-audit");
+ d.append(sec);panel.append(d);
+}
+function enableLegacyConsolidation(){
+ if(specEls.some(sec=>sec.contains(root)||root.contains(sec)))return;
+ const style=node("style");style.textContent="html.gt-bis-consolidated section.spec:not(.gt-legacy-in-audit){display:none!important}html.gt-bis-consolidated section.spec.gt-legacy-in-audit{display:block!important;margin:12px 0 0!important}html.gt-bis-consolidated section.spec.gt-legacy-in-audit:not(.gt-legacy-show-items) .slot{display:none!important}.gt-legacy-details>summary{font-weight:700;color:#e9c78c;cursor:pointer}.gt-legacy-details>.gt-check{margin:12px 0}";
+ document.head.append(style);document.documentElement.classList.add("gt-bis-consolidated");
+}
 const info=node("p","V14.2 · 選擇下方功能按鈕，快速查詢公會資料。原有職業與裝備選單維持不變。","gt-muted");
 add(root,node("p","03 選擇功能","gt-section-label"),nav,panel);
 let active="";
@@ -348,7 +372,7 @@ function modelScore(x,weights,hit={}){
 }
 
 function audit(){
- title("V16.6 · BiS 推薦總覽與資料稽核","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V16.9 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const model=savedModel(spec.id);
@@ -387,7 +411,7 @@ function audit(){
  const c=node("article",undefined,"gt-bis-slot");c.append(node("h4",slot.name));if(!first){c.append(node("span","尚無候選","gt-bis-status gt-bis-missing"));grid.append(c);continue;}
  const featured=matches.includes(first)?first:matches[0];c.append(node("small",featured.review?"適用性待複核 · 原順位 "+featured.rank:model?"依本機權重比較 · 原順位 "+featured.rank:(featured.rank?"舊版候選 #"+featured.rank+" · 非構築BiS":"候選順位未標示"),"gt-muted"));add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+slots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));}
- const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),excludedDetails,metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),field("篩選",mode),field("搜尋",q),out);draw();
+ const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),excludedDetails,metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),field("篩選",mode),field("搜尋",q),out);draw();attachLegacy(spec);
 }
 function talentPageURL(embedded=false){
  const id=getSpec(),p=new URLSearchParams();
@@ -403,7 +427,7 @@ function talentHub(){
  if(getSpec()){const legacy=node("details");legacy.append(node("summary","原有天賦與實戰手法研究"));const header=[...panel.childNodes];guide();const old=[...panel.childNodes];panel.replaceChildren(...header);legacy.append(...old);add(panel,full,status,frame,legacy);}else add(panel,full,status,frame);
 }
 const renderers={audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
-function show(key){active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
+function show(key){restoreLegacy();active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
 const dashboardMeta={v8:["⚔️","天賦樹、玩法與練等"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","官方更新摘要"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","檢查來源與證據"]};
 for(const [key,label] of tabs){const b=button(label,()=>show(key));b.dataset.tab=key;const [symbol,desc]=dashboardMeta[key];const pict=node("span",symbol,"gt-icon");pict.setAttribute("aria-hidden","true");b.replaceChildren(pict,node("span",label),node("span",desc,"gt-desc"));nav.append(b);}
 const toolboxDetails=root.closest("details");
@@ -420,7 +444,7 @@ if(toolboxDetails&&mainSpec){
 }else{root.classList.add("gt-flat");}
 
 const syncSpec=()=>{syncBuild();if(["v8","v9","v10","v13","v14","audit"].includes(active))show(active);};
-mainSpec?.addEventListener("change",syncSpec);syncBuild();
+mainSpec?.addEventListener("change",syncSpec);syncBuild();if(specEls.length&&bySpec.size){enableLegacyConsolidation();}
 const selectorGroup=mainSpec?.closest(".gt-unified")||mainSpec?.parentElement?.parentElement;
 selectorGroup?.addEventListener("change",e=>{if(e.target!==mainSpec&&e.target.tagName==="SELECT"&&!root.contains(e.target))queueMicrotask(syncSpec);});
 
