@@ -1,0 +1,902 @@
+{
+  "build": "1.60.1.71139",
+  "source": "https://zephras.com/data/forever/enUS/talents/1.60.1.71139.json",
+  "credit": "Zephras (https://zephras.com), CC BY 4.0; manually selected icon identifiers, rank limits and tier requirements; not full client snapshot. Game content belongs to Blizzard.",
+  "classes": [
+    {
+      "token": "druid",
+      "talents": [
+        {
+          "tree": 0,
+          "name": "Starlight Wrath",
+          "icon": 136006,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 0,
+          "name": "Genesis",
+          "icon": 135730,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Ferocity",
+          "icon": 132190,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Furor",
+          "icon": 135881,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Nature's Focus",
+          "icon": 136042,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Heart of the Wild",
+          "icon": 135879,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 0,
+          "name": "Moonglow",
+          "icon": 136087,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Moon and Stars",
+          "icon": 136096,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Nature's Majesty",
+          "icon": 135138,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Nature's Reach",
+          "icon": 136065,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Feral Swiftness",
+          "icon": 136095,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Feral Instinct",
+          "icon": 132089,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Brutal Impact",
+          "icon": 132114,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Thick Hide",
+          "icon": 134355,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Naturalist",
+          "icon": 136041,
+          "maxRank": 5,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Reflection",
+          "icon": 135863,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Natural Shapeshifter",
+          "icon": 136116,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Improved Entangling Roots",
+          "icon": 136100,
+          "maxRank": 3,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 0,
+          "name": "Nature's Splendor",
+          "icon": 136061,
+          "maxRank": 1,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Shredding Attacks",
+          "icon": 136231,
+          "maxRank": 3,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Savage Fury",
+          "icon": 132141,
+          "maxRank": 2,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Feral Charge",
+          "icon": 132183,
+          "maxRank": 1,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Sharpened Claws",
+          "icon": 134297,
+          "maxRank": 2,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 2,
+          "name": "Subtlety",
+          "icon": 132150,
+          "maxRank": 3,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 2,
+          "name": "Gift of Nature",
+          "icon": 136074,
+          "maxRank": 5,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 2,
+          "name": "Bloom",
+          "icon": 134206,
+          "maxRank": 1,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 0,
+          "name": "Insect Swarm",
+          "icon": 136045,
+          "maxRank": 1,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 0,
+          "name": "Vengeance",
+          "icon": 136075,
+          "maxRank": 5,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 0,
+          "name": "Improved Starfire",
+          "icon": 135753,
+          "maxRank": 2,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 1,
+          "name": "Predatory Strikes",
+          "icon": 132185,
+          "maxRank": 3,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 1,
+          "name": "Lacerate",
+          "icon": 132131,
+          "maxRank": 1,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 1,
+          "name": "Predatory Discipline",
+          "icon": 1033484,
+          "maxRank": 1,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 1,
+          "name": "Blood Frenzy",
+          "icon": 132152,
+          "maxRank": 2,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 2,
+          "name": "Tranquil Spirit",
+          "icon": 135900,
+          "maxRank": 5,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 2,
+          "name": "Improved Rejuvenation",
+          "icon": 136081,
+          "maxRank": 3,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 2,
+          "name": "Swiftmend",
+          "icon": 134914,
+          "maxRank": 1,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 0,
+          "name": "Overgrowth",
+          "icon": 134196,
+          "maxRank": 2,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 0,
+          "name": "Nature's Grace",
+          "icon": 136062,
+          "maxRank": 1,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 0,
+          "name": "Eclipse",
+          "icon": 236151,
+          "maxRank": 3,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 1,
+          "name": "Leader of the Pack",
+          "icon": 136112,
+          "maxRank": 1,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 1,
+          "name": "Natural Instinct",
+          "icon": 132138,
+          "maxRank": 2,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 2,
+          "name": "Nature's Swiftness",
+          "icon": 136076,
+          "maxRank": 1,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 2,
+          "name": "Living Spirit",
+          "icon": 136037,
+          "maxRank": 3,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 2,
+          "name": "Improved Tranquility",
+          "icon": 136107,
+          "maxRank": 2,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 0,
+          "name": "Dreamstate",
+          "icon": 132123,
+          "maxRank": 5,
+          "pointsInTreeRequired": 25
+        },
+        {
+          "tree": 1,
+          "name": "Rend and Tear",
+          "icon": 236164,
+          "maxRank": 5,
+          "pointsInTreeRequired": 25
+        },
+        {
+          "tree": 1,
+          "name": "Natural Reaction",
+          "icon": 132091,
+          "maxRank": 5,
+          "pointsInTreeRequired": 25
+        },
+        {
+          "tree": 2,
+          "name": "Improved Regrowth",
+          "icon": 136085,
+          "maxRank": 5,
+          "pointsInTreeRequired": 25
+        },
+        {
+          "tree": 0,
+          "name": "Moonkin Form",
+          "icon": 136036,
+          "maxRank": 1,
+          "pointsInTreeRequired": 30
+        },
+        {
+          "tree": 1,
+          "name": "Primal Bite",
+          "icon": 132278,
+          "maxRank": 1,
+          "pointsInTreeRequired": 30
+        },
+        {
+          "tree": 1,
+          "name": "Shifting Power",
+          "icon": 538514,
+          "maxRank": 1,
+          "pointsInTreeRequired": 30
+        },
+        {
+          "tree": 2,
+          "name": "Wild Growth",
+          "icon": 236153,
+          "maxRank": 1,
+          "pointsInTreeRequired": 30
+        }
+      ]
+    },
+    {
+      "token": "rogue",
+      "talents": [
+        {
+          "tree": 0,
+          "name": "Malice",
+          "icon": 132277,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Coup de Grace",
+          "icon": 132292,
+          "maxRank": 3,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Efficient Strikes",
+          "icon": 136189,
+          "maxRank": 2,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Lightning Reflexes",
+          "icon": 136047,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Setup",
+          "icon": 136056,
+          "maxRank": 3,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Master of Deception",
+          "icon": 136129,
+          "maxRank": 3,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Opportunity",
+          "icon": 132366,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 0,
+          "name": "Ruthlessness",
+          "icon": 132122,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Improved Expose Armor",
+          "icon": 132354,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Improved Slice and Dice",
+          "icon": 132306,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Puncturing Wounds",
+          "icon": 132090,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Deflection",
+          "icon": 132269,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Precision",
+          "icon": 132222,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Improved Sprint",
+          "icon": 132307,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Dirty Deeds",
+          "icon": 136220,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Camouflage",
+          "icon": 132320,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Improved Ambush",
+          "icon": 132282,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Dirty Tricks",
+          "icon": 132310,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Vigor",
+          "icon": 136023,
+          "maxRank": 2,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 0,
+          "name": "Blood Splatter",
+          "icon": 132302,
+          "maxRank": 1,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 0,
+          "name": "Lethality",
+          "icon": 132109,
+          "maxRank": 2,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Endurance",
+          "icon": 136205,
+          "maxRank": 2,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Riposte",
+          "icon": 132336,
+          "maxRank": 1,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Hack and Slash",
+          "icon": 135328,
+          "maxRank": 5,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 2,
+          "name": "Heightened Senses",
+          "icon": 132089,
+          "maxRank": 2,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 2,
+          "name": "Preparation",
+          "icon": 136121,
+          "maxRank": 1,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 2,
+          "name": "Hemorrhage",
+          "icon": 136168,
+          "maxRank": 1,
+          "pointsInTreeRequired": 20
+        },
+        {
+          "tree": 0,
+          "name": "Seal Fate",
+          "icon": 136130,
+          "maxRank": 3,
+          "pointsInTreeRequired": 25
+        },
+        {
+          "tree": 1,
+          "name": "Flash of Steel",
+          "icon": 458731,
+          "maxRank": 5,
+          "pointsInTreeRequired": 25
+        },
+        {
+          "tree": 2,
+          "name": "Boot Knife",
+          "icon": 135342,
+          "maxRank": 5,
+          "pointsInTreeRequired": 25
+        },
+        {
+          "tree": 0,
+          "name": "Mutilate",
+          "icon": 236270,
+          "maxRank": 1,
+          "pointsInTreeRequired": 30
+        },
+        {
+          "tree": 1,
+          "name": "Adrenaline Rush",
+          "icon": 136206,
+          "maxRank": 1,
+          "pointsInTreeRequired": 30
+        },
+        {
+          "tree": 2,
+          "name": "Death Mark",
+          "icon": 132094,
+          "maxRank": 1,
+          "pointsInTreeRequired": 30
+        }
+      ]
+    },
+    {
+      "token": "warrior",
+      "talents": [
+        {
+          "tree": 0,
+          "name": "Improved Heroic Strike",
+          "icon": 132282,
+          "maxRank": 3,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 0,
+          "name": "Deflection",
+          "icon": 132269,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 0,
+          "name": "Improved Rend",
+          "icon": 132155,
+          "maxRank": 3,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Booming Voice",
+          "icon": 136075,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Cruelty",
+          "icon": 132292,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Improved Bloodrage",
+          "icon": 132277,
+          "maxRank": 2,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Shield Specialization",
+          "icon": 134952,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Iron Will",
+          "icon": 135995,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 0,
+          "name": "Improved Charge",
+          "icon": 132337,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Improved Tactical Mastery",
+          "icon": 136031,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Improved Overpower",
+          "icon": 135275,
+          "maxRank": 2,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Lingering Rage",
+          "icon": 132356,
+          "maxRank": 5,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 1,
+          "name": "Unbridled Wrath",
+          "icon": 136097,
+          "maxRank": 5,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Anticipation",
+          "icon": 136056,
+          "maxRank": 5,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Improved Revenge",
+          "icon": 132353,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 2,
+          "name": "Improved Thunder Clap",
+          "icon": 132326,
+          "maxRank": 3,
+          "pointsInTreeRequired": 5
+        },
+        {
+          "tree": 0,
+          "name": "Anger Management",
+          "icon": 135881,
+          "maxRank": 1,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 0,
+          "name": "Deep Wounds",
+          "icon": 132090,
+          "maxRank": 3,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Furious Precision",
+          "icon": 236309,
+          "maxRank": 3,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Piercing Howl",
+          "icon": 136147,
+          "maxRank": 1,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Blood Craze",
+          "icon": 136218,
+          "maxRank": 3,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 1,
+          "name": "Enrage",
+          "icon": 136224,
+          "maxRank": 5,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 2,
+          "name": "Last Stand",
+          "icon": 135871,
+          "maxRank": 1,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 2,
+          "name": "Master of Defense",
+          "icon": 132359,
+          "maxRank": 2,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 2,
+          "name": "Improved Disarm",
+          "icon": 132343,
+          "maxRank": 3,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 2,
+          "name": "Defiance",
+          "icon": 132347,
+          "maxRank": 3,
+          "pointsInTreeRequired": 10
+        },
+        {
+          "tree": 0,
+          "name": "Spearing Strike",
+          "icon": 135124,
+          "maxRank": 1,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 0,
+          "name": "Two-Handed Weapon Specialization",
+          "icon": 132400,
+          "maxRank": 3,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 0,
+          "name": "Impale",
+          "icon": 132312,
+          "maxRank": 2,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 1,
+          "name": "Dual Wield Specialization",
+          "icon": 132147,
+          "maxRank": 5,
+          "pointsInTreeRequired": 15
+        },
+        {
+          "tree": 1,
+          "name": "Reckless Swings",
+          "icon": 132334,
+          "maxRank": 1,
+          "pointsInTreeRequired": 15
+        }
+      ]
+    },
+    {
+      "token": "priest",
+      "talents": [
+        {
+          "tree": 0,
+          "name": "Power in Light",
+          "icon": 135972,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 0,
+          "name": "Wand Specialization",
+          "icon": 135463,
+          "maxRank": 2,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 0,
+          "name": "Twin Disciplines",
+          "icon": 135969,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Twilight Focus",
+          "icon": 135918,
+          "maxRank": 3,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Improved Renew",
+          "icon": 135953,
+          "maxRank": 3,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 1,
+          "name": "Holy Specialization",
+          "icon": 135967,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Shadow Focus",
+          "icon": 136126,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Blackout",
+          "icon": 136160,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        },
+        {
+          "tree": 2,
+          "name": "Spirit Tap",
+          "icon": 136188,
+          "maxRank": 5,
+          "pointsInTreeRequired": 0
+        }
+      ]
+    }
+  ]
+}
