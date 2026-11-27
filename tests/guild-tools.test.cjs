@@ -16,7 +16,7 @@ const cases=[
 ];
 for(const [id,slot,type,expected] of cases)assert.equal(!gate.skillGate(id,{slot,type}),expected,id+" "+slot+" "+type);
 gate.buildChoice["spec-9"]="melee";assert.equal(gate.skillGate("spec-9",{slot:"副手",type:"單手劍"}),"");
-const score=new Function(section("function modelScore(","function audit(")+";return modelScore;")();
+const score=new Function(section("function weaponDpsKey(","function audit(")+";return modelScore;")();
 const x={slot:"主手",stats:{"命中機率":3,"敏捷":4},wm:{"DPS":"42.5"}},w={"命中機率":2,"敏捷":1,"武器DPS":1};
 assert.equal(score(x,w,{base:4,talent:3,cap:9}).total,50.5);
 assert.equal(score(x,w,{base:9,talent:3,cap:9}).parts["命中機率"],0);
@@ -33,4 +33,16 @@ for(const [id,profiles] of Object.entries(registry.rogueProfiles))assert.equal(n
 for(const entries of Object.values(registry.extraProfiles))for(const v of entries)assert.equal(v[2].split("/").reduce((a,b)=>a+Number(b),0),51,v[0]);
 registry.buildChoice["spec-10"]="mutilate_alt";assert.ok(registry.skillGate("spec-10",{slot:"主手",type:"單手劍"}));
 registry.buildChoice["spec-5"]="pal_dungeon";assert.ok(registry.skillGate("spec-5",{slot:"副手",type:"單手劍"}));
-console.log("PASS: syntax, weapon gates, scoring, 45 detailed talent totals and all registered variants");
+assert.equal(score(x,{"主手DPS":2}).total,85);
+assert.equal(score(x,{"遠程DPS":2,"武器DPS":1}).total,0);
+assert.equal(score({...x,slot:"副手",type:"盾牌",wm:{}},{"武器DPS":2}).incomplete,false);
+assert.equal(score({...x,slot:"遠程武器",type:"弓"},{"遠程DPS":2}).total,85);
+assert.equal(score({...x,slot:"主手",type:"雙手斧"},{"雙手DPS":2}).total,85);
+assert.equal(score({...x,slot:"副手",type:"匕首",wm:{}},{"副手DPS":2}).incomplete,true);
+assert.ok(gate.skillGate("spec-2",{slot:"副手",type:"副手物品"}));
+const materialTotals=new Function(section("function recipeMaterialTotals(","function material(")+";return recipeMaterialTotals;")();
+const list=materialTotals([{recipe:{name:"A",mat:"夢葉草×2、水晶瓶×1"},count:3},{recipe:{name:"B",mat:"夢葉草×1、特殊材料"},count:2}]);
+assert.equal(new Map(list.totals).get("夢葉草"),8);
+assert.equal(new Map(list.totals).get("水晶瓶"),3);
+assert.equal(list.unknown.length,1);
+console.log("PASS: syntax, build registry, 45 detailed talents, weapon scopes, hit scoring and material totals");
