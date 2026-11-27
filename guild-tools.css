@@ -84,3 +84,21 @@ html.gt-blue-mode section.spec{display:none!important}
 
 /* Clearly distinguish official change summaries from local analysis. */
 .gt-blue-impact{font-size:14px;color:#bed2e8;border-left:2px solid #7796b4;padding-left:10px;margin:8px 0 14px!important}.gt-spec-hotfix{margin-top:8px}.gt-spec-hotfix summary,.gt-feral-set summary{cursor:pointer;color:#e9c88c}.gt-spec-hotfix p{margin:10px 0 3px}.gt-feral-set p{margin:8px 0}
+
+/* V20.2: independently scrolling talent/gear workspace, one equipment slot per row. */
+#guild-tools .gt-build-workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:12px;align-items:stretch;margin:12px 0 20px;min-width:0}
+#guild-tools .gt-build-column{display:flex;flex-direction:column;min-width:0;height:clamp(560px,76vh,1000px);border:1px solid #40536a;border-radius:10px;background:#111923;overflow:hidden}
+#guild-tools .gt-build-column-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;flex:none;border-bottom:1px solid #40536a;background:#192634;flex-wrap:wrap}
+#guild-tools .gt-build-column-head h4{margin:0;color:#e9c78c}
+#guild-tools .gt-build-column-head a{font-size:13px}
+#guild-tools .gt-build-column-head button{min-height:30px;padding:4px 9px;font-size:12px}
+#guild-tools .gt-build-talent-frame{display:block;flex:1 1 0;min-height:0;min-width:0;width:100%;border:0;background:#0e131c}
+#guild-tools .gt-gear-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 8px;padding:7px 10px;flex:none;border-bottom:1px solid #34465a}
+#guild-tools .gt-gear-filters .gt-field{min-width:0;margin:0;gap:3px}
+#guild-tools .gt-gear-filters input,#guild-tools .gt-gear-filters select{box-sizing:border-box;min-height:36px;width:100%;font-size:13px;padding:5px 7px}
+#guild-tools .gt-gear-scroll{flex:1 1 0;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding:0 10px 10px}
+#guild-tools .gt-gear-scroll:focus-visible{outline:2px solid #a8d1ff;outline-offset:-2px}
+#guild-tools .gt-gear-scroll .gt-bis-grid{grid-template-columns:minmax(0,1fr);margin:8px 0}
+#guild-tools .gt-gear-scroll .gt-bis-slot h4{padding:8px 10px;background:#29384b;border-radius:5px;font-size:16px}
+@media(max-width:900px){#guild-tools .gt-build-workspace{grid-template-columns:minmax(0,1fr)}#guild-tools .gt-build-column{height:clamp(480px,74vh,800px)}}
+@media(max-width:400px){#guild-tools .gt-gear-filters{grid-template-columns:minmax(0,1fr)}#guild-tools .gt-build-column{height:max(580px,78vh)}}
