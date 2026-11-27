@@ -262,12 +262,12 @@ const navLabel=node("p","03 選擇功能","gt-section-label");add(root,navLabel,
 let active="";
 const specPairs=[...bySpec.values()].map(s=>[s.id,s.name]);
 const getSpec=()=>{const el=$("#spec-select");return el&&!el.disabled&&bySpec.has(el.value)?el.value:"";};
-const buildBar=node("div");root.insertBefore(buildBar,nav);
+const buildBar=node("div");buildBar.id="gt-build-bar";root.insertBefore(buildBar,nav);
 function syncBuild(){
  const id=getSpec();buildBar.replaceChildren();
  if(!rogueProfiles[id])return;
- const pick=select(rogueProfiles[id]);pick.value=buildFor(id);
- pick.addEventListener("change",()=>{chooseBuild(id,pick.value);syncBuild();if(active)show(active);});
+ const pick=select(rogueProfiles[id]);pick.id="gt-build-select";pick.value=buildFor(id);
+ pick.addEventListener("change",()=>{chooseBuild(id,pick.value);lastSpecKey=id+":"+buildFor(id);syncBuild();if(active)show(active);});
  add(buildBar,field("天賦構築（決定武器資格）",pick),node("p",variantFor(id)?"此構築獨立保存權重；"+(referenceTalent(id)?"已收錄逐項參考；模擬權重待補。":"逐項天賦與模擬權重待補。"):"依核心技能篩選；未收錄符合條件的武器時不自動補造排名。","gt-muted"));
  syncWeaponCards(id);
 }
@@ -527,10 +527,10 @@ if(toolboxDetails&&mainSpec){
 }else{root.classList.add("gt-flat");}
 
 let lastSpecKey=null;const syncSpec=()=>{if(siteMode==="blue")return;const id=getSpec(),key=id+":"+(id?buildFor(id):"");if(key===lastSpecKey)return;lastSpecKey=key;syncBuild();if(!active&&getSpec()){show("audit");return;}if(["v8","v9","v10","v13","v14","audit"].includes(active))show(active);};
-mainSpec?.addEventListener("change",()=>queueMicrotask(syncSpec));for(const id of bySpec.keys())syncWeaponCards(id);syncBuild();if(specEls.length&&bySpec.size){enableLegacyConsolidation();}if(getSpec()&&!active)show("audit");
+mainSpec?.addEventListener("change",()=>queueMicrotask(syncSpec));$("#class-select")?.addEventListener("change",()=>queueMicrotask(syncSpec));for(const id of bySpec.keys())syncWeaponCards(id);syncBuild();if(specEls.length&&bySpec.size){enableLegacyConsolidation();}if(getSpec()&&!active)show("audit");
 const selectorGroup=mainSpec?.closest(".gt-unified")||mainSpec?.parentElement?.parentElement;
 selectorGroup?.addEventListener("change",e=>{if(e.target!==mainSpec&&e.target.tagName==="SELECT"&&!root.contains(e.target))queueMicrotask(syncSpec);});
-const modeBar=node("div",undefined,"gt-site-mode"),classMode=button("職業資料",()=>switchMode("class")),blueMode=button("官方藍帖",()=>switchMode("blue"));
+const modeBar=node("div",undefined,"gt-site-mode"),classMode=button("職業資料",()=>switchMode("class")),blueMode=button("官方藍帖",()=>switchMode("blue"));classMode.id="gt-mode-class";blueMode.id="gt-mode-blue";
 modeBar.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px";
 for(const b of [classMode,blueMode])b.style.cssText="padding:10px 18px;border:1px solid #52647b;border-radius:8px;background:#172230;color:#e9c88c;font-weight:700";
 add(modeBar,classMode,blueMode);
@@ -549,14 +549,14 @@ function switchMode(next,record=true){
  if(!["class","blue"].includes(next))return;
  if(next===siteMode)return;
  if(next==="blue"&&siteMode!=="blue"&&active&&active!=="v12")lastClassTab=active;
- siteMode=next;const blue=next==="blue";
+ siteMode=next;const blue=next==="blue";document.documentElement.classList.toggle("gt-blue-mode",blue);root.dataset.mode=next;
  classMode.setAttribute("aria-pressed",String(!blue));blueMode.setAttribute("aria-pressed",String(blue));
  classMode.style.borderColor=blue?"#52647b":"#e9c88c";blueMode.style.borderColor=blue?"#e9c88c":"#52647b";
  for(const e of [pickerArea,...fallbackControls,buildBar,navLabel,nav])setModeHidden(e,blue);
  if(record){try{const u=new URL(location.href);if(blue)u.searchParams.set("view","blue");else u.searchParams.delete("view");history.pushState(null,"",u);}catch(e){}}
  if(blue)renderBlueMode();else{syncBuild();show(lastClassTab);}
 }
-classMode.setAttribute("aria-pressed","true");blueMode.setAttribute("aria-pressed","false");classMode.style.borderColor="#e9c88c";
+root.dataset.mode="class";classMode.setAttribute("aria-pressed","true");blueMode.setAttribute("aria-pressed","false");classMode.style.borderColor="#e9c88c";
 if(new URLSearchParams(location.search).get("view")==="blue")switchMode("blue",false);
 window.addEventListener("popstate",()=>switchMode(new URLSearchParams(location.search).get("view")==="blue"?"blue":"class",false));
 
