@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,catalogArmorPlan,catalogWeaponPlan,catalogWeaponScore,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogWeaponPlan,catalogWeaponScore,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -286,3 +286,15 @@ assert.equal(officialMerge.liveClassPosts("spec-29",[tagged]).length,0);
 assert.deepEqual(officialMerge.blueClassLabels(tagged),["法師","德魯伊"]);
 assert.equal(officialMerge.liveClassPosts("spec-28",[{...tagged,url:"https://untrusted.example"}]).length,0);
 console.log("PASS: tentative live notice class mapping and trusted sources");
+
+// Exact additive set constraint across slots; two rings cannot reuse the same item ID.
+const setItems=[itemForPlan(301,"Head","Plate",30),itemForPlan(302,"Head","Leather",20,{item_set:"Example Set"}),itemForPlan(303,"Chest","Plate",50),itemForPlan(304,"Chest","Leather",25,{item_set:"Example Set"}),itemForPlan(305,"Finger","Miscellaneous",15),itemForPlan(306,"Finger","Miscellaneous",12,{item_set:"Example Set"}),itemForPlan(306,"Finger","Miscellaneous",12,{item_set:"Example Set"}),itemForPlan(307,"Finger","Miscellaneous",0,{item_set:"Example Set"}),itemForPlan(308,"Shoulder","Plate",99,{item_set:"Example Set",estimated:1})];
+const setPools=expansion.catalogSetPools({id:"spec-2"},setItems,planProf,{"敏捷":1});
+assert.deepEqual(expansion.catalogSetOptions(setPools),[["Example Set",4]]);
+const twoSet=expansion.catalogSetAlternative(setPools,"Example Set",2);
+assert.equal(twoSet.total,97);assert.deepEqual(expansion.catalogSetCounts(twoSet.picks),[["Example Set",2]]);
+const fourSet=expansion.catalogSetAlternative(setPools,"Example Set",4);
+assert.equal(fourSet.total,57);assert.equal(new Set(fourSet.picks.map(p=>p.item.id)).size,4);
+assert.equal(expansion.catalogSetAlternative(setPools,"Example Set",5),null);
+assert.deepEqual(expansion.catalogSetOptions(expansion.catalogSetPools({id:"spec-2"},setItems,planProf,{"敏捷":1},{excludeEffects:true})),[]);
+console.log("PASS: exact armor set constraints, zero-stat set pieces, duplicate ID handling and trade-off scores");
