@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V17.2 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V17.3 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -414,7 +414,7 @@ function weaponSetScore(items,weights,hit={}){
  return {total:Object.values(parts).reduce((a,b)=>a+b,0),parts,incomplete,rawHit,usable};
 }
 function weaponSetView(spec,model){
- const d=node("details",undefined,"gt-card");d.open=true;d.append(node("summary","武器組合比較｜雙手 vs 主副手"));
+ const d=node("details",undefined,"gt-card");d.open=false;d.append(node("summary","進階武器組合試算（選用）"));
  const id=spec.id,kind=feralWeaponMode(id)==="twohand"?"twohand":feralWeaponMode(id)==="onehand"?"general":variantFor(id)?.[4]||buildFor(id),rows=weaponSets([...spec.slots.values()].flat(),x=>allowed(id,x),kind);
  const out=node("div"),base=inp("0","number"),talent=inp("0","number"),cap=inp("留空＝不設上限","number");
  for(const e of [base,talent,cap]){e.min="0";e.step="0.1";}base.value="0";talent.value="0";
@@ -440,12 +440,13 @@ function weaponSetView(spec,model){
  d.append(out);draw();return d;
 }
 function audit(){
- title("V17.2 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V17.3 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const model=savedModel(spec.id);
  const slots=[...spec.slots].map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).map(x=>model?{...x,model:modelScore(x,model.weights,model.hitBySlot?.[name])}:x).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||(model?(Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total):0)||(a.rank||999)-(b.rank||999))}));
  const excluded=[...spec.slots.values()].flat().filter(x=>!allowed(spec.id,x));
+ if(feralWeaponMode(spec.id)==="twohand"){for(let i=slots.length-1;i>=0;i--){if(/副手|盾牌|單手|主手/.test(slots[i].name)&&!slots[i].items.length)slots.splice(i,1);}}
  const all=slots.flatMap(x=>x.items),sourceMissing=x=>!x.source||/待查|待核|未知|未確認/.test(x.source),evidenceMissing=x=>!x.evidence,missing=x=>sourceMissing(x)||evidenceMissing(x)||!!x.review||!!x.model?.incomplete;
  const populated=slots.filter(x=>x.items.length),firsts=slots.map(x=>x.items.find(i=>!i.review)).filter(Boolean);
  const metrics=node("div",undefined,"gt-bis-summary");
@@ -479,7 +480,7 @@ function audit(){
  const c=node("article",undefined,"gt-bis-slot");c.append(node("h4",slot.name));if(!first){c.append(node("span","尚無候選","gt-bis-status gt-bis-missing"));grid.append(c);continue;}
  const featured=matches.includes(first)?first:matches[0];c.append(node("small",featured.review?"適用性待複核 · 原順位 "+featured.rank:model?"依本機權重比較 · 原順位 "+featured.rank:(featured.rank?"舊版候選 #"+featured.rank+" · 非構築BiS":"候選順位未標示"),"gt-muted"));add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+slots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));}
- const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),excludedDetails,metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),weaponSetView(spec,model),field("篩選",mode),field("搜尋",q),out);draw();attachLegacy(spec);
+ const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，顯示既有候選供查證；非此構築的最佳排名。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),excludedDetails,metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]),field("篩選",mode),field("搜尋",q),out);draw();attachLegacy(spec);
 }
 function talentPageURL(embedded=false){
  const id=getSpec(),p=new URLSearchParams();
