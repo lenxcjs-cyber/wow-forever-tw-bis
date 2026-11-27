@@ -56,3 +56,22 @@ if(fs.existsSync(communityFile)){
  }
  console.log("PASS: all nine imported community-data leveling paths (459 points against imported rules), icon IDs");
 }else console.log("SKIP community dataset: not downloaded");
+
+const skills=JSON.parse(fs.readFileSync(path.join(__dirname,"..","spec-skill-guides.json"),"utf8"));
+assert.equal(skills.format,1);
+assert.equal(Object.keys(skills.specs).length,28);
+assert.equal(Object.keys(skills.common).length,9);
+const classTokens=["warrior","paladin","hunter","rogue","priest","shaman","mage","warlock","druid"];
+let coreCount=0;
+for(const p of catalog.profiles){
+ const g=skills.specs[p.id],classKey=classTokens[Math.min(8,Math.floor((Number(p.id.split("-")[1])-1)/3))];
+ assert.ok(g&&g.class===classKey,p.id+" mismatched skill guide");
+ assert.ok(g.title&&g.priority&&g.skills.length>=6,p.id+" missing core skills");
+ const all=[...g.skills,...skills.common[classKey]];
+ for(const row of all)assert.ok(row.length===4&&row.every(v=>typeof v==="string"&&v.trim()),p.id+" invalid skill row");
+ assert.equal(new Set(g.skills.map(row=>row[1])).size,g.skills.length,p.id+" duplicate core skills");
+}
+for(const g of Object.values(skills.specs))coreCount+=g.skills.length;
+assert.equal(coreCount,176);
+assert.equal(Object.values(skills.common).flat().length,38);
+console.log("PASS: 28 spec skill guides, 176 core entries, 38 class utility entries, every build mapped");
