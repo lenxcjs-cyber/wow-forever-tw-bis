@@ -71,6 +71,19 @@ const server=http.createServer((req,res)=>{
     await audit.locator("article").first().waitFor({state:"visible"});
     assert.ok(await audit.locator("article").count()>0);
     assert.ok((await audit.innerText()).includes("資料版本："));
+    const profile=await build.inputValue();
+    const weightKey="gt-sim-weights-v1:spec-28:"+profile;
+    await page.evaluate(key=>localStorage.setItem(key,JSON.stringify({weights:{"智力":1,"精神":1,"治療加成":2},source:"browser test"})),weightKey);
+    await page.locator('#guild-tools button[data-tab="audit"]').click();
+    const plan=page.locator(".gt-armor-plan");
+    await plan.locator("summary").first().click();
+    await plan.locator("article").first().waitFor({state:"visible"});
+    assert.equal(await plan.locator("article").count(),12);
+    assert.ok((await plan.innerText()).includes("/ 14 個部位"));
+    await plan.locator('select:has(option[value="plain"])').selectOption("plain");
+    assert.equal(await plan.locator("article").count(),12);
+    await page.evaluate(key=>localStorage.removeItem(key),weightKey);
+    console.log("PASS: full-catalog armor plan with saved weights and effect filter");
     console.log("PASS: actual candidate-ID catalog reconciliation view");
     console.log("PASS: real catalog for restoration Druid and same-slot comparison controls");
   }
