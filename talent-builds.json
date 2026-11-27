@@ -1,5 +1,5 @@
 {
-  "version": "16.6",
+  "version": "17.8",
   "profiles": [
     {
       "id": "spec-1",
@@ -2095,6 +2095,32 @@
       "style": "降低仇恨而非強化寧靜",
       "rotation": "預判傷害安排HoT，按緊急程度補直接治療，管理啟動及續航。",
       "research": "按有效跳數、溢補及法力消耗評估權重。"
+    },
+    {
+      "id": "spec-26",
+      "key": "feral_onehand",
+      "label": "單手＋持有型副手（替代比較）",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "野性貓",
+      "split": null,
+      "talents": null,
+      "style": "單手武器與合法持有型副手組合；不是已驗證的獨立天賦。",
+      "rotation": "尚無獨立驗證的配點與技能循環。",
+      "research": "比較完整武器組合的形態收益；不借用雙手構築的模擬權重。"
+    },
+    {
+      "id": "spec-27",
+      "key": "feral_onehand",
+      "label": "單手＋持有型副手（替代比較）",
+      "cls": "druid",
+      "className": "德魯伊",
+      "spec": "野性熊",
+      "split": null,
+      "talents": null,
+      "style": "單手武器與合法持有型副手組合；不是已驗證的獨立天賦。",
+      "rotation": "尚無獨立驗證的配點與技能循環。",
+      "research": "比較完整武器組合的形態收益；不借用雙手構築的模擬權重。"
     }
   ],
   "source": "https://www.wofwforever.com/en/guides/",
