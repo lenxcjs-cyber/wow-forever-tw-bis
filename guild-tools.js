@@ -107,6 +107,8 @@ function classWeaponGate(id,x){
 }
 function skillGate(id,x){
  const classReason=classWeaponGate(id,x);if(classReason)return classReason;
+ const n=Number(String(id).split("-")[1]),armor=String(x.type||"").trim(),tier={"布甲":0,"皮甲":1,"鎖甲":2,"鎧甲":3,"板甲":3,Cloth:0,Leather:1,Mail:2,Plate:3}[armor],max=[3,3,2,1,0,2,0,0,1][Math.min(8,Math.floor((n-1)/3))];
+ if(tier!==undefined&&max!==undefined&&tier>max)return "超出職業可穿護甲等級";
  const build=variantFor(id)?.[4]||buildFor(id),slot=x.slot||"",type=x.type||"";
  if(feralSpec(id)&&!/遠程|遠距|聖物|塑像|relic|idol|ranged/i.test(slot+" "+type)){
   const mode=feralWeaponMode(id),off=/副手|盾牌|off.hand/i.test(slot),main=/主手|單手|雙手|近戰|武器|main.hand|weapon/i.test(slot)&&!off;
@@ -543,6 +545,13 @@ const gearSlotNames={"Head":"頭部","Neck":"頸部","Shoulder":"肩部","Back":
 const gearStatNames={strength:"力量",agility:"敏捷",stamina:"耐力",intellect:"智力",spirit:"精神",attack_power:"攻擊強度",ranged_attack_power:"遠程攻強",hit:"命中（來源單位）",crit:"爆擊（來源單位）",haste:"急速（來源單位）",spell_power:"法術能量",healing:"治療",spell_damage:"法術傷害",mp5:"每5秒法力",armor:"護甲",bonus_armor:"額外護甲",defense:"防禦",dodge:"閃躲",parry:"招架",block:"格擋",block_value:"格擋值",fire_res:"火焰抗性",frost_res:"冰霜抗性",nature_res:"自然抗性",shadow_res:"暗影抗性",arcane_res:"秘法抗性"};
 function gearClassIndex(id){const n=Number(String(id).split("-")[1]);return Number.isInteger(n)&&n>=1&&n<=28?Math.min(8,Math.floor((n-1)/3)):-1;}
 function gearType(x){const map={"One-Handed Axe":"單手斧","Two-Handed Axe":"雙手斧","One-Handed Mace":"單手錘","Two-Handed Mace":"雙手錘","One-Handed Sword":"單手劍","Two-Handed Sword":"雙手劍","Bow":"弓","Gun":"槍械","Crossbow":"弩","Wand":"魔杖","Thrown":"投擲武器","Spear":"長矛","Dagger":"匕首","Fist Weapon":"拳套","Staff":"法杖","Polearm":"長柄武器","Shield":"盾牌","Miscellaneous":"持有型副手","Idol":"塑像","Totem":"圖騰","Libram":"聖契","Cloth":"布甲","Leather":"皮甲","Mail":"鎖甲","Plate":"鎧甲"};if(x.slot==="Held In Off-hand")return "持有型副手";if(x.slot==="Shield")return "盾牌";const type=map[x.subclass]||x.subclass||"";return (x.slot==="Two-Hand"&&!/雙手/.test(type)?"雙手":x.slot==="Main Hand"?"主手限定":x.slot==="One-Hand"&&!/單手/.test(type)?"單手":"")+type;}
+const gearArmorTier={Cloth:0,Leather:1,Mail:2,Plate:3};
+const gearArmorMax={Warrior:3,Paladin:3,Hunter:2,Shaman:2,Rogue:1,Druid:1,Priest:0,Mage:0,Warlock:0};
+function gearArmorEligible(cls,subclass,p){
+ if(Object.hasOwn(gearArmorTier,subclass))return Object.hasOwn(gearArmorMax,cls)&&gearArmorTier[subclass]<=gearArmorMax[cls];
+ return subclass==="Shield"&&["Warrior","Paladin","Shaman"].includes(cls)&&p?.armor?.Shield!==undefined&&Number(p.armor.Shield)<=60;
+}
+function gearCrossArmor(cls,x){return x.item_class==="Armor"&&Object.hasOwn(gearArmorTier,x.subclass)&&gearArmorTier[x.subclass]<gearArmorMax[cls]&&!["Back"].includes(x.slot);}
 function gearCatalogEligible(spec,x,prof){
  if(String(x.id)==="2915"&&(x.slot!=="Two-Hand"||x.subclass!=="Two-Handed Mace"))return false;
  const index=gearClassIndex(spec.id);if(index<0)return false;const cls=gearCatalogClasses[index],bit=1<<(gearClassBits[index]-1),p=prof[cls]||prof[cls?.toLowerCase()];
@@ -551,7 +560,7 @@ function gearCatalogEligible(spec,x,prof){
  // The API's proficiency list is explicitly Classic-era; Forever added rogue axes and druid polearms.
  if(x.item_class==="Weapon"&&!p.weapons?.includes(x.subclass)&&!(cls==="Druid"&&x.subclass==="Polearm")&&!(cls==="Rogue"&&x.subclass==="One-Handed Axe"))return false;
  if(x.item_class==="Weapon"&&x.slot==="Off Hand"&&!["Warrior","Hunter","Rogue"].includes(cls))return false;
- if(x.item_class==="Armor"&&["Cloth","Leather","Mail","Plate","Shield"].includes(x.subclass)&&!(p.armor?.[x.subclass]!==undefined&&Number(p.armor[x.subclass])<=60))return false;
+ if(x.item_class==="Armor"&&["Cloth","Leather","Mail","Plate","Shield"].includes(x.subclass)&&!gearArmorEligible(cls,x.subclass,p))return false;
  if(x.item_class==="Armor"&&["Idol","Libram","Totem"].includes(x.subclass)&&!({Druid:"Idol",Paladin:"Libram",Shaman:"Totem"}[cls]===x.subclass))return false;
  const candidate={slot:gearSlotNames[x.slot],type:gearType(x)};
  // Generic one-hand weapons may also be usable in off-hand; check both without inventing a dual-wield permission.
@@ -605,16 +614,16 @@ function candidateAuditView(spec,slots){
  });return d;
 }
 function gearCatalogView(spec){
- const d=node("details",undefined,"gt-card gt-full-gear");add(d,node("summary","全來源裝備資料庫（世界掉落、裝綁、聲望、製作、任務及副本）"),node("p","依本專精的職業資格和構築武器規則查詢；來源含經典推定，不代表全部已開放。預設只顯示有客戶端數值及來源記載的物品；來源可能沿用舊版，並非已驗證可取得。不是 BiS 排名。","gt-muted"));
+ const d=node("details",undefined,"gt-card gt-full-gear");add(d,node("summary","全來源裝備資料庫（世界掉落、裝綁、聲望、製作、任務及副本）"),node("p","預設納入所有合法跨甲散件，不限制本職最高護甲。依本專精的職業資格和構築武器規則查詢；來源含經典推定，不代表全部已開放。預設只顯示有客戶端數值及來源記載的物品；來源可能沿用舊版，並非已驗證可取得。不是 BiS 排名。","gt-muted"));
  const status=node("p","展開後載入裝備資料。","gt-muted"),out=node("div");add(d,link("完整資料 API 與來源說明","https://github.com/gBlaku/wow-forever-kb#data-api"),status,out);
  let started=false;
  d.addEventListener("toggle",async()=>{if(!d.open||started)return;started=true;status.textContent="正在讀取裝備資料…";
  try{const data=await loadGearCatalog();if(!d.isConnected)return;
- const eligible=data.items.filter(x=>gearCatalogEligible(spec,x,data.prof)),q=inp("名稱、物品ID、來源、屬性"),sl=select([["","全部部位"],...Array.from(new Set(Object.values(gearSlotNames))).map(v=>[v,v])]),kind=select([["","全部取得方式"],...["世界掉落","裝綁","製作","聲望","任務","商人","掉落","待查"].map(v=>[v,v])]),scope=select([["live","客戶端數值＋來源記載"],["all","含經典推定及來源待查"]]),sort=select([["item_level","物品等級"],["dps","武器DPS"],...Object.entries(gearStatNames).map(([k,v])=>[k,v])]),quality=select([["","不限品質"],["2","優良以上（綠裝起）"],["3","精良以上（藍裝起）"],["4","史詩以上（紫裝起）"]]),levelMin=inp("最低需求等級（不限）","number"),list=node("div"),comparison=node("div");let limit=40,compareBase=null;const knownIds=catalogCandidateIds(spec);levelMin.min="0";levelMin.max="60";
+ const eligible=data.items.filter(x=>gearCatalogEligible(spec,x,data.prof)),q=inp("名稱、物品ID、來源、屬性"),sl=select([["","全部部位"],...Array.from(new Set(Object.values(gearSlotNames))).map(v=>[v,v])]),kind=select([["","全部取得方式"],...["世界掉落","裝綁","製作","聲望","任務","商人","掉落","待查"].map(v=>[v,v])]),scope=select([["live","客戶端數值＋來源記載"],["all","含經典推定及來源待查"]]),sort=select([["item_level","物品等級"],["dps","武器DPS"],...Object.entries(gearStatNames).map(([k,v])=>[k,v])]),quality=select([["","不限品質"],["2","優良以上（綠裝起）"],["3","精良以上（藍裝起）"],["4","史詩以上（紫裝起）"]]),levelMin=inp("最低需求等級（不限）","number"),list=node("div"),comparison=node("div");let limit=40,compareBase=null;const knownIds=catalogCandidateIds(spec),cls=gearCatalogClasses[gearClassIndex(spec.id)],armorFilter=select([["","全部合法護甲（含跨甲）"],["cross","只看跨甲"],["native","排除跨甲"]]);levelMin.min="0";levelMin.max="60";
  status.textContent="來源版本："+data.meta.client_build+"｜"+eligible.length+" 件符合初步裝備資格（含待查）";
- function draw(){list.replaceChildren();const terms=q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);const rows=eligible.filter(x=>(scope.value==="all"||(!Number(x.estimated)&&String(x.source_summary||"").trim()))&&(!quality.value||Number(x.quality)>=Number(quality.value))&&(!levelMin.value||Number(x.required_level||0)>=Number(levelMin.value))&&(!sl.value||gearSlotNames[x.slot]===sl.value)&&(!kind.value||gearCatalogTags(x).includes(kind.value))&&terms.every(t=>[x.name,globalThis.GTLocale?.item(x.id,x.name),x.id,x.source_summary,zhDisplay(x.source_summary||""),x.required_reputation,gearType(x),gearCatalogTags(x).join(" "),gearSlotNames[x.slot],...Object.keys(gearStatNames).filter(k=>x[k]).map(k=>gearStatNames[k])].join(" ").toLowerCase().includes(t))).sort((a,b)=>Number(b[sort.value]||0)-Number(a[sort.value]||0)||Number(b.item_level||0)-Number(a.item_level||0)||a.id-b.id);
+ function draw(){list.replaceChildren();const terms=q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);const rows=eligible.filter(x=>(!armorFilter.value||(armorFilter.value==="cross"?gearCrossArmor(cls,x):!gearCrossArmor(cls,x)))&&(scope.value==="all"||(!Number(x.estimated)&&String(x.source_summary||"").trim()))&&(!quality.value||Number(x.quality)>=Number(quality.value))&&(!levelMin.value||Number(x.required_level||0)>=Number(levelMin.value))&&(!sl.value||gearSlotNames[x.slot]===sl.value)&&(!kind.value||gearCatalogTags(x).includes(kind.value))&&terms.every(t=>[x.name,globalThis.GTLocale?.item(x.id,x.name),x.id,x.source_summary,zhDisplay(x.source_summary||""),x.required_reputation,gearType(x),gearCatalogTags(x).join(" "),gearSlotNames[x.slot],...Object.keys(gearStatNames).filter(k=>x[k]).map(k=>gearStatNames[k])].join(" ").toLowerCase().includes(t))).sort((a,b)=>Number(b[sort.value]||0)-Number(a[sort.value]||0)||Number(b.item_level||0)-Number(a.item_level||0)||a.id-b.id);
  list.append(node("p",rows.length+" 件候選；依單項數值排序，非專精BiS。","gt-muted"));
- for(const x of rows.slice(0,limit)){const c=node("article",undefined,"gt-card");add(c,link((globalThis.GTLocale?.item(x.id,x.name)||x.name)+"（ID "+x.id+"）","https://www.wowhead.com/forever/item="+x.id),node("p",gearSlotNames[x.slot]+"｜"+gearType(x)+"｜"+gearCatalogTags(x).join("・")+"｜"+(Number(x.estimated)?"經典推定":"客戶端資料；取得狀態待逐件確認"),"gt-muted"),node("p",x.source_summary||"取得來源待查"));
+ for(const x of rows.slice(0,limit)){const c=node("article",undefined,"gt-card");add(c,link((globalThis.GTLocale?.item(x.id,x.name)||x.name)+"（ID "+x.id+"）","https://www.wowhead.com/forever/item="+x.id),node("p",gearSlotNames[x.slot]+"｜"+gearType(x)+(gearCrossArmor(cls,x)?"（跨甲）":"")+"｜"+gearCatalogTags(x).join("・")+"｜"+(Number(x.estimated)?"經典推定":"客戶端資料；取得狀態待逐件確認"),"gt-muted"),node("p",x.source_summary||"取得來源待查"));
  const stats=Object.entries(gearStatNames).filter(([k])=>Number(x[k])).map(([k,v])=>v+" "+x[k]);if(x.dps)stats.unshift("武器DPS "+x.dps+(Number(x.dps_approx)?"（估算）":""));if(stats.length)c.append(node("p",stats.join(" · ")));
  const qualityLabel=["粗糙","普通","優良","精良","史詩","傳說","神器","傳家寶"][Number(x.quality)]||"品質待查";
  add(c,node("p",qualityLabel+"｜需求等級 "+(x.required_level||"未標示")+"｜物品等級 "+(x.item_level||"未標示")+(x.bonding?"｜"+x.bonding:"")+(Number(x.is_unique)?"｜唯一限制（詳見物品提示）":"")+(knownIds.has(String(x.id))?"｜已在本站候選":"｜尚未納入本站候選"),"gt-muted"));
@@ -625,12 +634,12 @@ function gearCatalogView(spec){
  list.append(c);}
  if(rows.length>limit)list.append(button("顯示更多40件",()=>{limit+=40;draw();}));if(!rows.length)list.append(node("p","沒有符合條件的裝備。"));
  }
- for(const e of [q,sl,kind,scope,sort,quality,levelMin])e.addEventListener(e===q||e===levelMin?"input":"change",()=>{limit=40;draw();});add(out,field("搜尋",q),field("部位",sl),field("來源",kind),field("資料範圍",scope),field("品質",quality),field("最低需求等級",levelMin),field("排序（非BiS）",sort),comparison,list);draw();
+ for(const e of [q,sl,kind,scope,sort,quality,levelMin,armorFilter])e.addEventListener(e===q||e===levelMin?"input":"change",()=>{limit=40;draw();});add(out,field("搜尋",q),field("部位",sl),field("來源",kind),field("資料範圍",scope),field("護甲範圍",armorFilter),field("品質",quality),field("最低需求等級",levelMin),field("排序（非BiS）",sort),comparison,list);draw();
  }catch(e){started=false;status.textContent="資料來源暫時無法讀取；收合後再次展開可重試，原有候選不受影響。";out.replaceChildren(link("開啟外部完整裝備查詢","https://gblaku.github.io/wow-forever-kb/"));}
  });return d;
 }
 function audit(){
- title("V19.0 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V19.1 · 跨甲 BiS 裝備、武器與準備資料總覽","跨甲以實際效益為優先；不因護甲較低而排除合法裝備。優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID（可用空格分隔）"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),acq=select([["","全部取得方式"],["聲望","聲望"],["世界掉落","世界掉落"],["製作","專業製作"],["裝綁","裝備綁定／拍賣場"],["任務","任務"],["商人","商人／兌換"],["其他","其他（含副本）"]]),out=node("div");acq.id="gt-acquisition-filter";acq.setAttribute("aria-label","取得方式");
  const model=savedModel(spec.id);
