@@ -726,7 +726,7 @@ if(!pickerArea&&mainSpec){let p=mainSpec.parentElement;while(p&&p!==root&&!p.con
 function setModeHidden(e,hidden){if(!e)return;if(hidden){if(!e.hasAttribute("data-gt-mode-hidden")){e.dataset.gtModeHidden=e.style.getPropertyValue("display");e.dataset.gtModePriority=e.style.getPropertyPriority("display");}e.style.setProperty("display","none","important");}else if(e.hasAttribute("data-gt-mode-hidden")){const v=e.dataset.gtModeHidden,p=e.dataset.gtModePriority;if(v)e.style.setProperty("display",v,p);else e.style.removeProperty("display");delete e.dataset.gtModeHidden;delete e.dataset.gtModePriority;}}
 function validOfficialPost(p){
  if(!p||typeof p.key!=="string"||typeof p.title!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(p.date)||!Array.isArray(p.sections)||!p.sections.length)return false;
- try{const u=new URL(p.url);return u.protocol==="https:"&&["us.forums.blizzard.com","eu.forums.blizzard.com"].includes(u.hostname)&&/^\/en\/wow\/t\//.test(u.pathname)&&p.sections.every(s=>typeof s.title==="string"&&typeof s.body==="string"&&typeof s.category==="string");}catch(e){return false;}
+ return /^https:\/\/(?:us|eu)\.forums\.blizzard\.com\/en\/wow\/t\/(?:[a-z0-9-]+\/)?\d+(?:\/\d+)?\/?$/i.test(String(p.url||""))&&p.sections.every(s=>s&&typeof s.title==="string"&&typeof s.body==="string"&&typeof s.category==="string");
 }
 function combineOfficialBlue(seed,live){
  const map=new Map(seed.filter(validOfficialPost).map(p=>[p.key,p]));
