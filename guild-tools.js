@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V15.3 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V15.4 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -123,7 +123,7 @@ function material(){title("V13 · 配方與材料索引","從 V6 結構化配方
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
 function optimizer(){title("V14 · 個人化配裝比較（試算版）","比較同一部位的候選裝備，可自行修改屬性權重、命中門檻及現有命中。不是完整戰鬥模擬；不估算觸發、套裝、天賦、武器手位及裝備互斥。");const out=node("div");const render=id=>{const s=bySpec.get(id);out.replaceChildren();const slot=select([...s.slots].filter(([k,v])=>v.length>0).map(([k])=>[k,k]));if(s.slots.has("頭部"))slot.value="頭部";const current=inp("0","number");current.value="0";current.min="0";current.step="0.1";const target=inp("留空＝不限制","number");target.min="0";target.step="0.1";const weights={...s.weights};if(["physical","tank"].includes(roleFor(id)))for(const k of Object.keys(weights))if(spellOnly.test(k))weights[k]=0;const weightBox=node("details");weightBox.append(node("summary","自訂屬性權重（各專精分數不可互比）"));const grid=node("div",undefined,"gt-weight-grid");weightBox.append(grid);const result=node("div");function draw(){const rows=s.slots.get(slot.value)||[];result.replaceChildren();const base=Number(current.value)||0;const cap=target.value===""?null:Math.max(0,Number(target.value)||0);const sorted=rows.map(x=>({...x,calc:statScore(x.stats,weights,base,cap)})).sort((a,b)=>b.calc-a.calc);const basePick=select(sorted.map(x=>[x.id,x.name]),"選擇目前穿戴候選（可略過）");const results=node("div");function show(){results.replaceChildren();const compare=sorted.find(x=>x.id===basePick.value);for(const [i,x] of sorted.entries()){const c=box(results,"#"+(i+1)+" "+x.name,"屬性加權分："+x.calc.toFixed(2)+(compare?" · 相對目前："+(x.calc-compare.calc>=0?"+":"")+(x.calc-compare.calc).toFixed(2):""));add(c,node("p",Object.entries(x.stats).map(([k,v])=>k+" "+v).join(" · "),"gt-muted"),node("p",x.source),node("p",x.review||"未觸發屬性警示；非已驗證","gt-muted"),link("物品來源",x.url));}}basePick.addEventListener("change",show);add(result,field("目前穿戴",basePick),results);show();}for(const k of Object.keys(weights)){const el=inp("0","number");el.step="0.01";el.min="0";el.value=String(weights[k]);el.addEventListener("input",()=>{weights[k]=Math.max(0,Number(el.value)||0);draw();});grid.append(field(k,el));}for(const e of [slot,current,target])e.addEventListener(e===slot?"change":"input",draw);add(out,field("比較部位",slot),field("不含此部位的目前命中 (%)",current),field("自訂命中目標 (%)；依種族天賦與敵人等級",target),weightBox,node("p","武器僅比較卡片列出的通用屬性，不加入DPS或手位修正；最佳化武器組合請使用原有專精武器區。","gt-muted"),result,link("WoWSims 永恆完整戰鬥模擬（外部）","https://wowsims.com/forever/"));draw();};const p=specPicker(render);add(panel,specLabel(),out);render(p.value);}
 function audit(){
- title("V15.3 · BiS 推薦總覽與資料稽核","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V15.4 · BiS 推薦總覽與資料稽核","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const slots=[...spec.slots].map(([name,items])=>({name,items:[...items].sort((a,b)=>(a.rank||999)-(b.rank||999))}));
@@ -133,7 +133,27 @@ function audit(){
  for(const [v,label] of [[populated.length+"/"+slots.length,"已有候選部位"],[firsts.filter(x=>!missing(x)).length+"/"+slots.length,"首推有來源及證據文字"],[all.length,"候選裝備筆數"],[all.filter(evidenceMissing).length,"缺證據文字"],[all.filter(sourceMissing).length,"來源待查"],[all.filter(missing).length,"需補資料候選"]]){const c=node("div",undefined,"gt-bis-metric");add(c,node("strong",String(v)),node("small",label));metrics.append(c);}
  const progress=node("div",undefined,"gt-bis-progress"),bar=node("span");bar.style.width=(slots.length?100*firsts.filter(x=>!missing(x)).length/slots.length:0)+"%";progress.append(bar);progress.setAttribute("role","progressbar");progress.setAttribute("aria-label","首推來源及證據文字完整度");progress.setAttribute("aria-valuenow",String(Math.round(slots.length?100*firsts.filter(x=>!missing(x)).length/slots.length:0)));
  function status(x){if(x.review)return node("span","適用性待複核","gt-bis-status gt-bis-review");return node("span",sourceMissing(x)?"來源待查":evidenceMissing(x)?"待補證據":"有來源與證據文字 · 待複核","gt-bis-status "+(sourceMissing(x)?"gt-bis-missing":evidenceMissing(x)?"gt-bis-review":"gt-bis-present"));}
- function itemView(x){const c=node("div",undefined,"gt-bis-alt"),name=link((x.rank?"#"+x.rank+" ":"")+x.name,x.url);name.className="gt-bis-name";add(c,name,status(x),node("p",x.source));if(x.review)add(c,node("p",x.review,"gt-muted"));const stats=[...Object.entries(x.stats).map(([k,v])=>k+" "+v),...Object.entries(x.wm).map(([k,v])=>k+" "+v)].join(" · ");if(stats)add(c,node("p",stats,"gt-muted"));return c;}
+ function statGroup(label,entries,weapon=false){
+  if(!entries.length)return null;
+  const wrap=node("div"),grid=node("div",undefined,"gt-stat-group"+(weapon?" gt-stat-weapon":""));
+  for(const [k,v] of entries){
+   const category=weapon?"":/耐力|護甲|防禦|閃躲|躲閃|招架|格擋|抗性|stamina|armor|defen[cs]e|dodge|parry|block/i.test(k)?" gt-stat-defense":/法術|法傷|治療|智力|精神|法力|spell|healing|mana|intellect/i.test(k)?" gt-stat-magic":/力量|敏捷|攻擊|命中|爆擊|致命|急速|精準|strength|agility|attack|hit|crit/i.test(k)?" gt-stat-offense":"";
+   const tile=node("div",undefined,"gt-stat-chip"+category);
+   add(tile,node("small",k),node("b",String(v)));grid.append(tile);
+  }
+  add(wrap,node("div",label,"gt-stat-title"),grid);return wrap;
+ }
+ function itemView(x){
+  const c=node("div",undefined,"gt-bis-alt"),name=link((x.rank?"#"+x.rank+" ":"")+x.name,x.url);name.className="gt-bis-name";
+  const source=node("div",undefined,"gt-bis-source");add(source,node("small","取得來源"),node("strong",x.source));
+  add(c,name,status(x),source);if(x.review)add(c,node("p",x.review,"gt-stat-warning"));
+  const stats=node("div",undefined,"gt-stat-wrap");
+  const weapon=Object.entries(x.wm||{}).filter(([k,v])=>k&&v!==""),normal=Object.entries(x.stats||{}).filter(([k])=>k);
+  const order=k=>/每秒傷害|DPS/i.test(k)?0:/速度|speed/i.test(k)?1:/傷害範圍|damage/i.test(k)?2:3;
+  weapon.sort((a,b)=>order(a[0])-order(b[0]));
+  for(const group of [statGroup("武器數值",weapon,true),statGroup("一般屬性",normal)])if(group)stats.append(group);
+  if(stats.childElementCount)c.append(stats);return c;
+ }
  function evidenceView(x){const d=node("details");add(d,node("summary","來源證據與備註"),node("p",x.evidence||"未提供證據文字","gt-muted"));if(x.note)add(d,node("p",x.note,"gt-muted"));return d;}
  function draw(){out.replaceChildren();const term=q.value.trim().toLowerCase(),grid=node("div",undefined,"gt-bis-grid");let count=0;
  for(const slot of slots){const first=slot.items.find(x=>!x.review)||slot.items[0];const matches=slot.items.filter(x=>(mode.value!=="missing"||missing(x))&&[slot.name,x.name,x.source,x.id].join(" ").toLowerCase().includes(term));if(!matches.length&&(slot.items.length||term))continue;count++;
