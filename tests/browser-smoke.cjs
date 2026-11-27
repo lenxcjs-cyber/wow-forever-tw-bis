@@ -237,6 +237,26 @@ const server=http.createServer((req,res)=>{
   assert.equal(await talentFrame.locator("#treeArea .talent").count(),0);
   assert.ok((await workspace.locator("iframe").getAttribute("src")).includes("build=feral_onehand"));
   await build.selectOption("general");
+
+  const skillsPane=talentFrame.locator("#skillGuide");
+  await skillsPane.getByText("野性貓 · 8 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),8);
+  await talentFrame.getByRole("button",{name:"技能使用指南",exact:true}).click();
+  await skillsPane.getByRole("searchbox").fill("Shred");
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),1);
+  assert.ok((await skillsPane.locator(":scope > .skill-list").innerText()).includes("撕碎"));
+  await skillsPane.getByRole("searchbox").fill("Rebirth");
+  assert.ok((await skillsPane.locator(".skill-common").innerText()).includes("復生"));
+  await skillsPane.getByRole("searchbox").fill("");
+  await build.selectOption("feral_onehand");
+  await skillsPane.getByText("此構築未收錄逐項配點：不假定已習得天賦技能。",{exact:true}).waitFor({state:"visible"});
+  await build.selectOption("general");
+  await spec.selectOption("spec-27");
+  await skillsPane.getByText("野性熊 · 7 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),7);
+  await spec.selectOption("spec-26");
+  await talentFrame.locator("#overview").getByText("9/32/10",{exact:true}).waitFor({state:"visible"});
+  console.log("PASS: skill guides below talent trees, English search, utility search, build and spec switching");
   console.log("PASS: synchronized desktop talent/gear layout, independent gear scroll, mobile stacking and build switching");
   await openTab("v8");
   const tf=page.frameLocator('iframe[title="天賦流派與野外練等"]');
