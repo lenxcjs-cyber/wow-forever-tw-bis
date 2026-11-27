@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V21.2 beta · 2026-11-27
+/* 墓鐘資料庫 V21.3 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -316,40 +316,63 @@ const official="https://news.blizzard.com/en-us/article/24315281/wow-forever-hot
 function raid(){title("團本準備","2026/11/27：首批團本尚未開放。以下是官方已公布的規模及前置，尚未加入首領技能推測。");const r=[["地深獸穴（Barrow Deeps）","10人 · 8首領 · 60級 · 官方公告12/9（台灣日期依維護公告）"],["海加爾山之巔（Hyjal Summit）","20人 · 13首領 · 60級 · 官方公告12/9"],["奧妮克希亞巢穴","40人 · 60級 · 每位玩家準備龍火護符；聯盟／部落前置不同。"]];for(const [a,b] of r)box(panel,a,b);const c=box(panel,"開荒通用檢查","先完成滿等技能與裝備、按職責準備消耗品、抗性按官方機制決定、預先分配坦補與斷法。世界增益進團本會移除（11/23熱修正）。");add(c,link("官方團本概覽","https://news.blizzard.com/en-gb/article/24303009/world-of-warcraft-forever-raid-overviewlocations-raid-sizes-and-attunement"),node("p","首領打法等正式資料出現後再補齊。","gt-muted"),link("官方熱修正",official));}
 const news=[["2026/11/25","平衡德天賦調整","憤怒與星火相關天賦重新整理，日月蝕增加憤怒爆擊，梟獸形態強化秘法與自然傷害。3點以上舊強化星火術可能被重置。"],["2026/11/25","獵人／術士寵物","修正寵物普通近戰攻擊爆擊率為0%的問題；野獸控制獵召喚的鷹亦有行為和爆擊修正。"],["2026/11/25","聖騎士／盜賊／薩滿","修正審判刷新及驅邪術爆擊；聖光誓約延長。毒藥與致盲粉暫時拾取綁定；薩滿閃電鏈的節能施法修正。"],["2026/11/23","團本世界增益與套裝","區域切換不再移除世界增益，但進團本仍移除；野性之心4件能量回復修正，數個武器過度觸發問題也已修正。"],["2026/11/17","聖坦魂鑄套裝","坦克版魂鑄套裝以法術能量取代力量。Whiteout Staff、Crackling Staff 的屬性統一為25耐、25智、74武器法傷。"]];
 function hotfix(){title("V12 · 官方藍帖繁中摘要","截至 2026/11/27 查得的最新官方熱修正為 11/25。此區為手動更新摘要，不是即時爬蟲。");const q=inp("搜尋日期、職業或關鍵字"),out=node("div");function draw(){out.replaceChildren();for(const [d,t,b] of news.filter(x=>x.join(" ").includes(q.value.trim()))){const c=box(out,d+" · "+t,b);c.append(link("官方原文",official));}}q.addEventListener("input",draw);add(panel,field("搜尋",q),out,link("暴雪魔獸世界最新消息","https://news.blizzard.com/en-us/world-of-warcraft"));draw();}
+function parseRecipeMaterials(mat){
+ const rows=[];
+ for(const part of String(mat??"").split(/[、；;\n]+/)){
+  const text=part.trim();if(!text)continue;
+  const m=text.match(/^([^×]+?)\s*×\s*(\d+)$/),qty=m?Number(m[2]):0;
+  rows.push(m&&m[1].trim()&&Number.isSafeInteger(qty)&&qty>0?{name:m[1].trim(),qty,text}:{name:"",qty:null,text});
+ }
+ return rows.length?rows:[{name:"",qty:null,text:"材料資料缺漏"}];
+}
 function recipeMaterialTotals(entries){
  const totals=new Map(),unknown=[];
  for(const {recipe,count} of entries){
   if(!Number.isSafeInteger(count)||count<1)continue;
-  for(const part of String(recipe.mat||"").split("、")){
-   const t=part.trim();if(!t)continue;
-   const m=t.match(/^([^×]+)\s*×\s*(\d+)$/);
-   if(!m||!m[1].trim()||!Number.isSafeInteger(Number(m[2]))||Number(m[2])<1){unknown.push({name:recipe.name,text:t,count});continue;}
-   const key=m[1].trim(),qty=Number(m[2])*count+(totals.get(key)||0);
-   if(!Number.isSafeInteger(qty)){unknown.push({name:recipe.name,text:t,count});continue;}totals.set(key,qty);
+  for(const part of parseRecipeMaterials(recipe.mat)){
+   if(part.qty===null){unknown.push({name:recipe.name,text:part.text,count});continue;}
+   const qty=part.qty*count+(totals.get(part.name)||0);
+   if(!Number.isSafeInteger(qty)){unknown.push({name:recipe.name,text:part.text,count});continue;}totals.set(part.name,qty);
   }
  }
  return {totals:[...totals.entries()].sort((a,b)=>a[0].localeCompare(b[0],"zh-Hant")),unknown};
 }
+function recipeShoppingRows(totals,owned={}){
+ return totals.map(([name,required])=>{const n=Object.prototype.hasOwnProperty.call(owned,name)?owned[name]:0,have=Number.isSafeInteger(n)&&n>=0?n:0;return {name,required,have,remaining:Math.max(0,required-have)};});
+}
+function recipeSearchMatches(recipe,term,translate=v=>v){
+ const terms=String(term||"").trim().toLowerCase().split(/\s+/).filter(Boolean),fields=[recipe.name,recipe.prof,recipe.fx,recipe.mat,recipe.where,recipe.state].filter(v=>typeof v==="string");
+ const hay=fields.concat(fields.map(translate)).join(" ").toLowerCase();
+ return terms.every(t=>hay.includes(t));
+}
 function material(){
- title("附魔、消耗品與材料","原V6配方索引；可依構築儲存個人準備清單及計算材料。候選配方不代表最佳附魔、消耗品或已驗證的永恆掉落。");
+ title("附魔、消耗品與材料","依構築保存準備清單。候選配方及取得來源仍待逐項核對。");
  let data;try{data=JSON.parse($("#v6-prep-data").textContent);}catch(e){panel.append(node("p","配方資料無法讀取"));return;}
  const rows=Object.entries(data.recipes||{}).filter(([,x])=>x&&typeof x==="object"),routes=data.routes||{},id=getSpec(),profile=id?buildFor(id):"",key=id?"gt-prep-v1:"+id+":"+profile:null;
- let chosen={};try{const v=key?JSON.parse(localStorage.getItem(key)||"{}"):{};if(v&&typeof v==="object"&&!Array.isArray(v))for(const [k] of rows)if(Number.isSafeInteger(v[k])&&v[k]>0&&v[k]<=999)chosen[k]=v[k];}catch(e){}
- const q=inp("例如：大塊魔光碎片、法術能量、夢葉草"),prof=select([...new Set(rows.map(([,x])=>x.prof).filter(Boolean))].sort().map(x=>[x,x]),"全部專業"),mode=select([["all","全部候選"],["chosen","僅顯示已選配方"]]),out=node("div"),summary=node("div"),msg=node("p","","gt-muted");
- function persist(){if(!key)return;try{localStorage.setItem(key,JSON.stringify(chosen));msg.textContent="已儲存於本瀏覽器："+profile;}catch(e){msg.textContent="本機儲存失敗，重新整理後可能遺失。";}}
+ let chosen=Object.create(null),owned=Object.create(null);try{const v=key?JSON.parse(localStorage.getItem(key)||"{}"):{};if(v&&typeof v==="object"&&!Array.isArray(v))for(const [k] of rows)if(Number.isSafeInteger(v[k])&&v[k]>0&&v[k]<=999)chosen[k]=v[k];}catch(e){}
+ try{const v=key?JSON.parse(localStorage.getItem(key+":owned")||"{}"):{};if(v&&typeof v==="object"&&!Array.isArray(v))for(const [n,qty] of Object.entries(v))if(Number.isSafeInteger(qty)&&qty>=0)owned[n]=qty;}catch(e){}
+ const q=inp("配方、效果、材料、來源（空格分隔）"),prof=select([...new Set(rows.map(([,x])=>x.prof).filter(Boolean))].sort().map(x=>[x,x]),"全部專業"),mode=select([["all","全部候選"],["chosen","僅顯示已選配方"]]),out=node("div"),summary=node("div"),msg=node("p","","gt-muted");
+ function persist(){if(!key)return;try{localStorage.setItem(key,JSON.stringify(chosen));localStorage.setItem(key+":owned",JSON.stringify(owned));msg.textContent="已儲存於本瀏覽器："+profile;}catch(e){msg.textContent="本機儲存失敗，重新整理後可能遺失。";}}
  function drawSummary(){summary.replaceChildren();if(!key){summary.append(node("p","請先選擇職業及專精，才能使用獨立準備清單。","gt-muted"));return;}
   const selected=rows.filter(([k])=>chosen[k]>0).map(([k,recipe])=>({recipe,count:chosen[k]}));
   const {totals,unknown}=recipeMaterialTotals(selected);
   const c=box(summary,"本構築材料採買清單",selected.length+" 種配方；數量為配方製作次數，不一定等於成品數。");
   if(!selected.length){c.append(node("p","尚未加入配方。"));return;}
-  for(const {recipe,count} of selected)add(c,node("p",recipe.name+" × "+count));
-  const ul=node("ul");for(const [name,count] of totals)add(ul,node("li",name+" × "+count+" — "+(routes[name]||"來源未核對")));c.append(ul);
+  const chosenDetails=node("details");chosenDetails.append(node("summary","已選配方（"+selected.length+"）"));
+  for(const {recipe,count} of selected)chosenDetails.append(node("p",recipe.name+" × "+count));c.append(chosenDetails);
+  const table=node("div",undefined,"gt-shopping-grid");add(table,...["材料／來源","需求","已有","尚缺"].map(t=>node("strong",t)));
+  for(const row of recipeShoppingRows(totals,owned)){
+   const qty=inp("0","number");qty.min="0";qty.max="999999999";qty.step="1";qty.value=String(row.have);qty.setAttribute("aria-label",row.name+" 已有數量");
+   qty.addEventListener("change",()=>{owned[row.name]=Math.min(999999999,Math.max(0,Math.floor(Number(qty.value)||0)));persist();drawSummary();});
+   add(table,add(node("div"),node("strong",row.name),node("p",routes[row.name]||"來源未核對","gt-muted")),node("span",String(row.required)),qty,node("span",String(row.remaining),"gt-shopping-remaining"));
+  }
+  c.append(table);
   if(unknown.length){const d=node("details");d.open=true;d.append(node("summary","未能自動合計的材料（"+unknown.length+"）"));for(const x of unknown)d.append(node("p",x.name+" × "+x.count+"： "+x.text));c.append(d);}
   add(c,node("p","合計只處理明確的「材料×整數」；未確認配方與材料來源保留待查，不推算成品產量。","gt-muted"));
-  const exportArea=node("textarea");exportArea.rows=4;exportArea.style.width="100%";exportArea.readOnly=true;exportArea.value=[bySpec.get(id)?.name+" / "+profile,...totals.map(([n,v])=>n+" × "+v),...unknown.map(x=>"待核算："+x.name+" × "+x.count+" / "+x.text)].join("\n");const d=node("details");add(d,node("summary","複製材料清單"),exportArea,button("選取清單文字",()=>{exportArea.focus();exportArea.select();}));c.append(d);
+  const exportArea=node("textarea");exportArea.rows=4;exportArea.style.width="100%";exportArea.readOnly=true;exportArea.value=["墓鐘資料庫｜尚缺材料（來源待核）",bySpec.get(id)?.name+" / "+profile,...recipeShoppingRows(totals,owned).filter(x=>x.remaining>0).map(x=>x.name+" × "+x.remaining+"（需求 "+x.required+"／已有 "+x.have+"）"),...unknown.map(x=>"待核算："+x.name+" × "+x.count+" / "+x.text)].join("\n");const d=node("details");add(d,node("summary","複製尚缺材料清單"),exportArea,button("複製清單",async()=>{try{await navigator.clipboard.writeText(exportArea.value);msg.textContent="已複製尚缺材料清單。";}catch(e){exportArea.focus();exportArea.select();msg.textContent="請手動複製已選取文字。";}}));c.append(d);
  }
- function draw(){out.replaceChildren();const term=q.value.trim().toLowerCase(),list=rows.filter(([k,x])=>(mode.value!=="chosen"||chosen[k]>0)&&(!prof.value||x.prof===prof.value)&&(!term||[x.name,x.fx,x.mat,x.where].join(" ").toLowerCase().includes(term)));out.append(node("p",list.length+" 個配方候選","gt-muted"));
-  for(const [k,x] of list){const c=box(out,x.name+" · "+x.prof,x.fx);add(c,node("small",x.state),node("p","配方取得："+x.where),node("p",x.mat));const ul=node("ul");for(const material of String(x.mat||"").split("、")){const name=material.split("×")[0].trim();if(name)add(ul,node("li",material+" — "+(routes[name]||"來源未核對")));}add(c,ul,link("永恆專業資料","https://wowamobi.com/professions"),node("p",x.why,"gt-muted"));
+ function draw(){out.replaceChildren();const term=q.value.trim().toLowerCase(),list=rows.filter(([k,x])=>(mode.value!=="chosen"||chosen[k]>0)&&(!prof.value||x.prof===prof.value)&&recipeSearchMatches(x,term,zhDisplay));out.append(node("p",list.length+" 個配方候選","gt-muted"));
+  for(const [k,x] of list){const c=box(out,x.name+" · "+x.prof,x.fx);add(c,node("small",x.state),node("p","配方取得："+x.where),node("p","材料及來源："));const ul=node("ul");for(const material of parseRecipeMaterials(x.mat))add(ul,node("li",material.text+" — "+(material.name&&routes[material.name]||"來源未核對")));add(c,ul,link("永恆專業資料","https://wowamobi.com/professions"),node("p",x.why,"gt-muted"));
    if(key){const qty=inp("0","number");qty.min="0";qty.max="999";qty.step="1";qty.value=String(chosen[k]||0);qty.addEventListener("change",()=>{const n=Math.min(999,Math.max(0,Math.floor(Number(qty.value)||0)));if(n)chosen[k]=n;else delete chosen[k];qty.value=String(n);persist();drawSummary();if(mode.value==="chosen"&&!n)draw();});add(c,field("製作次數（0＝未選）",qty));}
   }
   if(q.value.trim()&&routes[q.value.trim()])box(out,"材料來源："+q.value.trim(),routes[q.value.trim()]);
