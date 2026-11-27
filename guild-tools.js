@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V15.7 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V15.8 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -159,7 +159,7 @@ function hotfix(){title("V12 · 官方藍帖繁中摘要","截至 2026/11/27 查
 function material(){title("V13 · 配方與材料索引","從 V6 結構化配方建立可搜尋索引，保留原配方狀態與來源線索；尚未證實的成品不可當作一定能取得。");let data;try{data=JSON.parse($("#v6-prep-data").textContent);}catch(e){panel.append(node("p","配方資料無法讀取"));return;}const rows=Object.values(data.recipes||{});const q=inp("例如：大塊魔光碎片、法術能量、夢葉草"),prof=select([...new Set(rows.map(x=>x.prof))].sort().map(x=>[x,x]),"全部專業"),out=node("div");function draw(){out.replaceChildren();const term=q.value.trim(),list=rows.filter(x=>(!prof.value||x.prof===prof.value)&&(!term||[x.name,x.fx,x.mat,x.where].join(" ").includes(term)));out.append(node("p",list.length+" 個配方候選","gt-muted"));for(const x of list){const c=box(out,x.name+" · "+x.prof,x.fx);add(c,node("small",x.state),node("p","配方取得："+x.where),node("p",x.mat));const ul=node("ul");for(const material of String(x.mat).split("、")){const key=material.split("×")[0].trim();add(ul,node("li",material+" — "+(data.routes[key]||"來源未核對")));}add(c,ul,link("永恆專業資料","https://wowamobi.com/professions"),node("p",x.why,"gt-muted"));}if(term&&data.routes[term])box(out,"材料來源："+term,data.routes[term]);}q.addEventListener("input",draw);prof.addEventListener("change",draw);add(panel,field("配方／材料搜尋",q),field("專業",prof),out);draw();}
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
 function optimizer(){
- title("V15.6 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
+ title("V15.8 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
  const id=getSpec(),s=bySpec.get(id);if(!s)return;
  const out=node("div"),slot=select([...s.slots].map(([k])=>[k,k])),current=inp("0","number"),target=inp("留空＝不限制","number"),result=node("div");
  current.value="0";current.min="0";current.step="0.1";target.min="0";target.step="0.1";
@@ -167,8 +167,8 @@ function optimizer(){
  const defaults={...s.weights};if(["physical","tank"].includes(roleFor(id)))for(const k of Object.keys(defaults))if(spellOnly.test(k))defaults[k]=0;
  const weights={...defaults},keys=[...new Set([...Object.keys(defaults),...[...s.slots.values()].flatMap(xs=>xs.flatMap(x=>Object.keys(x.stats))),"武器DPS"])];
  for(const k of keys)if(!(k in weights))weights[k]=0;
- let provenance="舊版估算／未驗證",saved=null;try{saved=JSON.parse(localStorage.getItem(storageKey)||"null");}catch(e){}
- if(saved&&saved.weights&&typeof saved.weights==="object"){for(const k of keys)if(Number.isFinite(saved.weights[k])&&saved.weights[k]>=0)weights[k]=saved.weights[k];provenance=saved.source||"使用者設定";}
+ let provenance="舊版估算／未驗證",saved=savedModel(id);if(saved?.hitBySlot?.[slot.value]){current.value=String(saved.hitBySlot[slot.value].base);target.value=saved.hitBySlot[slot.value].cap??"";}
+ if(saved&&saved.weights&&typeof saved.weights==="object"){for(const k of keys)if(Number.isFinite(saved.weights[k])&&saved.weights[k]>=0)weights[k]=saved.weights[k];provenance=(saved.source||"使用者設定")+"（未經本站驗證）";}
  const source=inp("例如 WoWSims 版本、天賦連結、戰鬥時間","text");source.value=saved?.source||"";
  const indicator=node("p",provenance,"gt-muted"),message=node("p","","gt-muted"),weightBox=node("details"),grid=node("div",undefined,"gt-weight-grid"),inputs={};
  weightBox.append(node("summary","屬性權重與模擬資料匯入"));
@@ -176,33 +176,34 @@ function optimizer(){
  function refresh(){for(const k of keys)inputs[k].value=String(weights[k]);indicator.textContent=provenance;draw();}
  const importBtn=button("匯入 JSON 權重",()=>{try{const o=JSON.parse(raw.value);if(!o||typeof o!=="object"||Array.isArray(o))throw Error("需要物件");const entries=Object.entries(o);if(!entries.length||entries.some(([k,v])=>!keys.includes(k)||typeof v!=="number"||!Number.isFinite(v)||v<0))throw Error("欄位必須為本頁已列屬性，數值須為非負有限數");for(const k of keys)weights[k]=Object.prototype.hasOwnProperty.call(o,k)?o[k]:0;provenance="使用者匯入／未經本站驗證";message.textContent="匯入成功；未指定的屬性已設為0。";refresh();}catch(e){message.textContent="匯入失敗："+e.message;}});
  for(const k of keys){const el=inp("0","number");el.step="0.01";el.min="0";el.value=String(weights[k]);inputs[k]=el;el.addEventListener("input",()=>{weights[k]=Math.max(0,Number(el.value)||0);provenance="使用者調整／未經本站驗證";indicator.textContent=provenance;draw();});grid.append(field(k,el));}
- const saveBtn=button("儲存此專精與構築權重",()=>{if(!source.value.trim()){message.textContent="請填寫資料來源或計算假設。";return;}try{localStorage.setItem(storageKey,JSON.stringify({weights,source:source.value.trim()}));provenance=source.value.trim()+"（使用者提供，未驗證）";indicator.textContent=provenance;message.textContent="已儲存於本瀏覽器。";}catch(e){message.textContent="無法儲存。";}});
- const resetBtn=button("恢復舊版估算",()=>{for(const k of keys)weights[k]=defaults[k]||0;provenance="舊版估算／未驗證";source.value="";try{localStorage.removeItem(storageKey);}catch(e){}refresh();});
+ const saveBtn=button("儲存此專精與構築權重",()=>{if(!source.value.trim()){message.textContent="請填寫資料來源或計算假設。";return;}try{localStorage.setItem(storageKey,JSON.stringify({weights,source:source.value.trim(),hitBySlot:{...(saved?.hitBySlot||{}),[slot.value]:{base:Math.max(0,Number(current.value)||0),cap:target.value===""?null:Math.max(0,Number(target.value)||0)}}}));saved=savedModel(id);provenance=source.value.trim()+"（使用者提供，未驗證）";indicator.textContent=provenance;message.textContent="已儲存於本瀏覽器。";}catch(e){message.textContent="無法儲存。";}});
+ const resetBtn=button("恢復舊版估算",()=>{for(const k of keys)weights[k]=defaults[k]||0;provenance="舊版估算／未驗證";source.value="";saved=null;current.value="0";target.value="";try{localStorage.removeItem(storageKey);}catch(e){}refresh();});
  add(weightBox,grid,field("模擬來源與假設",source),field("JSON 權重（以本頁繁中屬性名稱為鍵）",raw),importBtn,saveBtn,resetBtn,message);
  function draw(){result.replaceChildren();const rows=(s.slots.get(slot.value)||[]).filter(x=>allowed(id,x));const base=Math.max(0,Number(current.value)||0),cap=target.value===""?null:Math.max(0,Number(target.value)||0);
- const sorted=rows.map(x=>{const dps=Object.entries(x.wm||{}).find(([k])=>/每秒傷害|DPS/i.test(k));const wd=dps?Number(String(dps[1]).match(/\d+(?:\.\d+)?/)?.[0]):NaN;const parts={};for(const [k,v] of Object.entries(x.stats)){const qty=k==="命中機率"&&cap!==null?Math.min(v,Math.max(0,cap-base)):v;parts[k]=qty*(weights[k]||0);}if(Number.isFinite(wd))parts["武器DPS"]=wd*(weights["武器DPS"]||0);return {...x,calc:Object.values(parts).reduce((a,b)=>a+b,0),parts,missingDps:!!weights["武器DPS"]&&/武器|主手|副手|雙手|遠程/.test(x.slot)&&!Number.isFinite(wd)};}).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||Number(a.missingDps)-Number(b.missingDps)||b.calc-a.calc);
+ const sorted=rows.map(x=>{const m=modelScore(x,weights,{base,cap});return {...x,calc:m.total,parts:m.parts,missingDps:m.incomplete};}).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||Number(a.missingDps)-Number(b.missingDps)||b.calc-a.calc);
  if(!sorted.length){result.append(node("p","本站沒有符合此構築的候選裝備，請查證外部資料。"));return;}
  for(const [i,x] of sorted.entries()){const c=box(result,(x.review?"待複核 · ":"比較 "+(i+1)+" · ")+x.name,"試算分："+x.calc.toFixed(2));add(c,node("p",x.source),node("p",x.review||"未觸發適用性警示；非已驗證","gt-muted"));if(x.missingDps)add(c,node("p","缺武器DPS，分數不完整","gt-muted"));const d=node("details");d.append(node("summary","查看各屬性分數貢獻"));for(const [k,v] of Object.entries(x.parts))if(v!==0)d.append(node("p",k+"："+v.toFixed(2)));add(c,d,link("物品來源",x.url));}}
- for(const el of [slot,current,target])el.addEventListener(el===slot?"change":"input",draw);
+ slot.addEventListener("change",()=>{const h=saved?.hitBySlot?.[slot.value];current.value=String(h?.base??0);target.value=h?.cap??"";draw();});for(const el of [current,target])el.addEventListener("input",draw);
  add(out,specLabel(),node("p","構築："+(rogueProfiles[id]?.find(x=>x[0]===profile)?.[1]||"既有專精／待建立完整構築")),indicator,field("比較部位",slot),field("其他部位命中 (%)",current),field("命中目標 (%)",target),weightBox,node("p","武器DPS權重預設0；須由適用構築模擬提供。未計套裝、觸發、整套互斥或完整技能循環。","gt-muted"),result,link("WoWSims Forever","https://wowsims.com/forever/"),node("p",""),link("VoidSim 屬性權重","https://voidsim.io/forever"));panel.append(out);draw();
 }
 // Saved simulation weights are local to the selected specialization and build.
 function savedModel(id){
  try{const v=JSON.parse(localStorage.getItem("gt-sim-weights-v1:"+id+":"+buildFor(id))||"null");if(v&&v.weights&&typeof v.weights==="object"&&Object.values(v.weights).every(n=>typeof n==="number"&&Number.isFinite(n)&&n>=0))return v;}catch(e){}return null;
 }
-function modelScore(x,weights){
- let total=0;for(const [k,v] of Object.entries(x.stats))total+=v*(weights[k]||0);
+function modelScore(x,weights,hit={}){
+ const parts={},base=Number.isFinite(hit.base)?Math.max(0,hit.base):0,cap=Number.isFinite(hit.cap)?Math.max(0,hit.cap):null;
+ for(const [k,v] of Object.entries(x.stats)){const qty=k==="命中機率"&&cap!==null?Math.min(v,Math.max(0,cap-base)):v;parts[k]=qty*(weights[k]||0);}
  const dps=Object.entries(x.wm||{}).find(([k])=>/每秒傷害|DPS/i.test(k));
  const wd=dps?Number(String(dps[1]).match(/\d+(?:\.\d+)?/)?.[0]):NaN;
- if(Number.isFinite(wd))total+=wd*(weights["武器DPS"]||0);
- return {total,incomplete:!!weights["武器DPS"]&&/武器|主手|副手|雙手|遠程/.test(x.slot)&&!Number.isFinite(wd)};
+ if(Number.isFinite(wd))parts["武器DPS"]=wd*(weights["武器DPS"]||0);
+ return {total:Object.values(parts).reduce((a,b)=>a+b,0),parts,incomplete:!!weights["武器DPS"]&&/武器|主手|副手|雙手|遠程/.test(x.slot)&&!Number.isFinite(wd)};
 }
 function audit(){
- title("V15.7 · BiS 推薦總覽與資料稽核","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V15.8 · BiS 推薦總覽與資料稽核","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const model=savedModel(spec.id);
- const slots=[...spec.slots].map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).map(x=>model?{...x,model:modelScore(x,model.weights)}:x).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||(model?(Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total):0)||(a.rank||999)-(b.rank||999))}));
+ const slots=[...spec.slots].map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).map(x=>model?{...x,model:modelScore(x,model.weights,model.hitBySlot?.[name])}:x).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||(model?(Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total):0)||(a.rank||999)-(b.rank||999))}));
  const excluded=[...spec.slots.values()].flat().filter(x=>!allowed(spec.id,x));
  const all=slots.flatMap(x=>x.items),sourceMissing=x=>!x.source||/待查|待核|未知|未確認/.test(x.source),evidenceMissing=x=>!x.evidence,missing=x=>sourceMissing(x)||evidenceMissing(x)||!!x.review;
  const populated=slots.filter(x=>x.items.length),firsts=slots.map(x=>x.items.find(i=>!i.review)).filter(Boolean);
@@ -233,11 +234,11 @@ function audit(){
  }
  function evidenceView(x){const d=node("details");add(d,node("summary","來源證據與備註"),node("p",x.evidence||"未提供證據文字","gt-muted"));if(x.note)add(d,node("p",x.note,"gt-muted"));return d;}
  function draw(){out.replaceChildren();const term=q.value.trim().toLowerCase(),grid=node("div",undefined,"gt-bis-grid");let count=0;
- for(const slot of slots){const first=slot.items.find(x=>!x.review)||slot.items[0];const matches=slot.items.filter(x=>(mode.value!=="missing"||missing(x))&&[slot.name,x.name,x.source,x.id].join(" ").toLowerCase().includes(term));if(!matches.length&&(slot.items.length||term))continue;count++;
+ for(const slot of slots){const first=slot.items.find(x=>!x.review&&!x.model?.incomplete)||slot.items[0];const matches=slot.items.filter(x=>(mode.value!=="missing"||missing(x))&&[slot.name,x.name,x.source,x.id].join(" ").toLowerCase().includes(term));if(!matches.length&&(slot.items.length||term))continue;count++;
  const c=node("article",undefined,"gt-bis-slot");c.append(node("h4",slot.name));if(!first){c.append(node("span","尚無候選","gt-bis-status gt-bis-missing"));grid.append(c);continue;}
  const featured=matches.includes(first)?first:matches[0];c.append(node("small",featured.review?"適用性待複核 · 原順位 "+featured.rank:model?"依本機權重比較 · 原順位 "+featured.rank:featured.rank===1?"原排名首推":(featured.rank?"符合條件的候選 #"+featured.rank:"候選順位未標示"),"gt-muted"));add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+slots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));}
- q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；未驗證、不含整套命中與套裝效果。":"目前未儲存模擬權重，沿用既有候選順位。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),field("篩選",mode),field("搜尋",q),out);draw();
+ const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p",model?"排序使用本機儲存權重："+(model.source||"使用者提供")+"；依各部位已儲存命中門檻試算，未驗證、不含整套與套裝效果。":"目前未儲存模擬權重，沿用既有候選順位。","gt-muted"),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),excludedDetails,metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),field("篩選",mode),field("搜尋",q),out);draw();
 }
 const renderers={audit,v8:guide,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
 function show(key){active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v8","v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
