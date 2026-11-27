@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V17.3 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V17.6 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -440,7 +440,7 @@ function weaponSetView(spec,model){
  d.append(out);draw();return d;
 }
 function audit(){
- title("V17.3 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V17.6 · BiS 裝備、武器與準備資料總覽","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
  const model=savedModel(spec.id);
@@ -488,17 +488,17 @@ function talentPageURL(embedded=false){
  if(embedded)p.set("embed","1");return "talents.html"+(p.size?"?"+p.toString():"");
 }
 function talentHub(){
- title("天賦流派與野外練等","在此切換滿等天賦樹、各階效果與九職業逐級練等；也可開啟獨立頁面分享。");
- const full=link("開啟獨立天賦頁面",talentPageURL());const frame=node("iframe");frame.title="天賦流派與野外練等";frame.style.cssText="display:block;width:100%;height:950px;border:0;border-radius:8px;background:#0e131c";
- const status=node("p","載入天賦頁面中…","gt-muted");
- frame.addEventListener("load",()=>{status.textContent="";try{const doc=frame.contentDocument;const win=frame.contentWindow;if(!doc||!win||!doc.body)return;const fit=()=>{if(!frame.isConnected){observer?.disconnect();return;}frame.style.height=Math.max(420,Math.ceil(doc.body.getBoundingClientRect().height)+16)+"px";};const observer=typeof win.ResizeObserver==="function"?new win.ResizeObserver(fit):null;observer?.observe(doc.body);fit();}catch(e){status.textContent="可使用上方獨立頁面連結。";}});
- frame.src=talentPageURL(true);
- if(getSpec()){const legacy=node("details");legacy.append(node("summary","原有天賦與實戰手法研究"));const header=[...panel.childNodes];guide();const old=[...panel.childNodes];panel.replaceChildren(...header);legacy.append(...old);add(panel,full,status,frame,legacy);}else add(panel,full,status,frame);
+ title("天賦流派與野外練等","使用首頁的職業、專精與玩法選單，直接查看天賦及練等。");
+ if(!getSpec()){panel.append(node("p","請先在上方選擇職業及專精。"));return;}
+ const frame=node("iframe");frame.title="天賦流派與野外練等";frame.style.cssText="display:block;width:100%;height:950px;border:0;border-radius:8px;background:#0e131c";
+ frame.addEventListener("load",()=>{try{const doc=frame.contentDocument,win=frame.contentWindow;if(!doc?.body||!win)return;let observer;const fit=()=>{if(!frame.isConnected){observer?.disconnect();return;}frame.style.height=Math.max(420,Math.ceil(doc.body.getBoundingClientRect().height)+16)+"px";};observer=typeof win.ResizeObserver==="function"?new win.ResizeObserver(fit):null;observer?.observe(doc.body);fit();}catch(e){}});
+ frame.src=talentPageURL(true)+"&v=17.6";
+ add(panel,frame);
 }
 const renderers={audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
 function show(key){restoreLegacy();active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
-const dashboardMeta={v8:["⚔️","天賦樹、玩法與練等"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","官方更新摘要"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","檢查來源與證據"]};
-for(const [key,label] of tabs){const b=button(label,()=>show(key));b.dataset.tab=key;const [symbol,desc]=dashboardMeta[key];const pict=node("span",symbol,"gt-icon");pict.setAttribute("aria-hidden","true");b.replaceChildren(pict,node("span",label),node("span",desc,"gt-desc"));nav.append(b);}
+const dashboardMeta={v8:["⚔️","天賦樹、玩法與練等"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","繁中藍帖專頁"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","檢查來源與證據"]};
+for(const [key,label] of tabs){const b=button(label,()=>{if(key==="v12")location.assign("blue-posts.html");else show(key);});b.dataset.tab=key;const [symbol,desc]=dashboardMeta[key];const pict=node("span",symbol,"gt-icon");pict.setAttribute("aria-hidden","true");b.replaceChildren(pict,node("span",label),node("span",desc,"gt-desc"));nav.append(b);}
 const toolboxDetails=root.closest("details");
 const mainSpec=$("#spec-select");
 if(toolboxDetails&&mainSpec){
