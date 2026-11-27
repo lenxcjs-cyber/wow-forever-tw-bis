@@ -19,6 +19,7 @@ SEEDS={"us":[2403040,2429007,2429074,2416343,2415068,2426335],"eu":[]}
 AGENT="TombGuildDatabase/1.0 (public WoW notices; low-rate polling)"
 MAX_TOPICS=18
 MAX_TRANSLATIONS=6
+CHECKPOINT_HOURS=6
 ROBOTS={}
 BLOCKED=set()
 def now(): return datetime.now(timezone.utc).isoformat()
@@ -105,17 +106,25 @@ def selected_facts(body):
         result.append(x);budget-=len(words)
         if len(result)>=2:break
     return result
+def checkpoint(state,counts,stamp=None):
+    stamp=stamp or datetime.now(timezone.utc)
+    previous=state.get("lastCheck") or {}
+    status="partial" if any(v["read"]<v["attempted"] or not v["attempted"] for v in counts.values()) else "ok"
+    try: elapsed=stamp-datetime.fromisoformat(previous["at"])
+    except (KeyError,TypeError,ValueError): elapsed=timedelta(days=1)
+    if previous.get("status")!=status or elapsed>=timedelta(hours=CHECKPOINT_HOURS):
+        state["lastCheck"]={"at":stamp.isoformat(),"status":status,"regions":counts}
 def poll():
-    state=read_state();original=json.dumps(state,sort_keys=True);old_posts=json.dumps(state["posts"],sort_keys=True);archive=archive_keys();by={p["identity"]:p for p in state["posts"]};queue=[];successful=0
+    state=read_state();original=json.dumps(state,sort_keys=True);old_posts=json.dumps(state["posts"],sort_keys=True);archive=archive_keys();by={p["identity"]:p for p in state["posts"]};queue=[];successful=0;counts={region:{"attempted":0,"read":0} for region in CATEGORIES}
     cutoff=datetime.now(timezone.utc)-timedelta(days=7)
     for region in CATEGORIES:
         for t in get_topics(region,state):
-            tid=t["id"]
+            tid=t["id"];counts[region]["attempted"]+=1
             try:
                 d=fetch(base(region)+f"/en/wow/t/{tid}.json")
                 posts=d["post_stream"]["posts"]
                 if not isinstance(posts,list):raise ValueError("bad post stream")
-                successful+=1
+                successful+=1;counts[region]["read"]+=1
                 # Staff replies can be absent from the initial stream in large topics.
                 # Request recent posts directly when the topic lists more IDs.
                 stream=d["post_stream"].get("stream",[])
@@ -150,6 +159,7 @@ def poll():
                 # Do not record ordinary player activity as a new official update.
             except Exception as e:print("Topic unavailable",region,tid,type(e).__name__,str(e)[:160])
     if not successful:raise RuntimeError("No official topic could be read; retain previous published data")
+    checkpoint(state,counts)
     state["posts"]=sorted(by.values(),key=lambda p:p.get("updatedAt") or "",reverse=True)[:150]
     # Keep fingerprints bounded; no update timestamp or commit for identical results.
     state["seen"]=dict(list(state["seen"].items())[-1500:]);state["topics"]=dict(list(state["topics"].items())[-600:])
@@ -157,7 +167,12 @@ def poll():
     if not OUT.exists() or json.dumps(state,sort_keys=True)!=original:atomic_write(OUT,state)
     queue.sort(key=lambda q:q["updatedAt"],reverse=True)
     atomic_write(QUEUE,queue[:MAX_TRANSLATIONS])
-    print("Official topic responses:",successful,"translation queue:",min(len(queue),MAX_TRANSLATIONS),"notices:",len(state["posts"]))
+    print("Official topic responses:",successful,"translation queue:",min(len(queue),MAX_TRANSLATIONS),"notices:",len(state["posts"]),"region counts:",json.dumps(counts))
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf-8") as summary:
+            summary.write(f"### Official blue poll: {successful} topics read; {len(queue)} pending translations\n\n")
+            for region,v in counts.items():summary.write(f"- {region.upper()}: {v['read']}/{v['attempted']} sampled topics read\n")
+            summary.write("\nSampled coverage only; successful response does not prove complete forum coverage.\n")
 def translate():
     queue=json.loads(QUEUE.read_text()) if QUEUE.exists() else []
     if not queue:return
