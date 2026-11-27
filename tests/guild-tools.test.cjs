@@ -185,7 +185,7 @@ assert.ok(news.specHotfixes("spec-26").some(x=>x.title==="野性德魯伊套裝"
 assert.ok(news.specHotfixes("spec-29").length===0);
 console.log("PASS: hotfix mapping, set candidates, Taran correction, overlapping acquisition and distinct collection coverage");
 
-const officialMerge=new Function(section("function validOfficialPost(","function renderBlueBoard(")+";return {validOfficialPost,combineOfficialBlue,blueCheckpointText};")();
+const officialMerge=new Function(section("function validOfficialPost(","function renderBlueBoard(")+";return {validOfficialPost,combineOfficialBlue,blueCheckpointText,liveClassPosts,blueClassLabels};")();
 assert.ok(news.bluePosts.every(officialMerge.validOfficialPost));
 const incoming={key:"official-us:123:1",date:"2026-11-27",title:"新公告",url:"https://us.forums.blizzard.com/en/wow/t/123/1",translationStatus:"pending",sections:[{category:"官方公告",title:"待翻譯",body:"請閱官方"}]};
 assert.ok(officialMerge.validOfficialPost(incoming));
@@ -277,3 +277,12 @@ assert.ok(officialMerge.blueCheckpointText(checkpointFixture,Date.parse("2026-11
 assert.ok(officialMerge.blueCheckpointText(checkpointFixture,Date.parse("2026-11-27T20:00:00Z")).includes("紀錄已逾7小時"));
 assert.ok(officialMerge.blueCheckpointText({}).includes("尚無已發布的抓取紀錄"));
 console.log("PASS: blue-post checkpoint and stale status display");
+
+const tagged={...incoming,classMentions:["druid","mage","invalid"]};
+assert.equal(officialMerge.liveClassPosts("spec-28",[tagged]).length,1);
+assert.equal(officialMerge.liveClassPosts("spec-19",[tagged]).length,1);
+assert.equal(officialMerge.liveClassPosts("spec-1",[tagged]).length,0);
+assert.equal(officialMerge.liveClassPosts("spec-29",[tagged]).length,0);
+assert.deepEqual(officialMerge.blueClassLabels(tagged),["法師","德魯伊"]);
+assert.equal(officialMerge.liveClassPosts("spec-28",[{...tagged,url:"https://untrusted.example"}]).length,0);
+console.log("PASS: tentative live notice class mapping and trusted sources");
