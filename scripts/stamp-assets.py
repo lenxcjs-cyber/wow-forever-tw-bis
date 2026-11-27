@@ -15,11 +15,16 @@ def stamp(text, root):
 
 if __name__ == "__main__":
     root = Path(".")
-    for name in ("index.html", "talents.html", "blue-posts.html"):
+    for name in ("index.html", "talents.html", "blue-posts.html", "blue-18-3.html"):
         p = root / name
         if p.exists():
             old = p.read_text(encoding="utf-8")
-            new = stamp(old, root)
+            new = old.replace("墓鐘公會用資料庫", "墓鐘資料庫")
+            new = re.sub(r"<title>[^<]*</title>", "<title>墓鐘資料庫</title>", new, count=1)
+            if name in ("index.html", "talents.html") and "locale-zhTW.js" not in new:
+                scripts = '<script src="locale-data.js"></script><script src="locale-zhTW.js"></script>'
+                new = re.sub(r'<script\b[^>]*src=["\'](?:guild-tools|talents-page)\.js[^"\']*["\'][^>]*>', lambda m: scripts + m.group(0), new, count=1)
+            new = stamp(new, root)
             if new != old:
                 p.write_text(new, encoding="utf-8")
                 print("Stamped", name)
