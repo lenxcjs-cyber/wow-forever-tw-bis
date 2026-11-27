@@ -40,7 +40,7 @@ assert.equal(score({...x,slot:"遠程武器",type:"弓"},{"遠程DPS":2}).total,
 assert.equal(score({...x,slot:"主手",type:"雙手斧"},{"雙手DPS":2}).total,85);
 assert.equal(score({...x,slot:"副手",type:"匕首",wm:{}},{"副手DPS":2}).incomplete,true);
 assert.ok(gate.skillGate("spec-2",{slot:"副手",type:"副手物品"}));
-const materialTotals=new Function(section("function recipeMaterialTotals(","function material(")+";return recipeMaterialTotals;")();
+const materialTotals=new Function(section("function parseRecipeMaterials(","function material(")+";return recipeMaterialTotals;")();
 const list=materialTotals([{recipe:{name:"A",mat:"夢葉草×2、水晶瓶×1"},count:3},{recipe:{name:"B",mat:"夢葉草×1、特殊材料"},count:2}]);
 assert.equal(new Map(list.totals).get("夢葉草"),8);
 assert.equal(new Map(list.totals).get("水晶瓶"),3);
