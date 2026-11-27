@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogSameSlot,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -204,3 +204,9 @@ assert.equal(leather.total,50);assert.equal(plate.total,30);
 assert.ok(leather.total>plate.total);
 assert.equal(expansion.catalogWeightScore({armor:400},{"護甲":2}).total,800);
 assert.equal(expansion.catalogWeightScore({hit:10},{"命中機率":2}).used,0);
+
+// Expanded raw stat fields are independent; ambiguous ratings are still excluded.
+assert.equal(expansion.catalogWeightScore({attack_power:30,ranged_attack_power:20,spell_power:15,spell_damage:10,healing:40,mp5:5,block_value:8},{"攻擊強度":1,"遠程攻強":2,"法術能量":3,"法術傷害":4,"治療加成":5,"每5秒法力":6,"格擋值":7}).total,441);
+assert.equal(expansion.catalogWeightScore({spell_power:30,spell_damage:10,healing:40},{"治療加成":1}).total,40);
+assert.deepEqual(expansion.catalogWeightCoverage({"力量":1,"命中機率":2,"武器DPS":3,"爆擊":0}),["命中機率","武器DPS"]);
+console.log("PASS: expanded catalog raw stat mappings and omitted-weight disclosure");
