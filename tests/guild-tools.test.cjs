@@ -87,3 +87,9 @@ gate.buildChoice["spec-27"]="bear_cat";
 assert.ok(gate.skillGate("spec-27",{slot:"主手",type:"單手錘"}));
 assert.equal(score(feralItems[5],{"雙手DPS":2}).total,96);
 console.log("PASS: feral weapon eligibility, complete combinations, staff DPS and hybrid build");
+
+const sourceGroup=new Function(section("function sourceGroup(","function drops(")+";return sourceGroup;")();
+for(const x of ["斯坦索姆－瑞文戴爾","斯坦索姆 - 瑞文戴爾","斯坦索姆 – 瑞文戴爾","斯坦索姆—瑞文戴爾"])assert.equal(sourceGroup(x),"斯坦索姆");
+assert.equal(sourceGroup("LBRS-Boss"),"LBRS-Boss");
+for(const [id,slot,type,ok] of [["spec-1","主手 / 單手武器","法杖",true],["spec-2","副手","法杖",false],["spec-12","武器","單手劍",false],["spec-12","主手","匕首",true],["spec-3","主手","盾牌",false],["spec-17","雙手武器","法杖",true]])assert.equal(!registry.skillGate(id,{slot,type}),ok,id+type);
+console.log("PASS: cross-class weapon classification and source normalization");
