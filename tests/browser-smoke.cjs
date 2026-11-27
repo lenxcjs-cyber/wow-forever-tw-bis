@@ -81,6 +81,9 @@ const server=http.createServer((req,res)=>{
     assert.equal(await plan.locator("article").count(),12);
     assert.ok((await plan.innerText()).includes("/ 14 個部位"));
     assert.ok(await plan.locator(".gt-catalog-weapon-plan").isVisible());
+    assert.ok(await plan.locator(".gt-catalog-set-plan").isVisible());
+    const setPicker=plan.locator(".gt-catalog-set-plan select").first();
+    if(await setPicker.count()){assert.ok((await plan.locator(".gt-catalog-set-plan").innerText()).includes("替代防具"));}
     assert.ok((await plan.innerText()).includes("武器與遠程／聖物分"));
     await plan.locator('select:has(option[value="plain"])').selectOption("plain");
     assert.equal(await plan.locator("article").count(),12);
