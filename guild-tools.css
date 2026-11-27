@@ -156,3 +156,9 @@ html.gt-blue-mode section.spec{display:none!important}
 #guild-tools .gt-gear-filters input,#guild-tools .gt-gear-filters select{min-height:32px}
 #guild-tools .gt-other-weapon-matches{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px;font-size:12px}
 @media(max-width:600px){#guild-tools .gt-tabs{gap:5px}#guild-tools .gt-nav-more-body{gap:5px}.gt-unified{padding:8px}}
+
+/* Preserve historical data notes without occupying the main viewport. */
+.gt-legacy-history{margin:8px 0 16px;padding:8px 12px;border:1px solid #34465a;border-radius:8px;background:#151e29;color:#9eafc6;font-size:12px}
+.gt-legacy-history>summary{cursor:pointer;color:#b8cbe2}
+.gt-legacy-history[open]>summary{margin-bottom:8px}
+html.gt-blue-mode .gt-legacy-history{display:none!important}
