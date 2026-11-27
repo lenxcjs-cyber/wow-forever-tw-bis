@@ -22,6 +22,10 @@ const server=http.createServer((req,res)=>{
   page.setDefaultTimeout(10000);
   const errors=[];page.on("pageerror",e=>errors.push(e.message));
   await page.route("**/*",route=>route.request().url().startsWith(origin+"/")?route.continue():route.abort());
+  // Isolate UI behavior from actual external icon availability with explicit test fixtures.
+  await page.route("**/item-icons.json",route=>route.fulfill({json:{build:"1.60.1.71139",items:{"19323":"fixture_mace","252484":"fixture_missing"}}}));
+  await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_mace.jpg",route=>route.fulfill({contentType:"image/svg+xml",body:'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="green"/></svg>'}));
+  await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_missing.jpg",route=>route.abort());
   await page.goto(origin+"/index.html");
   await page.locator("#gt-mode-class").waitFor({state:"visible"});
   await page.locator("#class-select").waitFor({state:"visible"});
@@ -128,6 +132,11 @@ const server=http.createServer((req,res)=>{
   assert.equal(await page.locator('.gt-bis-slot a[href*="/item/19323/"]').count(),0);
   assert.ok(await page.locator('.gt-bis-slot a[href*="/item/252484/"]').count()>0);
   await acquisition.selectOption("");
+  const maceIcon=page.locator('.gt-bis-slot .gt-item-heading:has(a[href*="/item/19323/"]) img').first();
+  await maceIcon.scrollIntoViewIfNeeded();
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll(".gt-item-icon img")).some(i=>i.src.includes("fixture_mace")&&i.complete&&i.naturalWidth>0));
+  await page.locator('.gt-bis-slot .gt-item-heading:has(a[href*="/item/19323/"]) .gt-item-icon').first().waitFor({state:"visible"});
+  console.log("PASS: original item icon UI with isolated image fixture");
   console.log("PASS: AV mace in main cat gear and acquisition/BoE filters");
   const slots=await page.locator(".gt-bis-slot h4").allTextContents();
   assert.ok(slots.length,"feral candidate cards missing");
