@@ -43,12 +43,17 @@ jobs:
           fi
       - name: Map client talent icons to original WoW textures
         run: |
-          if test -f talent-client.json && curl --fail --location --connect-timeout 10 --max-time 90 'https://github.com/wowdev/wow-listfile/releases/latest/download/community-listfile.csv' -o /tmp/wow-listfile.csv; then
-            if ! python3 scripts/map-talent-icons.py talent-client.json /tmp/wow-listfile.csv talent-icons.json; then
+          input=talent-reference-partial.json
+          if test -f talent-client.json; then input=talent-client.json; fi
+          if curl --fail --location --retry 1 --connect-timeout 10 --max-time 120 'https://github.com/wowdev/wow-listfile/releases/download/202611251712/verified-listfile.csv' -o /tmp/wow-listfile.csv; then
+            if ! python3 scripts/map-talent-icons.py "$input" /tmp/wow-listfile.csv talent-icons.json; then
               echo "::warning::Icon mapping failed; using fallback."
             fi
           else
             echo "::warning::Original texture mapping unavailable; fallback symbols remain."
+          fi
+          if test -f talent-icons.json; then
+            node -e 'const d=require("./talent-icons.json");console.log("Original texture IDs mapped:",Object.keys(d).filter(k=>/^[0-9]+$/.test(k)).length)'
           fi
       - name: Check independent talent page and leveling routes
         run: node tests/talents-page.test.cjs
@@ -60,6 +65,8 @@ jobs:
             echo '### Talent snapshot: unavailable; real-data tests skipped' >> "$GITHUB_STEP_SUMMARY"
             echo 'Site deployed in fallback mode. Do not mark 459 leveling steps as verified.' >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Stamp homepage asset versions
+        run: python3 scripts/stamp-assets.py
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
