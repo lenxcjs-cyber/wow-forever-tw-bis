@@ -93,6 +93,16 @@ jobs:
           else
             echo "::warning::Equipment catalog unavailable at publish time; page can retry the public API."
           fi
+      - name: Import official zhTW client names
+        run: |
+          dir="$RUNNER_TEMP/zh-tw-client"
+          mkdir -p "$dir"
+          build=1.60.1.71139
+          for entry in 'ItemSparse:zhTW:items-zhTW' 'SpellName:enUS:spells-enUS' 'SpellName:zhTW:spells-zhTW'; do
+            IFS=: read -r table locale file <<< "$entry"
+            curl -fsSL --connect-timeout 8 --max-time 40 "https://wago.tools/db2/$table/csv?build=$build&locale=$locale" -o "$dir/$file.csv" || rm -f "$dir/$file.csv"
+          done
+          python3 scripts/build-locale.py "$dir" "$build"
       - name: Stamp homepage asset versions
         run: python3 scripts/stamp-assets.py
       - name: Install browser test dependency
