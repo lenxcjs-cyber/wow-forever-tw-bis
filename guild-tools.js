@@ -1,4 +1,4 @@
-/* 墓鐘公會用資料庫 V15.4 beta · 2026-11-27
+/* 墓鐘公會用資料庫 V15.5 beta · 2026-11-27
    Uses the existing V7 candidate cards and V6 recipe JSON. No third-party scripts, no network calls, no personal data sent. */
 (function(){
 "use strict";
@@ -47,7 +47,7 @@ for(const sec of specEls){
    const type=text(card,".itemhead small").replace(/\s*· ID \d+$/,"");
    const wm={};for(const v of $$(".weaponmetrics > div",card))wm[text(v,"small")]=text(v,"b");
    const item={id:m[1],name:anchor.textContent.trim(),url:anchor.href,slot:title,type,stats,score,rank:parseNum(text(card,".rank")),source:src?.textContent.trim()||"來源待查",note:text(card,".note"),evidence:text(card,".audit-evidence"),wm};
-   item.review=suitability(id,item);
+   item.card=card;item.review=suitability(id,item);
    if(item.review){
     const warning=node("p","⚠ "+item.review+"；原順位暫不視為推薦。","gt-muted");
     warning.style.color="#f2c47d";card.append(warning);
@@ -60,6 +60,34 @@ for(const sec of specEls){
   slots.set(title,rows);
  }
  bySpec.set(id,{id,name,slots,weights,sec});
+}
+// V15.5: skill requirements are hard gates; talent multipliers are not stat weights.
+const rogueProfiles={
+ "spec-10":[["mutilate","截肢：雙匕首"],["general","其他構築（未驗證）"]],
+ "spec-11":[["general","邪惡攻擊／通用武器"],["backstab","背刺：主手匕首"]],
+ "spec-12":[["backstab","背刺／伏擊：主手匕首"],["hemo","出血：非匕首亦可"]]
+};
+const buildChoice={};
+const buildFor=id=>buildChoice[id]||rogueProfiles[id]?.[0][0]||"general";
+function skillGate(id,x){
+ const build=buildFor(id),slot=x.slot||"",type=x.type||"";
+ const main=/主手|單手武器/.test(slot)&&!/副手|遠程/.test(slot);
+ const off=/副手/.test(slot);
+ if(!((main&&["backstab","mutilate"].includes(build))||(off&&build==="mutilate")))return "";
+ if(/匕首|dagger/i.test(type))return "";
+ return "核心技能要求匕首；目前物品類型「"+(type||"未標示")+"」不符合或尚未確認";
+}
+function allowed(id,x){return !skillGate(id,x);}
+function syncWeaponCards(id){
+ const spec=bySpec.get(id);if(!spec)return;
+ for(const slot of spec.slots.values())for(const x of slot){
+  const card=x.card;if(!card)continue;
+  const reason=skillGate(id,x);let msg=$(".gt-build-warning",card);
+  if(reason){if(!msg){msg=node("p",undefined,"gt-build-warning");card.append(msg);}msg.textContent=reason;msg.style.color="#f2c47d";}
+  else if(msg)msg.remove();
+  if(reason){card.style.display="none";card.dataset.gtBuildHidden="1";}
+  else if(card.dataset.gtBuildHidden){card.style.removeProperty("display");delete card.dataset.gtBuildHidden;}
+ }
 }
 const guides=[
 ["雙手武器傷害、怒氣效率與致死打擊構築","主動技能前預留怒氣；單體維持主要傷害技能，斬殺階段依怒氣調整。","warrior"],
@@ -99,13 +127,22 @@ add(root,node("p","03 選擇功能","gt-section-label"),nav,panel);
 let active="";
 const specPairs=[...bySpec.values()].map(s=>[s.id,s.name]);
 const getSpec=()=>{const el=$("#spec-select");return el&&!el.disabled&&bySpec.has(el.value)?el.value:"";};
+const buildBar=node("div");root.insertBefore(buildBar,nav);
+function syncBuild(){
+ const id=getSpec();buildBar.replaceChildren();
+ if(!rogueProfiles[id])return;
+ const pick=select(rogueProfiles[id]);pick.value=buildFor(id);
+ pick.addEventListener("change",()=>{buildChoice[id]=pick.value;syncWeaponCards(id);if(active)show(active);});
+ add(buildBar,field("天賦構築（決定武器資格）",pick),node("p","依核心技能篩選；未收錄符合條件的武器時不自動補造排名。","gt-muted"));
+ syncWeaponCards(id);
+}
 function specPicker(){return {value:getSpec()};}
 function specLabel(){return node("p","目前專精："+(bySpec.get(getSpec())?.name||"尚未選擇"),"gt-muted");}
 function title(t,desc){panel.replaceChildren(node("h3",t),node("p",desc,"gt-muted"));}
-function guide(){title("V15 · 天賦與實戰手法","全 28 專精研究重點與多來源天賦查證。團本前 PvE；非已驗證的唯一最佳點法。");const out=node("div");const render=id=>{const s=bySpec.get(id),g=guides[Number(id.split("-")[1])-1];out.replaceChildren();const c=box(out,s.name,g[0]);add(c,node("p",g[1]),node("h4","構築與手法查證"),node("p","先依職責選擇滿等 PvE 天賦，再以遊戲內技能、最新熱修正及相同構築的實測確認優先序。"),link("ForeverSpec 滿等構築與版本更新","https://foreverspec.com/"),node("p",""),link("Azeroth DB 天賦計算器與技能資料","https://azeroth-db.github.io/"),node("p",""),link("WoWGuildHub 天賦與技能資料","https://wowguildhub.com/wow-forever/guide"),node("p",""),link("永恆職業指南／天賦與手法", "https://nossuary.com/guides/wow-forever/"+g[2]+"/"),node("p","另以官方熱修正、Icy Veins 與遊戲內技能說明交叉核對。","gt-muted"),link("Icy Veins 永恆職業指南","https://www.icy-veins.com/wow-forever/class-guides"));if(id==="spec-25")add(c,node("p","11/25：平衡天賦改名、星火術天賦降為2點、日月蝕增加憤怒爆擊，舊配置須重查。"),link("官方11/25熱修正","https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-25-2026"));};const p=specPicker(render);add(panel,specLabel(),out);render(p.value);}
+function guide(){title("V15 · 天賦與實戰手法","全 28 專精研究重點與多來源天賦查證。團本前 PvE；非已驗證的唯一最佳點法。");const out=node("div");const render=id=>{const s=bySpec.get(id),g=guides[Number(id.split("-")[1])-1];out.replaceChildren();const c=box(out,s.name,g[0]);add(c,node("p",g[1]),node("h4","構築與手法查證"),node("p","先依職責選擇滿等 PvE 天賦，再以遊戲內技能、最新熱修正及相同構築的實測確認優先序。"),link("ForeverSpec 滿等構築與版本更新","https://foreverspec.com/"),node("p",""),link("Azeroth DB 天賦計算器與技能資料","https://azeroth-db.github.io/"),node("p",""),link("WoWGuildHub 天賦與技能資料","https://wowguildhub.com/wow-forever/guide"),node("p",""),link("永恆職業指南／天賦與手法", "https://nossuary.com/guides/wow-forever/"+g[2]+"/"),node("p","另以官方熱修正、Icy Veins 與遊戲內技能說明交叉核對。","gt-muted"),link("Icy Veins 永恆職業指南","https://www.icy-veins.com/wow-forever/class-guides"));if(id==="spec-12"){add(c,node("h4","構築機制與裝備連動"),node("p","背刺與伏擊需要主手匕首；出血可用其他武器，但匕首係數為145%，一般武器100%。伺機而動5/5使背刺、伏擊、絞喉、截肢傷害增加20%。這些是技能係數，不可直接當成敏捷或攻強權重。"),link("永恆敏銳天賦與技能","https://azerothprime.com/en/forever/classes/rogue/subtlety/talents"),node("p",""),link("ForeverSpec 敏銳構築","https://foreverspec.com/classes/rogue/subtlety/"));}if(id==="spec-25")add(c,node("p","11/25：平衡天賦改名、星火術天賦降為2點、日月蝕增加憤怒爆擊，舊配置須重查。"),link("官方11/25熱修正","https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-25-2026"));};const p=specPicker(render);add(panel,specLabel(),out);render(p.value);}
 function drops(){title("V15 · 掉落反查與刷裝路線","以網站既有候選裝備為範圍，按來源、專精、部位及順位查詢。順位不是掉率；來源未經逐件交叉驗證。");
 const q=inp("裝備、首領、副本、任務、物品 ID（空格分隔）"),sp={value:getSpec()},slot=select([...new Set([...bySpec.values()].flatMap(s=>[...s.slots.keys()]))].sort().map(x=>[x,x]),"所有部位"),source=select([...new Set([...byItem.values()].map(x=>x.source.split("－")[0].trim()))].sort().map(v=>[v,v]),"所有取得來源"),rank=select([["0","不限順位"],["1","第一順位"],["3","前三順位"]]),mode=select([["items","裝備清單"],["routes","依來源整理"]]),out=node("div");
-let limit=40;function draw(){out.replaceChildren();const terms=q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);const rows=[...byItem.values()].map(x=>({...x,matched:x.uses.filter(u=>(!sp.value||u.id===sp.value)&&(!slot.value||u.slot===slot.value)&&(!Number(rank.value)||(u.rank>0&&u.rank<=Number(rank.value))))})).filter(x=>x.matched.length&&(!source.value||x.source.split("－")[0].trim()===source.value)&&terms.every(t=>[x.name,x.source,x.type,x.id,...x.matched.map(u=>u.name+" "+u.slot)].join(" ").toLowerCase().includes(t)));
+let limit=40;function draw(){out.replaceChildren();const terms=q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);const rows=[...byItem.values()].map(x=>({...x,matched:x.uses.filter(u=>(!sp.value||u.id===sp.value)&&allowed(u.id,{...x,slot:u.slot})&&(!slot.value||u.slot===slot.value)&&(!Number(rank.value)||(u.rank>0&&u.rank<=Number(rank.value))))})).filter(x=>x.matched.length&&(!source.value||x.source.split("－")[0].trim()===source.value)&&terms.every(t=>[x.name,x.source,x.type,x.id,...x.matched.map(u=>u.name+" "+u.slot)].join(" ").toLowerCase().includes(t)));
 const groups=new Map();for(const x of rows){const k=x.source.split("－")[0].trim();if(!groups.has(k))groups.set(k,[]);groups.get(k).push(x);}
 out.append(node("p",rows.length+" 件符合條件的物品 · "+groups.size+" 個來源分類（依原卡片文字）","gt-muted"));
 function card(x){const c=node("article",undefined,"gt-card");add(c,link(x.name,x.url),node("p",x.source),node("small",x.type+" · ID "+x.id),node("p",Object.entries(x.stats).map(([k,v])=>k+" "+v).join(" · "),"gt-muted"),node("p",x.matched.map(u=>u.name+" / "+u.slot+" #"+u.rank+(u.review?"（適用性待複核）":"")).join("、")),node("p",x.evidence||"缺少證據文字，請查證","gt-muted"));return c;}
@@ -114,19 +151,20 @@ if(!rows.length)out.append(node("p","沒有符合條件的候選；不代表遊�
 for(const el of [q,slot,source,rank,mode])el.addEventListener(el===q?"input":"change",()=>{limit=40;draw();});add(panel,field("搜尋",q),specLabel(),field("部位",slot),field("來源",source),field("候選順位",rank),field("檢視方式",mode),out,box(panel,"完整遊戲資料查證","本站非全物品掉落庫。外部資料也可能包含舊版推定掉落，須確認永恆版本。"));add(panel,link("Eternadex 物品與來源資料庫","https://eternadex.com/en/datenbank/"),node("p",""),link("Azeroth DB 副本掉落與物品","https://azeroth-db.github.io/"));draw();}
 const storeKey="tomb-bis-collected-v1";let collected={};let storageOK=true;try{collected=JSON.parse(localStorage.getItem(storeKey)||"{}");if(!collected||typeof collected!=="object")collected={};}catch(e){storageOK=false;collected={};}
 function save(){try{localStorage.setItem(storeKey,JSON.stringify(collected));}catch(e){storageOK=false;}}
-function checklist(){title("V10 · 個人裝備收集","每個專精獨立保存。只存在本瀏覽器，清除網站資料或換裝置不會同步。選擇某件第一順位並不代表整套最佳。");const out=node("div");const render=id=>{const s=bySpec.get(id),state=collected[id]||{};out.replaceChildren();let total=0,have=0;for(const [slot,items] of s.slots){if(!items.length)continue;total+=1;if(items.some(x=>state[x.id]))have++;}const status=node("p","已收集至少一件候選： "+have+" / "+total+" 部位"+(storageOK?"":"（目前無法永久儲存）"),"gt-muted");const progress=node("progress");progress.max=total||1;progress.value=have;add(out,status,progress,button("清除此專精紀錄",()=>{if(confirm("確定清除此專精的收集紀錄？")){delete collected[id];save();render(id);}}));for(const [slot,items] of s.slots){if(!items.length)continue;const c=node("div",undefined,"gt-card");c.append(node("h4",slot));for(const x of items){const chk=node("input");chk.type="checkbox";chk.checked=!!state[x.id];chk.addEventListener("change",()=>{collected[id]??={};collected[id][x.id]=chk.checked;save();render(id);});add(c,add(node("label",undefined,"gt-check"),chk,node("span","#"+x.rank+" "+x.name+(x.review?"（適用性待複核）":"")),node("small",x.source)));}out.append(c);}};const p=specPicker(render);add(panel,specLabel(),out);render(p.value);}
+function checklist(){title("V10 · 個人裝備收集","每個專精獨立保存。只存在本瀏覽器，清除網站資料或換裝置不會同步。選擇某件第一順位並不代表整套最佳。");const out=node("div");const render=id=>{const s=bySpec.get(id),state=collected[id]||{};out.replaceChildren();let total=0,have=0;for(const [slot,items] of s.slots){if(!items.length)continue;total+=1;if(items.some(x=>allowed(id,x)&&state[x.id]))have++;}const status=node("p","已收集至少一件候選： "+have+" / "+total+" 部位"+(storageOK?"":"（目前無法永久儲存）"),"gt-muted");const progress=node("progress");progress.max=total||1;progress.value=have;add(out,status,progress,button("清除此專精紀錄",()=>{if(confirm("確定清除此專精的收集紀錄？")){delete collected[id];save();render(id);}}));for(const [slot,items] of s.slots){if(!items.length)continue;const c=node("div",undefined,"gt-card");c.append(node("h4",slot));for(const x of items.filter(x=>allowed(id,x))){const chk=node("input");chk.type="checkbox";chk.checked=!!state[x.id];chk.addEventListener("change",()=>{collected[id]??={};collected[id][x.id]=chk.checked;save();render(id);});add(c,add(node("label",undefined,"gt-check"),chk,node("span","#"+x.rank+" "+x.name+(x.review?"（適用性待複核）":"")),node("small",x.source)));}out.append(c);}};const p=specPicker(render);add(panel,specLabel(),out);render(p.value);}
 const official="https://news.blizzard.com/en-us/article/24315281/wow-forever-hotfixes-november-25-2026";
 function raid(){title("V11 · 團本準備","2026/11/27：首批團本尚未開放。以下是官方已公布的規模及前置，尚未加入首領技能推測。");const r=[["地深獸穴（Barrow Deeps）","10人 · 8首領 · 60級 · 官方公告12/9（台灣日期依維護公告）"],["海加爾山之巔（Hyjal Summit）","20人 · 13首領 · 60級 · 官方公告12/9"],["奧妮克希亞巢穴","40人 · 60級 · 每位玩家準備龍火護符；聯盟／部落前置不同。"]];for(const [a,b] of r)box(panel,a,b);const c=box(panel,"開荒通用檢查","先完成滿等技能與裝備、按職責準備消耗品、抗性按官方機制決定、預先分配坦補與斷法。世界增益進團本會移除（11/23熱修正）。");add(c,link("官方團本概覽","https://news.blizzard.com/en-gb/article/24303009/world-of-warcraft-forever-raid-overviewlocations-raid-sizes-and-attunement"),node("p","首領打法等正式資料出現後再補齊。","gt-muted"),link("官方熱修正",official));}
 const news=[["2026/11/25","平衡德天賦調整","憤怒與星火相關天賦重新整理，日月蝕增加憤怒爆擊，梟獸形態強化秘法與自然傷害。3點以上舊強化星火術可能被重置。"],["2026/11/25","獵人／術士寵物","修正寵物普通近戰攻擊爆擊率為0%的問題；野獸控制獵召喚的鷹亦有行為和爆擊修正。"],["2026/11/25","聖騎士／盜賊／薩滿","修正審判刷新及驅邪術爆擊；聖光誓約延長。毒藥與致盲粉暫時拾取綁定；薩滿閃電鏈的節能施法修正。"],["2026/11/23","團本世界增益與套裝","區域切換不再移除世界增益，但進團本仍移除；野性之心4件能量回復修正，數個武器過度觸發問題也已修正。"],["2026/11/17","聖坦魂鑄套裝","坦克版魂鑄套裝以法術能量取代力量。Whiteout Staff、Crackling Staff 的屬性統一為25耐、25智、74武器法傷。"]];
 function hotfix(){title("V12 · 官方藍帖繁中摘要","截至 2026/11/27 查得的最新官方熱修正為 11/25。此區為手動更新摘要，不是即時爬蟲。");const q=inp("搜尋日期、職業或關鍵字"),out=node("div");function draw(){out.replaceChildren();for(const [d,t,b] of news.filter(x=>x.join(" ").includes(q.value.trim()))){const c=box(out,d+" · "+t,b);c.append(link("官方原文",official));}}q.addEventListener("input",draw);add(panel,field("搜尋",q),out,link("暴雪魔獸世界最新消息","https://news.blizzard.com/en-us/world-of-warcraft"));draw();}
 function material(){title("V13 · 配方與材料索引","從 V6 結構化配方建立可搜尋索引，保留原配方狀態與來源線索；尚未證實的成品不可當作一定能取得。");let data;try{data=JSON.parse($("#v6-prep-data").textContent);}catch(e){panel.append(node("p","配方資料無法讀取"));return;}const rows=Object.values(data.recipes||{});const q=inp("例如：大塊魔光碎片、法術能量、夢葉草"),prof=select([...new Set(rows.map(x=>x.prof))].sort().map(x=>[x,x]),"全部專業"),out=node("div");function draw(){out.replaceChildren();const term=q.value.trim(),list=rows.filter(x=>(!prof.value||x.prof===prof.value)&&(!term||[x.name,x.fx,x.mat,x.where].join(" ").includes(term)));out.append(node("p",list.length+" 個配方候選","gt-muted"));for(const x of list){const c=box(out,x.name+" · "+x.prof,x.fx);add(c,node("small",x.state),node("p","配方取得："+x.where),node("p",x.mat));const ul=node("ul");for(const material of String(x.mat).split("、")){const key=material.split("×")[0].trim();add(ul,node("li",material+" — "+(data.routes[key]||"來源未核對")));}add(c,ul,link("永恆專業資料","https://wowamobi.com/professions"),node("p",x.why,"gt-muted"));}if(term&&data.routes[term])box(out,"材料來源："+term,data.routes[term]);}q.addEventListener("input",draw);prof.addEventListener("change",draw);add(panel,field("配方／材料搜尋",q),field("專業",prof),out);draw();}
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
-function optimizer(){title("V14 · 個人化配裝比較（試算版）","比較同一部位的候選裝備，可自行修改屬性權重、命中門檻及現有命中。不是完整戰鬥模擬；不估算觸發、套裝、天賦、武器手位及裝備互斥。");const out=node("div");const render=id=>{const s=bySpec.get(id);out.replaceChildren();const slot=select([...s.slots].filter(([k,v])=>v.length>0).map(([k])=>[k,k]));if(s.slots.has("頭部"))slot.value="頭部";const current=inp("0","number");current.value="0";current.min="0";current.step="0.1";const target=inp("留空＝不限制","number");target.min="0";target.step="0.1";const weights={...s.weights};if(["physical","tank"].includes(roleFor(id)))for(const k of Object.keys(weights))if(spellOnly.test(k))weights[k]=0;const weightBox=node("details");weightBox.append(node("summary","自訂屬性權重（各專精分數不可互比）"));const grid=node("div",undefined,"gt-weight-grid");weightBox.append(grid);const result=node("div");function draw(){const rows=s.slots.get(slot.value)||[];result.replaceChildren();const base=Number(current.value)||0;const cap=target.value===""?null:Math.max(0,Number(target.value)||0);const sorted=rows.map(x=>({...x,calc:statScore(x.stats,weights,base,cap)})).sort((a,b)=>b.calc-a.calc);const basePick=select(sorted.map(x=>[x.id,x.name]),"選擇目前穿戴候選（可略過）");const results=node("div");function show(){results.replaceChildren();const compare=sorted.find(x=>x.id===basePick.value);for(const [i,x] of sorted.entries()){const c=box(results,"#"+(i+1)+" "+x.name,"屬性加權分："+x.calc.toFixed(2)+(compare?" · 相對目前："+(x.calc-compare.calc>=0?"+":"")+(x.calc-compare.calc).toFixed(2):""));add(c,node("p",Object.entries(x.stats).map(([k,v])=>k+" "+v).join(" · "),"gt-muted"),node("p",x.source),node("p",x.review||"未觸發屬性警示；非已驗證","gt-muted"),link("物品來源",x.url));}}basePick.addEventListener("change",show);add(result,field("目前穿戴",basePick),results);show();}for(const k of Object.keys(weights)){const el=inp("0","number");el.step="0.01";el.min="0";el.value=String(weights[k]);el.addEventListener("input",()=>{weights[k]=Math.max(0,Number(el.value)||0);draw();});grid.append(field(k,el));}for(const e of [slot,current,target])e.addEventListener(e===slot?"change":"input",draw);add(out,field("比較部位",slot),field("不含此部位的目前命中 (%)",current),field("自訂命中目標 (%)；依種族天賦與敵人等級",target),weightBox,node("p","武器僅比較卡片列出的通用屬性，不加入DPS或手位修正；最佳化武器組合請使用原有專精武器區。","gt-muted"),result,link("WoWSims 永恆完整戰鬥模擬（外部）","https://wowsims.com/forever/"));draw();};const p=specPicker(render);add(panel,specLabel(),out);render(p.value);}
+function optimizer(){title("V14 · 個人化配裝比較（試算版）","比較同一部位的候選裝備，可自行修改屬性權重、命中門檻及現有命中。不是完整戰鬥模擬；不估算觸發、套裝、天賦、武器手位及裝備互斥。");const out=node("div");const render=id=>{const s=bySpec.get(id);out.replaceChildren();const slot=select([...s.slots].filter(([k,v])=>v.length>0).map(([k])=>[k,k]));if(s.slots.has("頭部"))slot.value="頭部";const current=inp("0","number");current.value="0";current.min="0";current.step="0.1";const target=inp("留空＝不限制","number");target.min="0";target.step="0.1";const weights={...s.weights};if(["physical","tank"].includes(roleFor(id)))for(const k of Object.keys(weights))if(spellOnly.test(k))weights[k]=0;const weightBox=node("details");weightBox.append(node("summary","自訂屬性權重（各專精分數不可互比）"));const grid=node("div",undefined,"gt-weight-grid");weightBox.append(grid);const result=node("div");function draw(){const rows=(s.slots.get(slot.value)||[]).filter(x=>allowed(id,x));result.replaceChildren();const base=Number(current.value)||0;const cap=target.value===""?null:Math.max(0,Number(target.value)||0);const sorted=rows.map(x=>({...x,calc:statScore(x.stats,weights,base,cap)})).sort((a,b)=>b.calc-a.calc);const basePick=select(sorted.map(x=>[x.id,x.name]),"選擇目前穿戴候選（可略過）");const results=node("div");function show(){results.replaceChildren();const compare=sorted.find(x=>x.id===basePick.value);for(const [i,x] of sorted.entries()){const c=box(results,"#"+(i+1)+" "+x.name,"屬性加權分："+x.calc.toFixed(2)+(compare?" · 相對目前："+(x.calc-compare.calc>=0?"+":"")+(x.calc-compare.calc).toFixed(2):""));add(c,node("p",Object.entries(x.stats).map(([k,v])=>k+" "+v).join(" · "),"gt-muted"),node("p",x.source),node("p",x.review||"未觸發屬性警示；非已驗證","gt-muted"),link("物品來源",x.url));}}basePick.addEventListener("change",show);add(result,field("目前穿戴",basePick),results);show();}for(const k of Object.keys(weights)){const el=inp("0","number");el.step="0.01";el.min="0";el.value=String(weights[k]);el.addEventListener("input",()=>{weights[k]=Math.max(0,Number(el.value)||0);draw();});grid.append(field(k,el));}for(const e of [slot,current,target])e.addEventListener(e===slot?"change":"input",draw);add(out,field("比較部位",slot),field("不含此部位的目前命中 (%)",current),field("自訂命中目標 (%)；依種族天賦與敵人等級",target),weightBox,node("p","武器僅比較卡片列出的通用屬性，不加入DPS或手位修正；最佳化武器組合請使用原有專精武器區。","gt-muted"),result,link("WoWSims 永恆完整戰鬥模擬（外部）","https://wowsims.com/forever/"));draw();};const p=specPicker(render);add(panel,specLabel(),out);render(p.value);}
 function audit(){
- title("V15.4 · BiS 推薦總覽與資料稽核","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
+ title("V15.5 · BiS 推薦總覽與資料稽核","優先顯示未觸發適用性警示的既有候選；仍保留待複核裝備。來源及證據文字完整，不等於已經外部交叉驗證或整套最佳。");
  const spec=bySpec.get(getSpec());if(!spec)return;
  const q=inp("搜尋裝備、部位、來源或物品 ID"),mode=select([["all","全部部位"],["missing","僅顯示缺資料候選"]]),out=node("div");
- const slots=[...spec.slots].map(([name,items])=>({name,items:[...items].sort((a,b)=>(a.rank||999)-(b.rank||999))}));
+ const slots=[...spec.slots].map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).sort((a,b)=>(a.rank||999)-(b.rank||999))}));
+ const excluded=[...spec.slots.values()].flat().filter(x=>!allowed(spec.id,x));
  const all=slots.flatMap(x=>x.items),sourceMissing=x=>!x.source||/待查|待核|未知|未確認/.test(x.source),evidenceMissing=x=>!x.evidence,missing=x=>sourceMissing(x)||evidenceMissing(x)||!!x.review;
  const populated=slots.filter(x=>x.items.length),firsts=slots.map(x=>x.items.find(i=>i.rank===1)).filter(Boolean);
  const metrics=node("div",undefined,"gt-bis-summary");
@@ -160,7 +198,7 @@ function audit(){
  const c=node("article",undefined,"gt-bis-slot");c.append(node("h4",slot.name));if(!first){c.append(node("span","尚無候選","gt-bis-status gt-bis-missing"));grid.append(c);continue;}
  const featured=matches.includes(first)?first:matches[0];c.append(node("small",featured.review?"適用性待複核 · 原順位 "+featured.rank:featured.rank===1?"原排名首推":(featured.rank?"符合條件的候選 #"+featured.rank:"候選順位未標示"),"gt-muted"));add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+slots.length+" 個已列部位","gt-muted"),grid);if(!count)out.append(node("p","沒有符合條件的候選。"));}
- q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),field("篩選",mode),field("搜尋",q),out);draw();
+ q.addEventListener("input",draw);mode.addEventListener("change",draw);add(panel,specLabel(),node("p","構築排除 "+excluded.length+" 筆不符核心技能或武器類型未確認的候選。","gt-muted"),metrics,progress,node("p","完整度僅統計本站已列部位及文字資料；不表示裝備已驗證。","gt-muted"),field("篩選",mode),field("搜尋",q),out);draw();
 }
 const renderers={audit,v8:guide,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
 function show(key){active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{if(["v8","v9","v10","v14","audit"].includes(key)&&!getSpec()){panel.replaceChildren(node("p","請先在上方選擇職業與專精，即可查看對應資料。","gt-muted"));return;}renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
@@ -179,8 +217,8 @@ if(toolboxDetails&&mainSpec){
  }else{toolboxDetails.open=true;root.classList.add("gt-flat");const summary=toolboxDetails.querySelector("summary");if(summary)summary.style.display="none";}
 }else{root.classList.add("gt-flat");}
 
-const syncSpec=()=>{if(["v8","v9","v10","v14","audit"].includes(active))show(active);};
-mainSpec?.addEventListener("change",syncSpec);
+const syncSpec=()=>{syncBuild();if(["v8","v9","v10","v14","audit"].includes(active))show(active);};
+mainSpec?.addEventListener("change",syncSpec);syncBuild();
 const selectorGroup=mainSpec?.closest(".gt-unified")||mainSpec?.parentElement?.parentElement;
 selectorGroup?.addEventListener("change",e=>{if(e.target!==mainSpec&&e.target.tagName==="SELECT"&&!root.contains(e.target))queueMicrotask(syncSpec);});
 
