@@ -140,13 +140,13 @@ def poll():
                     old=state["seen"].get(identity)
                     state["seen"][identity]=fingerprint
                     if identity in archive and old is None and identity not in by:continue
-                    if old==fingerprint and by.get(identity,{}).get("translationStatus")=="machine":continue
+                    if old==fingerprint and by.get(identity,{}).get("translationStatus") in ("machine","title-only"):continue
                     if old==fingerprint and identity in archive and identity not in by:continue
                     url=base(region)+f"/en/wow/t/{tid}/{n}"
                     changed=identity in by or identity in archive
                     item={"identity":identity,"key":"official-"+identity,"date":stamp.date().isoformat(),"publishedAt":p.get("created_at"),"updatedAt":dt,"title":"官方新公告（繁中翻譯待處理）","author":str(p.get("username") or "Blizzard"),"url":url,"region":region.upper(),"translationStatus":"pending","sections":[{"category":"官方公告","title":"官方已發布","body":"已偵測到暴雪公告；繁中重點尚未完成，請先閱讀官方原文。"}],"revision":changed}
                     if identity not in by or old!=fingerprint:by[identity]=item
-                    queue.append({"identity":identity,"title":title,"facts":selected_facts(body)})
+                    queue.append({"identity":identity,"title":title,"facts":selected_facts(body),"updatedAt":dt})
                 # Do not record ordinary player activity as a new official update.
             except Exception as e:print("Topic unavailable",region,tid,type(e).__name__,str(e)[:160])
     if not successful:raise RuntimeError("No official topic could be read; retain previous published data")
@@ -155,6 +155,7 @@ def poll():
     state["seen"]=dict(list(state["seen"].items())[-1500:]);state["topics"]=dict(list(state["topics"].items())[-600:])
     if json.dumps(state["posts"],sort_keys=True)!=old_posts:state["lastPublished"]=now()
     if not OUT.exists() or json.dumps(state,sort_keys=True)!=original:atomic_write(OUT,state)
+    queue.sort(key=lambda q:q["updatedAt"],reverse=True)
     atomic_write(QUEUE,queue[:MAX_TRANSLATIONS])
     print("Official topic responses:",successful,"translation queue:",min(len(queue),MAX_TRANSLATIONS),"notices:",len(state["posts"]))
 def translate():
@@ -182,8 +183,9 @@ def translate():
                 value=zh(fact)
                 if Counter(re.findall(r"\d+(?:\.\d+)?",fact))!=Counter(re.findall(r"\d+(?:\.\d+)?",value)):continue
                 sections.append({"category":"官方公告","title":"機器翻譯重點（待校對）","body":value})
+            status="machine" if sections else "title-only"
             if not sections:sections=[{"category":"官方公告","title":"標題已翻譯","body":"內容未通過自動數值檢查或無可安全節錄的短條目，請閱官方原文。"}]
-            p.update(title=title,sections=sections,translationStatus="machine",translationEngine="Argos Translate + OpenCC")
+            p.update(title=title,sections=sections,translationStatus=status,translationEngine="Argos Translate + OpenCC")
             done+=1
         except Exception as e:print("Translation pending",q["identity"],type(e).__name__)
     if done:state["lastPublished"]=now();atomic_write(OUT,state)
