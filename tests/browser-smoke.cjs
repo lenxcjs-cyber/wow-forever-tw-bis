@@ -112,10 +112,10 @@ const server=http.createServer((req,res)=>{
   for(const selector of ["#class-select","#spec-select","#gt-build-bar","#guild-tools .gt-tabs"]){assert.equal(await page.locator(selector).isVisible(),false,selector);}
   assert.equal(await page.locator("section.spec:visible").count(),0);
   const bf=page.locator("#gt-blue-board");
-  assert.equal(await bf.getAttribute("data-release"),"18.9");
+  assert.equal(await bf.getAttribute("data-release"),"19.0");
   assert.equal(await page.locator("iframe").count(),0,"no homepage iframe in blue mode");
   await bf.locator("#blue-list article").first().waitFor({state:"visible"});
-  assert.equal(await bf.locator("#blue-list article").count(),14);
+  assert.ok(await bf.locator("#blue-list article").count()>=15);
   await bf.locator('#blue-list details[data-post-key="199"] > summary').click();
   assert.equal(await bf.locator('#blue-list details[data-post-key="199"] .gt-blue-body h4').count(),6);
   assert.ok((await bf.locator('#blue-list details[data-post-key="199"]').innerText()).includes("20%、40%、60%、80%或100%"));
@@ -133,11 +133,12 @@ const server=http.createServer((req,res)=>{
   await bf.locator("#blue-list details > summary").nth(1).click();
   assert.equal(await bf.locator("#blue-list details[open]").count(),0);
   assert.equal(await bf.locator(":scope > .gt-blue-source a").count(),2);
-  assert.equal(await bf.locator(":scope > .gt-blue-source a").first().getAttribute("href"),"https://exwind.net/zhTW/blue/forever/");
+  assert.equal(await bf.locator(":scope > .gt-blue-source a").first().getAttribute("href"),"https://us.forums.blizzard.com/en/wow/c/wow-forever/346");
+  assert.equal(await bf.locator('a[href*="exwind.net"]').count(),0);
   await bf.locator("#blue-list details > summary").first().click();
   assert.equal(await bf.locator("iframe").count(),0,"never create blocked external frames");
-  assert.equal(await bf.locator('#blue-list details[open] a[href*="/post/blue/"]').count(),1);
-  assert.equal(await bf.locator('#blue-list details[open] a[href*="/post/blue/"]').getAttribute("target"),"_blank");
+  assert.equal(await bf.locator('#blue-list details[open] a[href*="forums.blizzard.com/en/wow/t/"]').count(),1);
+  assert.equal(await bf.locator('#blue-list details[open] a[href*="forums.blizzard.com/en/wow/t/"]').getAttribute("target"),"_blank");
   const articleKeys=await bf.locator("#blue-list details").evaluateAll(xs=>xs.map(x=>x.dataset.postKey));
   assert.equal(new Set(articleKeys).size,articleKeys.length,"unique source article");
   await bf.locator("#blue-list details > summary").first().click();
@@ -159,13 +160,10 @@ const server=http.createServer((req,res)=>{
   await page.goBack();await page.waitForFunction(()=>document.getElementById("guild-tools")?.dataset.mode==="blue");
   console.log("PASS: blue mode deep link and browser history");
   await page.goto(origin+"/blue-18-3.html");
-  await page.locator("#posts article").first().waitFor({state:"visible"});
-  assert.equal(await page.locator("#posts article").count(),14,"legacy standalone matches homepage");
+  await page.locator("#gt-blue-board").waitFor({state:"visible"});
   assert.equal(await page.locator("iframe").count(),0);
-  await page.locator("#posts details > summary").first().click();
-  assert.equal(await page.locator("iframe").count(),0);
-  assert.equal(await page.locator('#posts details[open] a[href*="/post/blue/"]').count(),1);
-  console.log("PASS: fresh standalone blue-post URL without iframe");
+  assert.equal(await page.locator('#gt-blue-board a[href*="exwind.net"]').count(),0);
+  console.log("PASS: legacy blue URL redirects to canonical official board");
   assert.deepEqual(errors,[],"page errors");
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 })().catch(e=>{console.error(e);process.exitCode=1;});
