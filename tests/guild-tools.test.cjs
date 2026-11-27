@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogSameSlot,candidateCatalogCheck,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogSameSlot,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -152,3 +152,27 @@ assert.deepEqual(expansion.candidateCatalogCheck({stats:{"力量":18,"命中機�
 assert.equal(expansion.candidateCatalogCheck({wm:{"每秒傷害":"56.5"}},{dps:58,dps_approx:1}).differences.length,0);
 assert.equal(expansion.catalogSameSlot({slot:"invalid"},{slot:"invalid"}),false);
 console.log("PASS: Forever weapon eligibility and candidate catalog discrepancies without mixing stat units");
+
+assert.ok(expansion.acquisitionMatches({acquisition:"世界掉落",source:"世界掉落；裝備後綁定"},"裝綁"));
+assert.ok(expansion.acquisitionMatches({acquisition:"製作",bond:"裝備綁定"},"裝綁"));
+assert.ok(!expansion.acquisitionMatches({acquisition:"聲望",bond:"拾取綁定"},"裝綁"));
+const oldTaran={id:"2915",type:"單手錘",slot:"主手"};
+const fixedCat=expansion.expandCandidateSlots({id:"spec-26",slots:new Map([["主手",[oldTaran]],["雙手武器",[]],["頭部",[]],["肩部",[]],["手腕",[]],["腳部",[]]])});
+assert.equal(fixedCat.get("主手").length,0);
+assert.equal(fixedCat.get("雙手武器").find(x=>x.id==="2915").type,"雙手錘");
+assert.equal([...fixedCat.values()].flat().filter(x=>x.setGroup==="feralheart-cat").length,4);
+assert.equal(expansion.gearCatalogEligible({id:"spec-26"},{id:2915,item_class:"Weapon",slot:"One-Hand",subclass:"One-Handed Mace"},p),false);
+const coverage=new Function(section("function collectionCoverage(","function checklist(")+";return collectionCoverage;")();
+assert.deepEqual(coverage([[{id:"a"}],[{id:"a"}]],{a:true}),{have:1,total:2});
+assert.deepEqual(coverage([[{id:"a"},{id:"b"}],[{id:"a"}]],{a:true,b:true}),{have:2,total:2});
+assert.deepEqual(coverage([[{id:"a"}]],{}),{have:0,total:1});
+const news=new Function(section("const bluePosts=","function feralSetView(")+";return {bluePosts,specHotfixes};")();
+assert.equal(news.bluePosts.length,14);
+assert.equal(new Set(news.bluePosts.map(p=>p.key)).size,14);
+assert.equal(news.bluePosts.find(p=>p.key==="199").sections.length,6);
+assert.ok(news.bluePosts.find(p=>p.key==="180").sections[0].body.includes("13級"));
+assert.ok(news.specHotfixes("spec-17").some(x=>x.date==="2026-11-11"));
+assert.ok(news.specHotfixes("spec-25").some(x=>x.title==="梟獸形態"));
+assert.ok(news.specHotfixes("spec-26").some(x=>x.title==="野性德魯伊套裝"));
+assert.ok(news.specHotfixes("spec-29").length===0);
+console.log("PASS: hotfix mapping, set candidates, Taran correction, overlapping acquisition and distinct collection coverage");
