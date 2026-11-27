@@ -33,3 +33,24 @@
 #guild-tools .gt-tabs button[aria-pressed=true]{background:#3b3224!important}
 .gt-section-label{font-size:13px;color:#c9b288;margin:0 0 8px}
 @media(max-width:760px){#guild-tools .gt-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}#guild-tools .gt-tabs button{min-height:44px;padding:8px 5px!important}.gt-unified{padding:12px}}
+
+/* V15.2 BiS visual overview */
+#guild-tools .gt-bis-summary,#guild-tools .gt-bis-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 18px}
+#guild-tools .gt-bis-metric,#guild-tools .gt-bis-slot{background:#192634;border:1px solid #40536a;border-radius:10px;padding:12px;min-width:0;overflow-wrap:anywhere}
+#guild-tools .gt-bis-metric strong{display:block;font-size:25px;color:#e9c78c;font-variant-numeric:tabular-nums}
+#guild-tools .gt-bis-metric small{color:#b3c3d5}
+#guild-tools .gt-bis-slot h4{font-size:14px;margin:0 0 10px;color:#e9c78c}
+#guild-tools .gt-bis-name{display:block;font-size:16px;font-weight:700;margin:7px 0}
+#guild-tools .gt-bis-status{font-size:12px;display:inline-block;padding:3px 7px;border-radius:5px;border:1px solid currentColor}
+#guild-tools .gt-bis-present{color:#a4c9b1}
+#guild-tools .gt-bis-review{color:#f2c47d}
+#guild-tools .gt-bis-missing{color:#ef9e9e}
+#guild-tools .gt-bis-slot p{margin:7px 0;font-size:13px}
+#guild-tools .gt-bis-slot details{background:transparent;border-top:1px solid #40536a;border-radius:0;padding:10px 0 0;margin:12px 0 0}
+#guild-tools .gt-bis-slot summary{cursor:pointer;color:#b8cee7;font-size:13px}
+#guild-tools .gt-bis-alt{padding:10px 0;border-bottom:1px solid #34465a}
+#guild-tools .gt-bis-alt:last-child{border-bottom:0}
+#guild-tools .gt-bis-progress{height:6px;background:#101923;border-radius:9px;margin:10px 0;overflow:hidden}
+#guild-tools .gt-bis-progress span{display:block;background:#b99b60;height:100%}
+@media(max-width:850px){#guild-tools .gt-bis-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){#guild-tools .gt-bis-grid{grid-template-columns:1fr}#guild-tools .gt-bis-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
