@@ -73,8 +73,8 @@ const root=$("#guild-tools");if(!root)return;
 const tabs=[["v8","天賦手法"],["v9","掉落反查"],["v10","收集進度"],["v11","團本準備"],["v12","官方藍帖"],["v13","配方材料"],["v14","配裝試算"],["audit","BiS 資料稽核"]];
 const nav=node("div",undefined,"gt-tabs"),panel=node("div",undefined,"gt-panel");
 const info=node("p","V14.2 · 選擇下方功能按鈕，快速查詢公會資料。原有職業與裝備選單維持不變。","gt-muted");
-add(root,node("h2","公會工具箱"),info,nav,panel);
-let active="v8";
+add(root,node("p","03 選擇功能","gt-section-label"),nav,panel);
+let active="";
 const specPairs=[...bySpec.values()].map(s=>[s.id,s.name]);
 const getSpec=()=>$("#spec-select")?.value||"spec-5";
 function specPicker(onChange){const p=select(specPairs);p.value=bySpec.has(getSpec())?getSpec():(bySpec.has("spec-5")?"spec-5":(specPairs[0]?.[0]||""));p.addEventListener("change",()=>onChange(p.value));return p;}
@@ -96,7 +96,18 @@ const renderers={audit,v8:guide,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:m
 function show(key){active=key;for(const b of $$("button",nav)){b.setAttribute("aria-pressed",String(b.dataset.tab===key));}try{renderers[key]();}catch(e){panel.replaceChildren(node("p","此工具載入失敗，原有職業裝備區仍可使用。"));console.error(e);}}
 const dashboardMeta={v8:["⚔️","天賦與實戰技巧"],v9:["🔎","首領與裝備來源"],v10:["📋","個人裝備清單"],v11:["🛡️","開荒前置準備"],v12:["📜","官方更新摘要"],v13:["🧪","附魔與消耗品"],v14:["⚖️","比較候選裝備"],audit:["✅","檢查來源與證據"]};
 for(const [key,label] of tabs){const b=button(label,()=>show(key));b.dataset.tab=key;const [symbol,desc]=dashboardMeta[key];const pict=node("span",symbol,"gt-icon");pict.setAttribute("aria-hidden","true");b.replaceChildren(pict,node("span",label),node("span",desc,"gt-desc"));nav.append(b);}
-const toolboxDetails=root.closest("details");if(toolboxDetails)toolboxDetails.open=true;
+const toolboxDetails=root.closest("details");
+const mainSpec=$("#spec-select");
+if(toolboxDetails&&mainSpec){
+ let picker=mainSpec.parentElement;
+ while(picker&&picker.parentElement&&picker.parentElement!==toolboxDetails.parentElement&&!picker.parentElement.contains(toolboxDetails))picker=picker.parentElement;
+ if(picker&&picker.parentElement===toolboxDetails.parentElement&&picker!==toolboxDetails&&!picker.contains(root)&&picker.querySelectorAll("select").length>=2&&!picker.querySelector("section.spec")){
+  const group=node("div",undefined,"gt-unified");
+  picker.before(group);group.append(picker,root);
+  toolboxDetails.hidden=true;
+  if(toolboxDetails.id){const alias=node("span");alias.id=toolboxDetails.id;toolboxDetails.removeAttribute("id");group.prepend(alias);}
+ }else{toolboxDetails.open=true;root.classList.add("gt-flat");const summary=toolboxDetails.querySelector("summary");if(summary)summary.style.display="none";}
+}else{root.classList.add("gt-flat");}
+
 $("#spec-select")?.addEventListener("change",()=>{if(["v8","v10","v14","audit"].includes(active))show(active);});
-show("v8");
 })();
