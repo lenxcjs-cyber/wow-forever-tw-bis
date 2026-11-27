@@ -109,3 +109,23 @@ console.log("PASS: 28-spec external evidence, slot identity, source uncertainty 
 const restored=new Function("localStorage",section("const rogueProfiles=","function syncWeaponCards")+";return {buildFor,skillGate};")({getItem:()=>JSON.stringify({"spec-26":"feral_onehand","spec-27":"feral_onehand"})});
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
+
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,allowed,buildChoice};")();
+const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
+const catSlots=expansion.expandCandidateSlots(cat);
+assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
+assert.ok(catSlots.get("雙手武器").find(x=>x.id==="19323").priority);
+assert.equal(catSlots.get("戒指1").filter(x=>x.id==="19325").length,1);
+assert.equal(catSlots.get("戒指2").filter(x=>x.id==="19325").length,1);
+assert.equal(cat.slots.get("雙手武器").length,0);
+expansion.buildChoice["spec-26"]="feral_onehand";
+assert.equal(expansion.allowed("spec-26",catSlots.get("雙手武器")[0]),false);
+const p={Druid:{weapons:["Staff","Dagger","Two-Handed Mace"],armor:{Cloth:1,Leather:1}}};
+expansion.buildChoice["spec-26"]="general";
+assert.ok(expansion.gearCatalogEligible(cat,{item_class:"Weapon",slot:"Two-Hand",subclass:"Two-Handed Mace",class_mask:1024,required_level:55},p));
+assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Weapon",slot:"One-Hand",subclass:"Dagger"},p),false);
+assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Armor",slot:"Chest",subclass:"Plate"},p),false);
+assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Armor",slot:"Chest",subclass:"Leather",class_mask:1},p),false);
+assert.deepEqual(expansion.gearCatalogTags({source_summary:"World drop",bonding:"Binds when equipped"}),["世界掉落","裝綁"]);
+assert.deepEqual(expansion.gearCatalogTags({source_summary:"Crafted: Leatherworking",bonding:"Binds when equipped"}),["裝綁","製作"]);
+console.log("PASS: expanded gear candidates, feral reputation weapon, class eligibility, source and binding filters");
