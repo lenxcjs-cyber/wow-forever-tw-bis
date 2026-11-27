@@ -78,6 +78,21 @@ jobs:
             echo '### Talent snapshot: unavailable; real-data tests skipped' >> "$GITHUB_STEP_SUMMARY"
             echo 'Site deployed in fallback mode. Do not mark 459 leveling steps as verified.' >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Import all-source equipment catalog (optional)
+        run: |
+          base='https://gblaku.github.io/wow-forever-kb/api'
+          dir="$RUNNER_TEMP/gear-catalog"
+          mkdir -p "$dir"
+          if curl -fsSL --connect-timeout 8 --max-time 45 "$base/items.json" -o "$dir/items.json" && curl -fsSL --connect-timeout 8 --max-time 20 "$base/proficiency.json" -o "$dir/proficiency.json" && curl -fsSL --connect-timeout 8 --max-time 20 "$base/meta.json" -o "$dir/meta.json"; then
+            if python3 -c 'import json,sys; from pathlib import Path; p=Path(sys.argv[1]); d={k:json.loads((p/f"{f}.json").read_text()) for k,f in [("items","items"),("prof","proficiency"),("meta","meta")]}; assert isinstance(d["items"],list) and len(d["items"])>1000 and len(d["prof"])>=9 and d["meta"].get("client_build"); d["items"]=[i for i in d["items"] if i.get("item_class") in ("Weapon","Armor") and i.get("slot")!="Non-equippable"]; Path("gear-catalog.json").write_text(json.dumps(d,ensure_ascii=False,separators=(",",":"))); print("Catalog equippable records:",len(d["items"]),"build:",d["meta"]["client_build"])' "$dir"; then
+              echo "All-source catalog snapshot available"
+            else
+              rm -f gear-catalog.json
+              echo "::warning::Equipment data schema changed; existing candidates and external link remain."
+            fi
+          else
+            echo "::warning::Equipment catalog unavailable at publish time; page can retry the public API."
+          fi
       - name: Stamp homepage asset versions
         run: python3 scripts/stamp-assets.py
       - name: Install browser test dependency
