@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogSameSlot,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogSameSlot,candidateCatalogCheck,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -139,3 +139,16 @@ assert.equal(expansion.catalogSameSlot({slot:"One-Hand"},{slot:"Two-Hand"}),fals
 const diffs=expansion.catalogDiff({dps:56.5,strength:18,crit:28},{dps:53.8,strength:26,crit:14});
 assert.deepEqual(diffs.map(x=>[x.key,x.delta]),[["dps",2.7],["strength",-8],["crit",14]]);
 console.log("PASS: restoration druid catalog eligibility and same-slot raw stat differences");
+
+const rogue={Rogue:{weapons:["Dagger","One-Handed Sword"],armor:{Cloth:1,Leather:1}}};
+assert.ok(expansion.gearCatalogEligible({id:"spec-11"},{item_class:"Weapon",slot:"One-Hand",subclass:"One-Handed Axe"},rogue));
+assert.equal(expansion.gearCatalogEligible({id:"spec-10"},{item_class:"Weapon",slot:"One-Hand",subclass:"One-Handed Axe"},rogue),false);
+const priest={Priest:{weapons:["Dagger"],armor:{Cloth:1}}};
+assert.equal(expansion.gearCatalogEligible({id:"spec-13"},{item_class:"Weapon",slot:"Off Hand",subclass:"Dagger"},priest),false);
+assert.ok(expansion.gearCatalogEligible({id:"spec-13"},{item_class:"Armor",slot:"Held In Off-hand",subclass:"Miscellaneous"},priest));
+assert.equal(expansion.candidateCatalogCheck({},null).state,"未收錄");
+assert.equal(expansion.candidateCatalogCheck({stats:{"力量":18}},{estimated:1,strength:20}).state,"經典推定");
+assert.deepEqual(expansion.candidateCatalogCheck({stats:{"力量":18,"命中機率":2},wm:{"每秒傷害":"56.5"}},{strength:20,hit:10,dps:56.5}).differences,[{label:"力量",old:18,current:20}]);
+assert.equal(expansion.candidateCatalogCheck({wm:{"每秒傷害":"56.5"}},{dps:58,dps_approx:1}).differences.length,0);
+assert.equal(expansion.catalogSameSlot({slot:"invalid"},{slot:"invalid"}),false);
+console.log("PASS: Forever weapon eligibility and candidate catalog discrepancies without mixing stat units");
