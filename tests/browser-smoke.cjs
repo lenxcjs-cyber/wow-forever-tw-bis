@@ -253,6 +253,23 @@ const server=http.createServer((req,res)=>{
    console.log("PASS: imported Druid leveling route, talent grid and 60-level controls");
   }
   console.log("PASS: embedded talent exact-match and safe missing-build mode");
+  await openTab("v13");
+  const prep=page.locator(".gt-panel");
+  const recipe=await page.evaluate(()=>{const d=JSON.parse(document.querySelector("#v6-prep-data").textContent);return Object.entries(d.recipes||{}).map(([key,r])=>({key,name:r.name,prof:r.prof,mat:r.mat})).find(r=>typeof r.mat==="string"&&r.mat.split(/[、；;\n]+/).some(t=>/^([^×]+?)\s*×\s*[1-9]\d*$/.test(t.trim())));});
+  assert.ok(recipe,"actual embedded recipe with countable ingredients");
+  await prep.getByPlaceholder("配方、效果、材料、來源（空格分隔）").fill(recipe.name);
+  const qty=prep.locator('.gt-card').filter({has:page.getByRole("heading",{name:recipe.name+" · "+recipe.prof,exact:true})}).locator('input[type="number"]').first();
+  await qty.fill("2");await qty.press("Tab");
+  const shop=prep.locator(".gt-shopping-grid");
+  await shop.waitFor({state:"visible"});
+  const before=Number(await shop.locator(".gt-shopping-remaining").first().textContent());
+  assert.ok(before>0);
+  await shop.locator("input").first().fill("1");await shop.locator("input").first().press("Tab");
+  assert.equal(Number(await shop.locator(".gt-shopping-remaining").first().textContent()),before-1);
+  await openTab("audit");await openTab("v13");
+  assert.equal(await shop.locator("input").first().inputValue(),"1");
+  assert.equal(Number(await shop.locator(".gt-shopping-remaining").first().textContent()),before-1);
+  console.log("PASS: actual recipe selection, material shortage calculation and persisted inventory");
   await page.locator("#gt-mode-blue").click();
   for(const selector of ["#class-select","#spec-select","#gt-build-bar","#guild-tools .gt-tabs"]){assert.equal(await page.locator(selector).isVisible(),false,selector);}
   assert.equal(await page.locator("section.spec:visible").count(),0);
