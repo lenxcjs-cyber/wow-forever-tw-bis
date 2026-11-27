@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,effectiveGearWeights,omittedFeralWeights,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogPlanSourceAllowed,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,effectiveGearWeights,omittedFeralWeights,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -351,3 +351,12 @@ const feralProf={Druid:{armor:{Leather:1},weapons:["Two-Handed Mace"]}};
 assert.equal(expansion.catalogWeaponPlan({id:"spec-26"},feralWeapons,feralProf,feralWeights).melee.picks[0].item.id,502);
 assert.equal(expansion.catalogWeaponPlan({id:"spec-27"},feralWeapons,feralProf,{"武器DPS":1}).melee,null);
 console.log("PASS: raw weapon DPS excluded from unverified feral form scores");
+
+const sourceItems=[itemForPlan(601,"Head","Plate",50,{required_reputation:"Frostwolf - Exalted",source_summary:"Vendor"}),itemForPlan(602,"Head","Leather",20,{bonding:"Binds when equipped"}),itemForPlan(603,"Head","Plate",30,{bonding:"Binds when picked up"})];
+assert.equal(expansion.catalogArmorPlan({id:"spec-2"},sourceItems,planProf,{"敏捷":1}).total,50);
+assert.equal(expansion.catalogArmorPlan({id:"spec-2"},sourceItems,planProf,{"敏捷":1},{excludeReputation:true}).total,30);
+assert.equal(expansion.catalogArmorPlan({id:"spec-2"},sourceItems,planProf,{"敏捷":1},{boeOnly:true}).total,20);
+assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"World drop",estimated:1},{boeOnly:true}),false);
+assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Reputation vendor"},{excludeReputation:true}),false);
+assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Drop",bonding:"Binds when picked up"},{boeOnly:true}),false);
+console.log("PASS: source constraints for reputation and BoE equipment plans");
