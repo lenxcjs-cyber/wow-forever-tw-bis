@@ -60,6 +60,13 @@ const server=http.createServer((req,res)=>{
     await full.getByRole("button",{name:"設為同部位比較基準"}).first().click();
     await full.getByRole("button",{name:"清除比較基準"}).waitFor({state:"visible"});
     await full.getByRole("button",{name:"清除比較基準"}).click();
+    const audit=page.locator(".gt-catalog-audit");
+    await audit.locator("summary").first().click();
+    await audit.locator("select").selectOption("all");
+    await audit.locator("article").first().waitFor({state:"visible"});
+    assert.ok(await audit.locator("article").count()>0);
+    assert.ok((await audit.innerText()).includes("資料版本："));
+    console.log("PASS: actual candidate-ID catalog reconciliation view");
     console.log("PASS: real catalog for restoration Druid and same-slot comparison controls");
   }
   await classes.selectOption(classFor["spec-26"]);await spec.selectOption("spec-26");
