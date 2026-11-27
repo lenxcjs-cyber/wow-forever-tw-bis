@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -210,3 +210,23 @@ assert.equal(expansion.catalogWeightScore({attack_power:30,ranged_attack_power:2
 assert.equal(expansion.catalogWeightScore({spell_power:30,spell_damage:10,healing:40},{"治療加成":1}).total,40);
 assert.deepEqual(expansion.catalogWeightCoverage({"力量":1,"命中機率":2,"武器DPS":3,"爆擊":0}),["命中機率","武器DPS"]);
 console.log("PASS: expanded catalog raw stat mappings and omitted-weight disclosure");
+
+// Candidate coverage, data validity and hand/slot mismatch regression tests.
+const ids=new Set(["1","2"]);
+assert.equal(expansion.catalogCandidateFilter({id:1},ids,"new"),false);
+assert.equal(expansion.catalogCandidateFilter({id:3},ids,"new"),true);
+assert.equal(expansion.catalogCandidateFilter({id:1},ids,"known"),true);
+assert.equal(expansion.catalogCandidateFilter({id:3},ids,"known"),false);
+assert.equal(expansion.catalogSourceRecorded({estimated:1,source_summary:"World drop"}),false);
+assert.equal(expansion.catalogSourceRecorded({source_summary:" "}),false);
+assert.equal(expansion.catalogSourceRecorded({source_summary:"World drop"}),true);
+assert.equal(expansion.validGearCatalog({items:[],prof:{},meta:{client_build:"x"}}),false);
+assert.equal(expansion.validGearCatalog({items:[{}],prof:{},meta:{client_build:"x"}}),true);
+assert.equal(expansion.catalogSlotCheck({slot:"主手",type:"雙手錘"},{slot:"Two-Hand"}),true);
+assert.equal(expansion.catalogSlotCheck({slot:"主手",type:"單手錘"},{slot:"Two-Hand"}),false);
+assert.equal(expansion.catalogSlotCheck({slot:"副手",type:"匕首"},{slot:"One-Hand"}),true);
+assert.equal(expansion.catalogSlotCheck({slot:"副手",type:"匕首"},{slot:"Main Hand"}),false);
+assert.equal(expansion.catalogSlotCheck({slot:"胸部"},{slot:"Robe"}),true);
+assert.equal(expansion.catalogSlotCheck({slot:"戒指2"},{slot:"Trinket"}),false);
+assert.equal(expansion.catalogSlotCheck({slot:"特殊"},{slot:"Head"}),null);
+console.log("PASS: missing candidate discovery, catalog validation and slot mismatch checks");
