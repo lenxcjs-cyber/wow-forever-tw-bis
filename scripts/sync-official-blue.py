@@ -95,6 +95,10 @@ def get_topics(region, state):
             tid=int(p["identity"].split(":")[1])
             if len(known)<8:known.setdefault(tid,{"id":tid})
     return list({**known,**selected}.values())[:MAX_TOPICS]
+CLASS_NAMES=("warrior","paladin","hunter","rogue","priest","shaman","mage","warlock","druid")
+def class_mentions(title,body):
+    text=title+"\n"+body
+    return [name for name in CLASS_NAMES if re.search(r"\b"+name+r"s?\b",text,re.I)]
 def selected_facts(body):
     # Only a short selection of factual changes, not a complete translated article.
     # Avoid copying long passages or quoted player messages.
@@ -153,7 +157,7 @@ def poll():
                     if old==fingerprint and identity in archive and identity not in by:continue
                     url=base(region)+f"/en/wow/t/{tid}/{n}"
                     changed=identity in by or identity in archive
-                    item={"identity":identity,"key":"official-"+identity,"date":stamp.date().isoformat(),"publishedAt":p.get("created_at"),"updatedAt":dt,"title":"官方新公告（繁中翻譯待處理）","author":str(p.get("username") or "Blizzard"),"url":url,"region":region.upper(),"translationStatus":"pending","sections":[{"category":"官方公告","title":"官方已發布","body":"已偵測到暴雪公告；繁中重點尚未完成，請先閱讀官方原文。"}],"revision":changed}
+                    item={"identity":identity,"key":"official-"+identity,"date":stamp.date().isoformat(),"publishedAt":p.get("created_at"),"updatedAt":dt,"title":"官方新公告（繁中翻譯待處理）","author":str(p.get("username") or "Blizzard"),"url":url,"region":region.upper(),"translationStatus":"pending","sections":[{"category":"官方公告","title":"官方已發布","body":"已偵測到暴雪公告；繁中重點尚未完成，請先閱讀官方原文。"}],"revision":changed,"classMentions":class_mentions(title,body)}
                     if identity not in by or old!=fingerprint:by[identity]=item
                     queue.append({"identity":identity,"title":title,"facts":selected_facts(body),"updatedAt":dt})
                 # Do not record ordinary player activity as a new official update.
