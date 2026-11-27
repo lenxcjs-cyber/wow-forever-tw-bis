@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V20.6 beta · 2026-11-27
+/* 墓鐘資料庫 V20.7 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -357,7 +357,7 @@ function material(){
 }
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
 function optimizer(){
- title("V20.6 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
+ title("V20.7 · 天賦連動配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
  const id=getSpec(),baseSpec=bySpec.get(id);if(!baseSpec)return;const s={...baseSpec,slots:expandCandidateSlots(baseSpec)};
  const out=node("div"),slot=select([...s.slots].map(([k])=>[k,k])),current=inp("0","number"),target=inp("留空＝不限制","number"),result=node("div");
  current.value="0";current.min="0";current.step="0.1";target.min="0";target.step="0.1";const talentHit=inp("0","number");talentHit.value="0";talentHit.min="0";talentHit.step="0.1";
@@ -611,14 +611,36 @@ function validGearCatalog(d){return !!d&&Array.isArray(d.items)&&d.items.length>
 function catalogSlotCheck(candidate,record){
  const slot=String(candidate.slot||""),type=String(candidate.type||"");
  if(!record||!gearSlotNames[record.slot])return null;
- if(/副手|盾牌|off.hand/i.test(slot))return ["Off Hand","Held In Off-hand","Shield","One-Hand"].includes(record.slot);
- if(/遠程|遠距|聖物|魔杖|塑像|圖騰|聖契/i.test(slot))return ["Ranged","Thrown","Relic"].includes(record.slot);
- if(/主手|單手|雙手|近戰|^武器$/i.test(slot))return isTwoHand(type)?record.slot==="Two-Hand":["Main Hand","One-Hand"].includes(record.slot);
+ if(/副手|盾牌|off.hand/i.test(slot)){
+  if(/盾牌|shield/i.test(slot+" "+type))return record.slot==="Shield";
+  if(/持有|副手物品|法器|書籍|held in off.hand|off.hand frill/i.test(type))return record.slot==="Held In Off-hand";
+  if(/單手|匕首|拳套|拳刃|one.hand|dagger|fist/i.test(type))return ["Off Hand","One-Hand"].includes(record.slot);
+  return ["Off Hand","Held In Off-hand","Shield","One-Hand"].includes(record.slot);
+ }
+ if(/遠程|遠距|聖物|魔杖|塑像|圖騰|聖契/i.test(slot)){
+  if(/聖物|塑像|圖騰|聖契|relic|idol|totem|libram/i.test(slot+" "+type))return record.slot==="Relic";
+  if(/弓|槍|弩|魔杖|投擲|bow|gun|wand|thrown/i.test(slot+" "+type))return ["Ranged","Thrown"].includes(record.slot);
+  return ["Ranged","Thrown","Relic"].includes(record.slot);
+ }
+ if(/主手|單手|雙手|近戰|^武器$/i.test(slot))return isTwoHand(type)||/雙手/.test(slot)?record.slot==="Two-Hand":["Main Hand","One-Hand"].includes(record.slot);
  const rules=[[/頭部|頭盔|^頭$/,"Head"],[/頸部|項鍊/,"Neck"],[/肩部|肩甲/,"Shoulder"],[/背部|披風/,"Back"],[/胸部|胸甲/,"Chest"],[/手腕|護腕/,"Wrist"],[/手部|手套/,"Hands"],[/腰部|腰帶/,"Waist"],[/腿部|腿甲/,"Legs"],[/腳部|足部|鞋|靴/,"Feet"],[/戒指|指環/,"Finger"],[/飾品/,"Trinket"]];
  for(const [re,key] of rules)if(re.test(slot))return record.slot===key||(key==="Chest"&&record.slot==="Robe");
  return null;
 }
 // This is an additive panel-stat proposal, not a full combat simulator.
+function candidateCatalogPosition(candidate,record){
+ if(!record||catalogSlotCheck(candidate,record)!==true)return "";
+ const slot=String(candidate.slot||"");
+ if(/副手|盾牌|off.hand/i.test(slot))return "副手";
+ return gearSlotNames[record.slot]||"";
+}
+function catalogHasEffect(value){
+ if(value==null||value===false||value===0)return false;
+ if(Array.isArray(value))return value.some(catalogHasEffect);
+ if(typeof value==="object")return Object.values(value).some(catalogHasEffect);
+ return !["","0","[]","{}","null"].includes(String(value).trim());
+}
+function catalogHasSpecial(x){return !!catalogSetName(x)||catalogHasEffect(x.effects)||catalogHasEffect(x.other_stats);}
 const catalogArmorGroups=[["頭部",1],["頸部",1],["肩部",1],["背部",1],["胸部",1],["手腕",1],["手部",1],["腰部",1],["腿部",1],["腳部",1],["戒指",2],["飾品",2]];
 function catalogArmorPlan(spec,records,prof,weights,options={}){
  const pools=catalogSetPools(spec,records,prof,weights,options);
@@ -635,7 +657,7 @@ function catalogSetPools(spec,records,prof,weights,options={}){
  for(const x of records){
   const slot=gearSlotNames[x.slot],id=String(x.id??"");
   if(!id||seen.has(id)||!pools.has(slot)||!catalogSourceRecorded(x)||!gearCatalogEligible(spec,x,prof)||Number(x.quality||0)<Number(options.minQuality||0))continue;
-  if(options.excludeEffects&&(catalogSetName(x)||x.effects||x.other_stats))continue;
+  if(options.excludeEffects&&catalogHasSpecial(x))continue;
   const score=catalogWeightScore(x,weights);if(!score.used||!Number.isFinite(score.total))continue;
   seen.add(id);pools.get(slot).push({item:x,score});
  }
@@ -700,7 +722,7 @@ function catalogWeaponPlan(spec,records,prof,weights,options={}){
  const pools=new Map(["主手","副手","雙手武器","遠程","聖物"].map(k=>[k,[]])),seen=new Set();
  const kind=variantFor(spec.id)?.[4]||buildFor(spec.id),rogue=gearClassIndex(spec.id)===3,feral=feralWeaponMode(spec.id),requirePair=rogue||["dual","shield","mutilate","backstab","hemo"].includes(kind)||feral==="onehand",requireTwo=feral==="twohand"||["twohand","weaving"].includes(kind);
  for(const x of records){
-  if(!String(x.id??"")||!catalogSourceRecorded(x)||Number(x.quality||0)<Number(options.minQuality||0)||options.excludeEffects&&(x.item_set||x.effects||x.other_stats))continue;
+  if(!String(x.id??"")||!catalogSourceRecorded(x)||Number(x.quality||0)<Number(options.minQuality||0)||options.excludeEffects&&catalogHasSpecial(x))continue;
   for(const [position,pool] of pools){
    const id=position+":"+x.id;
    if(seen.has(id)||!gearCatalogEligible(spec,x,prof,position))continue;
@@ -748,12 +770,12 @@ function candidateAuditView(spec,slots){
  const out=node("div");d.append(out);let started=false;
  d.addEventListener("toggle",async()=>{if(!d.open||started)return;started=true;out.replaceChildren(node("p","正在核對物品資料…"));
  try{const data=await loadGearCatalog();if(!d.isConnected)return;const index=new Map(data.items.map(x=>[String(x.id),x]));
- const rows=slots.flatMap(s=>s.items.map(x=>{const rec=index.get(String(x.id)),check=candidateCatalogCheck(x,rec);return {x,rec,check,slotOK:catalogSlotCheck(x,rec),eligible:rec?gearCatalogEligible(spec,rec,data.prof):null};}));
+ const rows=slots.flatMap(s=>s.items.map(x=>{const rec=index.get(String(x.id)),check=candidateCatalogCheck(x,rec),slotOK=catalogSlotCheck(x,rec),position=candidateCatalogPosition(x,rec);return {x,rec,check,slotOK,eligible:rec?gearCatalogEligible(spec,rec,data.prof,position):null};}));
  const mode=select([["issues","只顯示待核對"],["all","全部候選"]]),list=node("div");
- const issue=r=>r.check.state!=="已比對（有限欄位）"||r.eligible===false||r.slotOK===false||!r.rec?.source_summary;
+ const issue=r=>r.check.state!=="已比對（有限欄位）"||r.eligible!==true||r.slotOK!==true||!r.rec?.source_summary;
  add(out,node("p","資料版本："+data.meta.client_build+"｜"+rows.length+" 筆部位候選｜"+rows.filter(r=>!issue(r)).length+" 筆有限欄位相符且有來源文字｜"+rows.filter(issue).length+" 筆待核對","gt-muted"),field("核對範圍",mode),list);
  function draw(){list.replaceChildren();const visible=rows.filter(r=>mode.value==="all"||issue(r));for(const {x,rec,check,eligible,slotOK} of visible){
- const c=node("article",undefined,"gt-card");add(c,link(zhItem(x)+"（"+x.slot+"）",x.url),node("p",check.state+(check.compared?"｜"+check.compared+" 個可比欄位":"")+(eligible===false?"｜資料目錄初步資格不符":"")+(slotOK===false?"｜裝備部位與目錄不符":"")+(rec&&!rec.source_summary?"｜目錄缺取得來源":""),"gt-muted"));
+ const c=node("article",undefined,"gt-card");add(c,link(zhItem(x)+"（"+x.slot+"）",x.url),node("p",check.state+(check.compared?"｜"+check.compared+" 個可比欄位":"")+(eligible===false?"｜資料目錄初步資格不符":"")+(slotOK===false?"｜裝備部位與目錄不符":rec&&slotOK===null?"｜裝備部位待核":"")+(rec&&!rec.source_summary?"｜目錄缺取得來源":""),"gt-muted"));
  for(const v of check.differences)add(c,node("p",v.label+"：本站 "+v.old+" ／ 目錄 "+v.current));
  if(rec)add(c,node("p","目錄來源："+(rec.source_summary||"待查")+"；掉落及階段須另核","gt-muted"),link("依物品ID查閱繁中遊戲資料","https://www.wowhead.com/forever/tw/item="+rec.id));
  list.append(c);}
