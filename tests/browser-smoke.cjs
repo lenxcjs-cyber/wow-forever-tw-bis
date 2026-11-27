@@ -30,7 +30,14 @@ const server=http.createServer((req,res)=>{
   await page.locator("#gt-mode-class").waitFor({state:"visible"});
   await page.locator("#class-select").waitFor({state:"visible"});
   const spec=page.locator("#spec-select"),build=page.locator("#gt-build-select"),classes=page.locator("#class-select");
-  await page.locator('#guild-tools button[data-tab="v11"]').click();
+  const moreNav=page.locator(".gt-nav-more");
+  assert.equal(await moreNav.getAttribute("open"),null);
+  assert.ok(await page.locator('#guild-tools button[data-tab="audit"]').isVisible());
+  assert.ok(await page.locator('#guild-tools button[data-tab="v13"]').isVisible());
+  assert.equal(await page.locator('#guild-tools button[data-tab="v11"]').isVisible(),false);
+  async function openTab(key){const b=page.locator('#guild-tools button[data-tab="'+key+'"]');if(!await b.isVisible())await moreNav.locator("summary").click();await b.click();}
+
+  await openTab("v11");
   const classOptions=await classes.evaluate(e=>Array.from(e.options).filter(o=>o.value&&!o.disabled).map(o=>({value:o.value,label:o.textContent})));
   const seen=new Set(),classFor={};let buildCount=0;
   for(const c of classOptions){
@@ -72,7 +79,7 @@ const server=http.createServer((req,res)=>{
     await page.locator(".gt-audit-research > summary").waitFor({state:"visible"});
     assert.equal(await page.locator(".gt-audit-research").getAttribute("open"),null);
     assert.equal(await page.locator(".gt-community-bis > summary").isVisible(),false);
-    await page.locator('#guild-tools button[data-tab="v11"]').click();
+    await openTab("v11");
     seen.add(id);classFor[id]=c.value;buildCount+=expected.length;
    }
   }
@@ -174,6 +181,12 @@ const server=http.createServer((req,res)=>{
   assert.ok(!slots.some(x=>/副手|單手/.test(x)),"feral invalid slot: "+slots.join(","));
   console.log("PASS: actual feral default cards exclude one-hand/offhand slots");
   const workspace=page.locator(".gt-build-workspace"),pane=workspace.locator(".gt-gear-scroll");
+  await workspace.getByRole("button",{name:"收合篩選"}).click();
+  assert.equal(await workspace.locator("#gt-gear-filter-panel").isVisible(),false);
+  assert.ok(await pane.isVisible());
+  await workspace.getByRole("button",{name:"展開篩選"}).click();
+  assert.ok(await workspace.locator("#gt-gear-filter-panel").isVisible());
+
   const talentFrame=workspace.frameLocator('iframe[title="並排天賦流派"]');
   await talentFrame.locator("#overview").getByText("9/32/10",{exact:true}).waitFor({state:"visible"});
   const columns=workspace.locator(".gt-build-column");
@@ -213,7 +226,7 @@ const server=http.createServer((req,res)=>{
   assert.ok((await workspace.locator("iframe").getAttribute("src")).includes("build=feral_onehand"));
   await build.selectOption("general");
   console.log("PASS: synchronized desktop talent/gear layout, independent gear scroll, mobile stacking and build switching");
-  await page.locator('#guild-tools button[data-tab="v8"]').click();
+  await openTab("v8");
   const tf=page.frameLocator('iframe[title="天賦流派與野外練等"]');
   await tf.locator("#overview").getByText("9/32/10",{exact:true}).waitFor({state:"visible"});
   assert.equal(await tf.locator("#classSelect").isVisible(),false);
