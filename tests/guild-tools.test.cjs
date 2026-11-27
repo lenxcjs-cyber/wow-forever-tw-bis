@@ -185,7 +185,7 @@ assert.ok(news.specHotfixes("spec-26").some(x=>x.title==="野性德魯伊套裝"
 assert.ok(news.specHotfixes("spec-29").length===0);
 console.log("PASS: hotfix mapping, set candidates, Taran correction, overlapping acquisition and distinct collection coverage");
 
-const officialMerge=new Function(section("function validOfficialPost(","function renderBlueBoard(")+";return {validOfficialPost,combineOfficialBlue};")();
+const officialMerge=new Function(section("function validOfficialPost(","function renderBlueBoard(")+";return {validOfficialPost,combineOfficialBlue,blueCheckpointText};")();
 assert.ok(news.bluePosts.every(officialMerge.validOfficialPost));
 const incoming={key:"official-us:123:1",date:"2026-11-27",title:"新公告",url:"https://us.forums.blizzard.com/en/wow/t/123/1",translationStatus:"pending",sections:[{category:"官方公告",title:"待翻譯",body:"請閱官方"}]};
 assert.ok(officialMerge.validOfficialPost(incoming));
@@ -271,3 +271,9 @@ assert.equal(expansion.catalogWeaponScore(wpItems[5],"副手",{"武器DPS":5,"�
 assert.equal(expansion.catalogWeaponScore(wpItems[4],"主手",{"武器DPS":1}).incomplete,true);
 assert.equal(expansion.catalogWeaponPlan({id:"spec-10"},[weaponForPlan(211,"One-Hand","Dagger",50)],wp,{"武器DPS":1}).melee,null);
 console.log("PASS: full catalog weapon configurations and hand-specific DPS");
+
+const checkpointFixture={lastCheck:{at:"2026-11-27T12:00:00Z",status:"partial",regions:{us:{read:10,attempted:10},eu:{read:0,attempted:3}}}};
+assert.ok(officialMerge.blueCheckpointText(checkpointFixture,Date.parse("2026-11-27T12:10:00Z")).includes("部分抽查未成功"));
+assert.ok(officialMerge.blueCheckpointText(checkpointFixture,Date.parse("2026-11-27T20:00:00Z")).includes("紀錄已逾7小時"));
+assert.ok(officialMerge.blueCheckpointText({}).includes("尚無已發布的抓取紀錄"));
+console.log("PASS: blue-post checkpoint and stale status display");
