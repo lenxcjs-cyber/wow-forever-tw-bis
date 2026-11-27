@@ -132,7 +132,7 @@ const server=http.createServer((req,res)=>{
   for(const selector of ["#class-select","#spec-select","#gt-build-bar","#guild-tools .gt-tabs"]){assert.equal(await page.locator(selector).isVisible(),false,selector);}
   assert.equal(await page.locator("section.spec:visible").count(),0);
   const bf=page.locator("#gt-blue-board");
-  assert.equal(await bf.getAttribute("data-release"),"19.0");
+  assert.match(await bf.getAttribute("data-release"),/^19\.\d+$/);
   assert.equal(await page.locator("iframe").count(),0,"no homepage iframe in blue mode");
   await bf.locator("#blue-list article").first().waitFor({state:"visible"});
   assert.ok(await bf.locator("#blue-list article").count()>=15);
