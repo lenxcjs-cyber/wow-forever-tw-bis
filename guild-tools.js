@@ -1068,6 +1068,27 @@ if(toolboxDetails&&mainSpec){
 
 let lastSpecKey=null;const syncSpec=()=>{if(siteMode==="blue")return;const id=getSpec(),key=id+":"+(id?buildFor(id):"");if(key===lastSpecKey)return;lastSpecKey=key;syncBuild();if(!active&&getSpec()){show("audit");return;}if(["v8","v9","v10","v13","v14","audit"].includes(active))show(active);};
 mainSpec?.addEventListener("change",()=>queueMicrotask(syncSpec));$("#class-select")?.addEventListener("change",()=>queueMicrotask(syncSpec));for(const id of bySpec.keys())syncWeaponCards(id);syncBuild();if(specEls.length&&bySpec.size){enableLegacyConsolidation();}if(getSpec()&&!active)show("audit");
+// Archive only explicitly identified historical banners, never move controls or equipment data.
+function archiveLegacyHeader(){
+ const safe=e=>e&&e.isConnected&&!root.contains(e)&&!e.contains(root)&&!e.closest("section.spec")&&!e.querySelector("select,input,button,iframe,script,section.spec,#guild-tools")&&e.textContent.length<4000;
+ const textOf=e=>e.textContent.trim().replace(/\s+/g," ");
+ const rules=[/^(?:2026\/11\/27\s*[｜|]\s*)?V6\s*修正法系與物理裝備混排/,/^V7\s*[｜|]\s*全專精資料稽核/,/^V8\s*[–—-]\s*V14\s*功能試用版/];
+ const selected=[];
+ for(const rule of rules){
+  const candidates=$$("p,div,section,aside,article,blockquote,h2,h3,h4").filter(e=>safe(e)&&rule.test(textOf(e)));
+  // The V7 audit heading belongs to a card with multiple paragraphs.
+  const full=candidates.filter(e=>!/^H[2-4]$/.test(e.tagName));
+  const choice=(full.length?full:candidates).find(e=>!full.some(p=>p!==e&&p.contains(e)));
+  if(choice&&!selected.some(e=>e.contains(choice)||choice.contains(e)))selected.push(choice);
+ }
+ if(!selected.length)return;
+ const archive=node("details",undefined,"gt-legacy-history");
+ add(archive,node("summary","歷史版本與資料說明"));
+ const target=root.closest(".gt-unified")||root;
+ target.after(archive);
+ for(const e of selected)archive.append(e);
+}
+archiveLegacyHeader();
 const selectorGroup=mainSpec?.closest(".gt-unified")||mainSpec?.parentElement?.parentElement;
 selectorGroup?.addEventListener("change",e=>{if(e.target!==mainSpec&&e.target.tagName==="SELECT"&&!root.contains(e.target))queueMicrotask(syncSpec);});
 const modeBar=node("div",undefined,"gt-site-mode"),classMode=button("職業資料",()=>switchMode("class")),blueMode=button("官方藍帖",()=>switchMode("blue"));classMode.id="gt-mode-class";blueMode.id="gt-mode-blue";
