@@ -127,3 +127,13 @@ assert.equal(skillGuideMatch(shred,{...filters,acq:"talent"},{kind:"unknown"},fo
 assert.equal(skillGuideMatch(shred,{...filters,category:"回能"},{kind:"unknown"},focus),false);
 assert.equal(skillGuideMatch(shift,{scenario:skills.scenarios["spec-26"][2]},{kind:"talent"},focus),true);
 console.log("PASS: all 84 combat scenarios, correct class mapping and combined skill filters");
+
+const {skillClientRecord}=require("../talents-page.js");
+const spellFixture={build:"1.60.1.71139",classes:{hunter:{Lacerate:{name:"割裂",records:[{id:1,name:"割裂"}]}},druid:{Lacerate:{name:"割傷",records:[{id:2,name:"割傷",cooldownMs:6000}]}}}};
+assert.equal(skillClientRecord(spellFixture,"hunter","Lacerate").records[0].id,1);
+assert.equal(skillClientRecord(spellFixture,"druid","Lacerate").name,"割傷");
+assert.equal(skillClientRecord(spellFixture,"warrior","Lacerate"),null);
+assert.equal(skillClientRecord({...spellFixture,build:"old"},"druid","Lacerate"),null);
+assert.equal(skillClientRecord({build:spellFixture.build,classes:{druid:{X:{name:"錯誤",records:[{id:3,name:"另一名"}]}}}},"druid","X").name,null);
+assert.equal(skillGuideMatch(shred,{terms:["測試名稱"],localizedName:"測試名稱"},{kind:"unknown"},focus),true);
+console.log("PASS: exact version/class spell metadata and localized aliases");
