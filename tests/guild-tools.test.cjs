@@ -665,7 +665,7 @@ assert.throws(()=>combat.combatApplyEquipment(nestedSwap,gearExport,"spec-1"));
 console.log("PASS: catalog-to-combat gear bridge, explicit enchant/affix, A/B partial swap and weapon-mode guard");
 
 // Exact simultaneous minimum-piece constraints across disjoint sets, including two ring slots.
-const multiSet=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogMultiSetAlternative,catalogSetAlternative};")();
+const multiSet=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogMultiSetAlternative,catalogSetAlternative,catalogSlotChoices};")();
 const mkSet=(id,item_set,total)=>({item:{id,item_set},score:{total}});
 const dualPools=new Map([["頭部",[mkSet(1,"A",10),mkSet(2,"B",9)]],["頸部",[mkSet(3,"A",8),mkSet(4,"B",7)]],["戒指",[mkSet(8,"",20),mkSet(5,"A",6),mkSet(6,"B",5),mkSet(7,"B",4)]]]);
 const dualSet=multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2},{name:"B",minimum:2}]);
@@ -675,7 +675,16 @@ assert.equal(new Set(dualSet.picks.map(x=>x.item.id)).size,4);
 assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2}]).total,multiSet.catalogSetAlternative(dualPools,"A",2).total);
 assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:3},{name:"B",minimum:2}]),null);
 assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2},{name:"A",minimum:2}]),null);
-console.log("PASS: simultaneous two-set piece constraints and infeasible combination rejection");
+const conflictPool=[mkSet(13965,"A",100),mkSet(991,"A",90),mkSet(13966,"B",120),mkSet(992,"B",10)];
+const conflictChoice=multiSet.catalogSlotChoices(conflictPool,"飾品",2,["A","B"],true).find(x=>x.counts.join(",")==="1,1");
+assert.equal(conflictChoice.total,210);
+assert.deepEqual(conflictChoice.picks.map(p=>p.item.id).sort((a,b)=>a-b),[991,13966]);
+const conflictSets=new Map([["頭部",[mkSet(993,"A",5)]],["肩部",[mkSet(994,"B",5)]],["飾品",conflictPool]]);
+assert.equal(multiSet.catalogMultiSetAlternative(conflictSets,[{name:"A",minimum:2},{name:"B",minimum:2}]).total,220);
+const conflictExact=multiSet.catalogSetAlternative(conflictSets,"A",2);
+assert.equal(conflictExact.total,220);
+assert.equal(multiSet.catalogSlotChoices([mkSet(13965,"A",10),mkSet(13966,"A",9)],"飾品",2,["A"],true).length,0);
+console.log("PASS: simultaneous two-set piece constraints, exact compatible pairs and infeasible combination rejection");
 
 
 // Shared native encounter parameters and explicit healer/dummy selection.
@@ -751,7 +760,7 @@ const tierPools=new Map([["頭部",[tierItem(1,"",10),tierItem(2,"A",8)]],["頸�
 const tierStudy=tierLogic.catalogSetTierComparison(tierPools,"A",3,[{pieces:2,value:5},{pieces:3,value:null}]);
 assert.equal(tierStudy.base.total,30);assert.equal(tierStudy.rows[1].loss,4);assert.equal(tierStudy.rows[1].net,1);assert.equal(tierStudy.rows[2].net,null);assert.equal(tierStudy.firstWin,2);
 assert.equal(tierLogic.catalogExactSet(tierPools,"A",4),null);
-const setScreen=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSetPlans,catalogSetTierComparison,catalogSetShortlist};")();
+const setScreen=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSetPlans,catalogSetTierComparison,catalogSetShortlist,catalogDualSetShortlist};")();
 const screenPools=new Map([["頭部",[tierItem(21,"A",12),tierItem(22,"",10),tierItem(23,"B",7)]],["肩部",[tierItem(24,"",10),tierItem(25,"B",9),tierItem(26,"A",8)]]]);
 const exactPlans=setScreen.catalogExactSetPlans(screenPools,"A",2);
 const sparseSetPools=new Map([["頭部",[{item:{id:900,item_set:"A"},score:{total:12}},{item:{id:901},score:{total:10}}]],["肩部",[{item:{id:902,item_set:"A"},score:{total:8}},{item:{id:903},score:{total:10}}]],["飾品",[{item:{id:904,item_set:"A"},score:{total:100}}]]]);
@@ -780,6 +789,12 @@ const scans=setScreen.catalogSetShortlist(screenPools,effects,scanBase);
 assert.deepEqual(scans.map(x=>[x.name,x.count,x.required]),[["A",2,2],["B",2,6]]);
 assert.equal(setScreen.catalogSetShortlist(screenPools,[effects[0],effects[0]],scanBase).length,0);
 assert.equal(setScreen.catalogSetShortlist(screenPools,effects,scanBase.slice(0,1)).length,0);
+const pairPools=new Map([["頭部",[tierItem(51,"A",8),tierItem(52,"",10)]],["肩部",[tierItem(53,"A",8),tierItem(54,"",10)]],["胸部",[tierItem(55,"B",9),tierItem(56,"",10)]],["手腕",[tierItem(57,"B",9),tierItem(58,"",10)]]]);
+const pairBase=[...pairPools].map(([slot,rows])=>({...rows[1],slot}));
+const dualScan=setScreen.catalogDualSetShortlist(pairPools,effects,pairBase);
+assert.equal(dualScan.available,2);assert.equal(dualScan.tested,1);assert.equal(dualScan.rows.length,1);assert.equal(dualScan.rows[0].required,6);
+assert.deepEqual(dualScan.rows[0].counts,[2,2]);
+assert.equal(setScreen.catalogDualSetShortlist(pairPools,effects,pairBase,1).rows.length,0);
 console.log("PASS: exact-count set plans, known inactive vs unknown bonuses and all-set panel-loss screening");
 
 const nativeTier={cases:[{pieces:0,duration:60,metrics:{dps:100,tps:100,dtps:20,death:0}},{pieces:2,duration:60,metrics:{dps:110,tps:110,dtps:30,death:0}},{pieces:4,duration:60,metrics:{dps:120,tps:120,dtps:19,death:0}},{pieces:6,duration:180,metrics:{dps:999,tps:999,dtps:0,death:0}}]};
