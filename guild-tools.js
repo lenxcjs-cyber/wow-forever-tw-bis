@@ -1117,8 +1117,17 @@ function combatBestPriority(raw,metric){
  let best=null,count=0;function visit(prefix,left){if(!left.length){const r=simulatePriority({...raw,skills:prefix});count++;if(!best||r.totals[metric]>best.result.totals[metric]+1e-8)best={order:prefix.map(x=>x.name),result:r};return;}for(let i=0;i<left.length;i++)visit([...prefix,left[i]],left.filter((_,j)=>i!==j));}
  visit([],raw.skills);return {...best,count,metric};
 }
+const combatPresetCommit="3b9c125a9b1387cd53ce2bb12969e0c6b54b813e";
+function combatPresetCases(data,id){
+ if(data?.format!==1||data.release!=="v1.0.12"||data.commit!==combatPresetCommit||!Array.isArray(data.cases))return [];
+ return data.cases.filter(x=>x.spec===id&&typeof x.label==="string"&&Number.isFinite(x.dps)&&x.dps>=0&&Number.isFinite(x.duration)&&x.duration>0&&Number.isInteger(x.iterations)&&x.iterations>0&&Array.isArray(x.timeline)&&x.timeline.length>0&&[x.settings,x.apl].every(p=>typeof p==="string"&&/^ui\/specs\/[a-z_0-9/.-]+\.siml$/.test(p)&&!p.includes("..")));
+}
+function combatTimelineText(timeline){
+ return (Array.isArray(timeline)?timeline:[]).filter(e=>e&&Number.isFinite(e.timeMs)&&typeof e.label==="string").slice(0,1000).map(e=>(e.timeMs/1000).toFixed(3)+"s ｜ "+e.label).join("\n");
+}
 function combatResult(raw){
- if(!raw||raw.error?.message||raw.error?.type==="ErrorOutcomeAborted"||!Number.isInteger(raw.iterationsDone)||raw.iterationsDone<1)throw Error("請提供成功完成的 WoWSims RaidSimResult JSON");
+ if(raw&&Number.isInteger(raw.iterations)&&raw.iterations>0&&Number.isFinite(raw.dps?.mean)&&raw.dps.mean>=0&&!raw.error){return {name:raw.character?.source||"SIML 模擬",iterations:raw.iterations,duration:Number.isFinite(raw.duration)&&raw.duration>0?raw.duration:null,dps:raw.dps.mean,tps:null,hps:null,dtps:null,death:null,logs:combatTimelineText(raw.timeline)};}
+ if(!raw||typeof raw.error==="string"&&raw.error||raw.error?.message||raw.error?.type==="ErrorOutcomeAborted"||!Number.isInteger(raw.iterationsDone)||raw.iterationsDone<1)throw Error("請提供成功完成的 WoWSims RaidSimResult 或 SIML sim JSON");
  const players=(raw.raidMetrics?.parties||[]).flatMap(p=>p.players||[]).filter(p=>p&&[p.dps,p.threat,p.hps,p.dtps].some(m=>Number.isFinite(m?.avg)));
  if(players.length!==1)throw Error("僅接受單一玩家的個人模擬結果，避免誤把團隊總值當個人值");
  const p=players[0],metric=k=>Number.isFinite(p[k]?.avg)?p[k].avg:null;
@@ -1131,9 +1140,24 @@ function combatLab(){
  const engine=box(panel,"完整戰鬥模擬（外部引擎）","目前參考 WoWSims 2026/11/27、客戶端 1.60.1.71139、原始碼 71311a4。外部網站會自行更新；開啟後請核對版本與構築。");
  if(url)engine.append(link("開啟對應職業模擬器",url));
  add(engine,link("WoWSims 開源引擎（MIT）","https://github.com/wowsims/forever"),node("p","請在引擎內設定裝備、天賦、種族、附魔、消耗品、團隊增益、敵人數、戰鬥時間及技能優先序（APL）。用相同遭遇與迭代條件比較方案；查看戰鬥紀錄／時間軸。本站尚未自動同步配裝或代跑外部引擎。","gt-muted"));
- const importBox=box(panel,"比較完整模擬結果","可貼上 WoWSims CLI 的 RaidSimResult JSON；結果來源與配置由使用者填寫，本站不替其驗證。");
+ const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
+ fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
+  if(!presets.isConnected)return;const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));
+  if(!cases.length){presets.append(node("p","目前此專精沒有已成功匯入的原生引擎案例；請使用上方引擎連結。","gt-muted"));return;}
+  add(presets,node("p","WoWSims v1.0.12 ｜ 固定種子 "+data.seed+" ｜ 上游預設裝備、天賦與技能策略，不代表本站目前構築或最佳 BiS。CLI 未自動加入網頁生成的藥水／魔法物品 APL 行。","gt-muted"));
+  for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));
+   if(x.tank&&Number.isFinite(x.tank.tps))add(c,node("p","另一次完整引擎坦克測試：TPS "+x.tank.tps.toFixed(2)+(Number.isFinite(x.tank.dtps)?" ｜ DTPS "+x.tank.dtps.toFixed(2):"")+(Number.isFinite(x.tank.death)?" ｜ 死亡機率 "+(x.tank.death*100).toFixed(1)+"%":"")));
+   add(c,link("裝備、天賦與設定來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.settings),link("技能優先序（APL）來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.apl));
+   const character=x.character||{};if(character.talents)add(c,node("p","天賦碼："+character.talents,"gt-muted"));if(character.race)add(c,node("p","種族："+character.race,"gt-muted"));
+   const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=combatTimelineText(x.timeline);add(d,node("summary","第一輪技能時間軸（最多400個事件）"),pre);c.append(d);
+   if(Array.isArray(x.spells)&&x.spells.length){const a=node("details"),p=node("pre");p.className="gt-combat-log";p.textContent=x.spells.filter(y=>Number.isFinite(y.dps)).map(y=>y.name+" ｜ DPS "+y.dps.toFixed(2)+(Number.isFinite(y.casts)?" ｜ 平均施放 "+y.casts.toFixed(2):"")).join("\n");add(a,node("summary","各技能傷害貢獻"),p);c.append(a);}
+   if(Array.isArray(character.warnings)&&character.warnings.length){const a=node("details"),p=node("pre");p.className="gt-combat-log";p.textContent=character.warnings.join("\n");add(a,node("summary","引擎限制與警告"),p);c.append(a);}
+  }
+  if(cases.length>1){const sorted=[...cases].sort((a,b)=>b.dps-a.dps);presets.append(node("p","已成功的上游預設中，"+sorted[0].label+" 的平均 DPS 較高；此為預設整套方案比較，並非只改單一因素或全域最佳。","gt-muted"));}
+ }).catch(()=>{if(presets.isConnected)presets.replaceChildren(node("h4","開源引擎實跑預設案例"),node("p","實跑快照未取得；不顯示估算數值。可使用上方引擎連結。","gt-muted"));});
+ const importBox=box(panel,"比較完整模擬結果","可貼上 WoWSims CLI 的 RaidSimResult 或 SIML sim JSON；結果來源與配置由使用者填寫，本站不替其驗證。");
  const resultInputs=[],labels=[],results=node("div"),msg=node("p","","gt-muted");
- for(const name of ["A","B"]){const label=inp("裝備／構築／遭遇與迭代條件"),area=node("textarea");area.rows=3;area.placeholder="貼上 RaidSimResult JSON "+name;area.setAttribute("aria-label","模擬結果 "+name);labels.push(label);resultInputs.push(area);add(importBox,field("方案 "+name+" 說明",label),area);}
+ for(const name of ["A","B"]){const label=inp("裝備／構築／遭遇與迭代條件"),area=node("textarea");area.rows=3;area.placeholder="貼上 RaidSimResult／SIML sim JSON "+name;area.setAttribute("aria-label","模擬結果 "+name);labels.push(label);resultInputs.push(area);add(importBox,field("方案 "+name+" 說明",label),area);}
  const compare=button("比較已完成的模擬",()=>{results.replaceChildren();try{const rows=resultInputs.map((v,i)=>v.value.trim()?{...combatResult(JSON.parse(v.value)),label:labels[i].value.trim()||"方案 "+["A","B"][i]}:null).filter(Boolean);if(!rows.length)throw Error("至少貼上一份結果");for(const r of rows){const b=box(results,r.label,r.iterations+" 次迭代"+(r.duration?" ｜ 平均 "+r.duration.toFixed(1)+" 秒":""));add(b,node("p",["DPS","TPS","HPS","DTPS"].map(k=>k+" "+(r[k.toLowerCase()]===null?"未提供":r[k.toLowerCase()].toFixed(2))).join(" ｜ ")));if(r.death!==null)add(b,node("p","死亡機率 "+(r.death*100).toFixed(1)+"%"));if(r.logs){const d=node("details"),pre=node("pre");pre.textContent=r.logs;pre.className="gt-combat-log";add(d,node("summary","原始戰鬥時間紀錄"),pre);b.append(d);}}if(rows.length===2){const a=rows[0],b=rows[1];add(results,node("p","B − A："+["dps","tps","hps","dtps"].filter(k=>a[k]!==null&&b[k]!==null).map(k=>k.toUpperCase()+" "+(b[k]-a[k]).toFixed(2)).join(" ｜ "),"gt-muted"));}msg.textContent="比較完成；不同遭遇、增益、迭代或生存條件的結果不可直接判為最佳。";}catch(e){msg.textContent="匯入失敗："+e.message;}});
  add(importBox,compare,msg,results);
  const local=box(panel,"自訂技能時間軸試算","使用自行填寫的每次平均傷害、仇恨、治療、冷卻及資源值；以技能清單由上到下作為優先序。無命中、爆擊、DoT、連擊點、普攻、觸發、承傷、仇恨轉移等遊戲模型。");
