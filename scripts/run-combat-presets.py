@@ -73,8 +73,8 @@ def finite(x): return type(x) in (float,int) and math.isfinite(x)
 def invoke(cli,root,args,payload=None):
     result=subprocess.run([str(cli),*args],cwd=root,input=payload,text=True,capture_output=True,timeout=45,check=True)
     data=json.loads(result.stdout)
-    if not isinstance(data,dict) or data.get("error"):
-        raise ValueError("Engine reported error: "+str(data.get("error"))[:500])
+    if not isinstance(data,dict):raise ValueError("Engine output must be a JSON object")
+    if data.get("error"):raise ValueError("Engine reported error: "+str(data.get("error"))[:500])
     return data
 def apl_result(data):
     if not finite(data.get("dps",{}).get("mean")) or data["dps"]["mean"]<0 or not finite(data.get("duration")) or data["duration"]<=0 or data.get("iterations")!=ITERATIONS:
@@ -358,6 +358,24 @@ def direct_metrics(result):
         metrics["death"]=p["chanceOfDeath"]
     return metrics,duration,str(result.get("logs") or "")[:80000]
 
+def native_target_damage(result,request):
+    """Mean received DPS per target, from engine encounter metrics.
+    A weakest target can take much longer than total HP / total DPS suggests.
+    These are stationary-target extrapolations, not kill times.
+    """
+    targets=result.get("encounterMetrics",{}).get("targets",[])
+    config=request.get("encounter",{}).get("targets",[])
+    if not isinstance(targets,list) or len(targets)!=len(config):return []
+    rows=[]
+    for i,(t,c) in enumerate(zip(targets,config)):
+        if not isinstance(t,dict) or not isinstance(c,dict):return []
+        d=t.get("dtps",{}).get("avg")
+        stats=c.get("stats",[])
+        hp=stats[29] if len(stats)>29 else None
+        if not finite(d) or d<0 or not finite(hp) or hp<=0:return []
+        rows.append({"index":i,"health":hp,"dps":d,"timeEstimate":hp/d if d>0 else None})
+    return rows
+
 def direct_action_rows(result):
     """Aggregate per-action totals across iterations, not average DPS.
     Keep pets distinct. Target-level cast counts may not equal unique casts.
@@ -436,7 +454,7 @@ def direct_case(cli,root,job,duration=None,output_dir=None,targets=None,scenario
     metrics,actual,logs=direct_metrics(result)
     if spec in TANKS and (not finite(metrics.get("tps")) or not finite(metrics.get("dtps")) or not request["raid"].get("tanks")):
         raise ValueError("Tank threat, incoming damage or assignment missing")
-    p=data["player"]
+    p=request["raid"]["parties"][0]["players"][0]
     nominal=request["encounter"].get("duration")
     variation=request["encounter"].get("durationVariation",0)
     sources=[]
@@ -449,7 +467,7 @@ def direct_case(cli,root,job,duration=None,output_dir=None,targets=None,scenario
     request_file=write_request_file(output_dir,spec,request) if output_dir is not None else None
     suffix=("／"+GUILD_SCENARIOS[scenario]["label"] if scenario else "")+("／"+str(duration)+"秒" if duration is not None else "")+("／"+str(targets)+"目標" if targets is not None else "")
     if scenario:config+=" 公會標準遭遇覆蓋原目標；零基礎護甲及抗性、固定時間、坦克正面／其他背面；坦克受擊為示意每2秒300（首領1000）基礎傷害。非擊殺模擬。"
-    return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"scenario":scenario,"targetHealth":GUILD_SCENARIOS[scenario]["health"] if scenario else None,"targetLevel":GUILD_SCENARIOS[scenario]["level"] if scenario else None,"inFrontOfTarget":request["raid"]["parties"][0]["players"][0].get("inFrontOfTarget"),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeActions":direct_action_rows(result),"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
+    return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"scenario":scenario,"targetHealth":GUILD_SCENARIOS[scenario]["health"] if scenario else None,"targetLevel":GUILD_SCENARIOS[scenario]["level"] if scenario else None,"inFrontOfTarget":request["raid"]["parties"][0]["players"][0].get("inFrontOfTarget"),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeTargets":native_target_damage(result,request) if scenario else [],"nativeActions":direct_action_rows(result),"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
 
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
