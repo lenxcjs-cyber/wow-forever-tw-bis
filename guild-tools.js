@@ -863,11 +863,12 @@ function nativeSetTrialView(parent,id){
   for(const t of trials){
    const d=node("details");d.append(node("summary",zhDisplay(t.setName||"未知套裝")+" ｜ "+(guildScenarios[t.scenario]?.label||t.scenario)));
    const result=nativeSetComparison(t,role);
-   add(d,node("p","引擎登錄件數："+(Array.isArray(t.thresholds)?t.thresholds.join("／"):"未知")+" ｜ 基準："+(t.baseLabel||"")+"。"+(t.epProfile?"散件依上游部分EP權重挑選；":"散件以接近物品等級選取；")+"同部位、同護甲類型；換裝位置的附魔均清除，非全目錄最優。","gt-muted"));
+   add(d,node("p","引擎登錄件數："+(Array.isArray(t.thresholds)?t.thresholds.join("／"):"未知")+" ｜ 基準："+(t.baseLabel||"")+"。"+(t.epProfile?"散件依上游部分EP權重挑選；":"散件以接近物品等級選取；")+(t.crossArmor?"同部位合法跨甲；":"同部位、同護甲類型；")+"換裝位置的附魔均清除，非全目錄最優。","gt-muted"));
+   if(t.requiredProfession)d.append(node("p","效果啟動需要專業："+zhDisplay(t.requiredProfession),"gt-muted"));
    if(t.epProfile){d.append(node("p","參考權重："+t.epProfile.label+" ｜ "+Object.entries(t.epProfile.catalogWeights||{}).map(([k,v])=>(catalogWeightFields[k]||k)+" "+v).join("、")+"；未納入："+(t.epProfile.omitted||[]).join("、"),"gt-muted"));}
    if(typeof t.source==="string"&&/^sim\/[a-zA-Z0-9_/.]+\.go$/.test(t.source)&&!t.source.includes(".."))d.append(link("套裝原生效果實作","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+t.source));
    if(Array.isArray(t.registeredThresholds)){const unplanned=t.registeredThresholds.filter(n=>Number.isInteger(n)&&!t.thresholds?.includes(n));if(unplanned.length)d.append(node("p","尚無合資格候選可測的登錄門檻："+unplanned.join("／")+" 件","gt-muted"));}
-   if(Array.isArray(t.items)&&t.items.length){const gear=node("details");gear.append(node("summary","實際套裝與散件替換部位"));for(const x of t.items.slice(0,14)){if(!x||!Number.isSafeInteger(x.setId)||x.setId<=0||!Number.isSafeInteger(x.scatterId)||x.scatterId<=0)continue;const line=node("p");add(line,node("span",(gearSlotNames[x.slot]||x.slot)+"："),link("套裝 "+x.setId,"https://www.wowhead.com/forever/tw/item="+x.setId),node("span"," ／ "),link("散裝 "+x.scatterId,"https://www.wowhead.com/forever/tw/item="+x.scatterId));if(Number.isFinite(x.setScore)&&Number.isFinite(x.scatterScore))line.append(node("span"," ｜ 部分EP "+x.setScore.toFixed(2)+"／"+x.scatterScore.toFixed(2)));gear.append(line);}d.append(gear);}
+   if(Array.isArray(t.items)&&t.items.length){const gear=node("details");gear.append(node("summary","實際套裝與散件替換部位"));for(const x of t.items.slice(0,14)){if(!x||!Number.isSafeInteger(x.setId)||x.setId<=0||!Number.isSafeInteger(x.scatterId)||x.scatterId<=0)continue;const line=node("p");add(line,node("span",(gearSlotNames[x.slot]||x.slot)+"："),link("套裝 "+x.setId,"https://www.wowhead.com/forever/tw/item="+x.setId),node("span"," ／ "),link("散裝 "+x.scatterId,"https://www.wowhead.com/forever/tw/item="+x.scatterId));if(x.setArmor&&x.scatterArmor&&x.setArmor!==x.scatterArmor)line.append(node("span"," ｜ "+gearType({subclass:x.setArmor})+"／"+gearType({subclass:x.scatterArmor})+"（跨甲對照）"));if(Number.isFinite(x.setScore)&&Number.isFinite(x.scatterScore))line.append(node("span"," ｜ 部分EP "+x.setScore.toFixed(2)+"／"+x.scatterScore.toFixed(2)));gear.append(line);}d.append(gear);}
    if(!result)d.append(node("p","0件基準尚未成功，不能判定勝負。","gt-muted"));
    else{
     const m=result.metric.toUpperCase();
@@ -1030,6 +1031,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
       const name=setSelect.value,max=sets.find(([n])=>n===name)?.[1]||0,match=effectRows.filter(r=>r.name===name||r.alternativeName===name);
       const thresholds=match.length===1?match[0].bonuses:[]; 
       add(tierFields,node("h4","套裝效果啟動門檻"),node("p",thresholds.length?"來自固定版本 WoWSims 已登錄套裝實作；不保證所有遊戲效果皆已支援。":"未取得唯一對應的引擎套裝門檻。可填寫已核對的件數收益，但不能當作正式 BiS。","gt-muted"));
+      if(match.length===1&&match[0].requiredProfession)tierFields.append(node("p","啟動專業要求："+zhDisplay(match[0].requiredProfession)+"；手動權重試算不驗證角色專業。","gt-muted"));
       if(match.length===1&&match[0].source)tierFields.append(link("引擎套裝實作","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+match[0].source));
       for(const row of thresholds.filter(x=>x.pieces<=max)){
        const input=inp("未知＝留空","number");input.step="0.01";tierInputs.push({pieces:row.pieces,input});input.addEventListener("input",drawTiers);add(tierFields,field(row.pieces+" 件額外收益（面板分）",input),node("p",row.effect||"引擎實作已登錄，效果數值待核","gt-muted"));
