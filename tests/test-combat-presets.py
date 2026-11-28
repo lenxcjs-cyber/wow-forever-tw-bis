@@ -120,6 +120,27 @@ class PresetTests(unittest.TestCase):
         changed_buff=mod.direct_request({**source,"raidBuffs":{"arcaneIntellect":False}})
         self.assertNotEqual(mod.direct_comparison_group(original),mod.direct_comparison_group(changed_buff))
 
+    def test_missing_encounter_fallback_and_failure_categories(self):
+        import json
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            path=root/"ui/specs/shaman/enhancement/builds/default.build.json"
+            path.parent.mkdir(parents=True)
+            encounter={"duration":180,"targets":[{"id":31146,"level":63}]}
+            path.write_text(json.dumps({"encounter":encounter}),encoding="utf-8")
+            settings={"player":{"rotation":{"type":"TypeAPL"}}}
+            self.assertTrue(mod.ensure_encounter(settings,root))
+            self.assertEqual(settings["encounter"],encounter)
+            self.assertFalse(mod.ensure_encounter(settings,root))
+            settings["encounter"]["targets"][0]["level"]=60
+            self.assertEqual(mod.common_encounter(root)["targets"][0]["level"],63)
+        self.assertEqual(mod.failure_kind(subprocess.TimeoutExpired("cli",45)),"timeout")
+        self.assertEqual(mod.failure_kind(FileNotFoundError()),"missing-source")
+        self.assertEqual(mod.failure_kind(subprocess.CalledProcessError(1,"cli")),"engine-exit")
+        self.assertEqual(mod.failure_kind(json.JSONDecodeError("bad","x",0)),"invalid-json")
+        self.assertEqual(mod.failure_kind(ValueError()),"validation")
+
     def test_native_action_aggregation(self):
         result={"iterationsDone":10,"raidMetrics":{"parties":[{"players":[{"dps":{"avg":100},"actions":[
             {"id":{"spellId":123,"rank":2},"targets":[{"damage":200,"threat":300,"manualCasts":10},{"damage":400,"threat":100,"manualCasts":10}]},
