@@ -750,6 +750,38 @@ function catalogMultiSetAlternative(pools,requirements){
  const result=states.get(minima.join(","));
  return result?{...result,sets:names.map((name,i)=>({name,count:result.counts[i],minimum:minima[i]}))}:null;
 }
+function catalogExactSet(pools,name,count){
+ if(typeof name!=="string"||!name||!Number.isInteger(count)||count<0||count>14)return null;
+ let states=new Map([[0,{total:0,picks:[]}]]);
+ for(const [slot,capacity] of catalogArmorGroups){
+  const rows=pools.get(slot)||[],yes=rows.filter(p=>catalogSetName(p.item)===name),no=rows.filter(p=>catalogSetName(p.item)!==name&&p.score.total>0),next=new Map();
+  for(const [old,prev] of states)for(let n=0;n<=Math.min(count-old,capacity,yes.length);n++){
+   const picks=[...yes.slice(0,n),...no.slice(0,capacity-n)].map(p=>({...p,slot}));
+   const total=prev.total+picks.reduce((sum,p)=>sum+p.score.total,0),k=old+n;
+   if(!next.has(k)||total>next.get(k).total)next.set(k,{total,picks:[...prev.picks,...picks]});
+  }
+  states=next;
+ }
+ const r=states.get(count);return r?{count,...r}:null;
+}
+function catalogSetTierComparison(pools,name,max,bonuses=[]){
+ if(!Number.isInteger(max)||max<1||max>14||!Array.isArray(bonuses))return null;
+ const base=catalogExactSet(pools,name,0);if(!base)return null;
+ const rows=[];
+ for(let n=1;n<=max;n++){
+  const plan=catalogExactSet(pools,name,n);if(!plan)continue;
+  const active=bonuses.filter(b=>Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=n);
+  const complete=active.length>0&&active.every(b=>Number.isFinite(b.value));
+  const value=complete?active.reduce((sum,b)=>sum+b.value,0):null;
+  rows.push({...plan,loss:base.total-plan.total,active,bonus:value,net:value===null?null:plan.total+value-base.total});
+ }
+ return {base,rows,firstWin:rows.find(x=>x.net!==null&&x.net>1e-8)?.count??null};
+}
+let setEffectsPromise=null;
+function loadSetEffects(){
+ if(!setEffectsPromise)setEffectsPromise=fetch("set-effects.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("套裝資料未生成");return r.json();}).then(d=>d?.commit===combatPresetCommit&&Array.isArray(d.sets)?d.sets:[]).catch(()=>[]);
+ return setEffectsPromise;
+}
 function catalogSetTradeoff(base,alternative,netBonus=null){
  if(!Number.isFinite(base)||!Number.isFinite(alternative)||!Number.isFinite(base-alternative))return null;
  const gap=base-alternative;
@@ -850,7 +882,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
   if(![...Object.values(catalogWeightFields),...Object.values(catalogDpsKeys),"武器DPS"].some(k=>Number.isFinite(weights[k])&&weights[k]>0)){out.replaceChildren(node("p","尚無適用的已儲存面板權重，請先在配裝試算儲存本專精構築的權重。"),button("前往配裝試算",()=>show("v14")));return;}
   started=true;out.replaceChildren(node("p","正在讀取全來源裝備目錄…"));
   try{
-   const data=await loadGearCatalog();if(!d.isConnected)return;
+   const [data,effectRows]=await Promise.all([loadGearCatalog(),loadSetEffects()]);if(!d.isConnected)return;
    const quality=select([["0","不限品質"],["2","優良以上"],["3","精良以上"],["4","史詩以上"]]),effect=select([["all","保留特殊效果與套裝（不計效果）"],["plain","排除有特殊效果或套裝文字的物品"]]),sourceFilter=select([["all","所有已記載來源"],["no-rep","排除已標記聲望裝備"],["boe","只看已標記裝備綁定"]]),planWeapon=select([["follow","沿用上方武器配置"],["auto","比較所有合法配置"],["two","僅雙手武器"],["one","僅單手／副手"]]),rows=node("div");
    const omitted=[...catalogWeightCoverage(weights).filter(k=>!Object.values(catalogDpsKeys).includes(k)&&k!=="武器DPS"),...omittedFeralWeights(spec.id,model?.weights).map(k=>k+"（野性形態待驗證）")];out.replaceChildren(node("p","權重來源："+(model.source||"使用者設定")+"｜資料版本："+data.meta.client_build,"gt-muted"),node("p","未計入權重："+(omitted.join("、")||"無其他已設定欄位")+"；尚未計算命中門檻、套裝、特殊效果、陣營、職業以外限制及戰鬥環境。","gt-muted"),field("品質",quality),field("取得條件（依來源標記，非開放驗證）",sourceFilter),field("特殊效果範圍",effect),field("武器配置",planWeapon),rows);
    function draw(){
@@ -869,7 +901,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
     for(const {item:x,position,score} of [...(weapon.melee?.picks||[]),...weapon.extra])add(w,node("p",position+"｜"+score.total.toFixed(2)),link(zhItem(x)+"（"+gearType(x)+"）","https://www.wowhead.com/forever/tw/item="+x.id),node("p",score.parts.map(v=>v.label+" "+v.value+" × "+v.weight).join("；")||"無已計分屬性","gt-muted"),node("p",x.source_summary||"來源待查"));
     rows.append(w);
     const setPanel=node("section",undefined,"gt-card gt-catalog-set-plan"),baseline=plan.groups.flatMap(g=>g.picks.map(p=>({...p,slot:g.slot}))),setCounts=catalogSetCounts(baseline);
-    add(setPanel,node("h4","套裝件數與散件取捨"),node("p",setCounts.length?"目前防具方案："+setCounts.map(([n,c])=>zhDisplay(n)+" "+c+" 件").join("；"):"目前防具方案未包含已標記套裝。","gt-muted"),node("p","僅依客戶端套裝名稱辨識，名稱相同不保證套裝ID一致。可同時指定一至兩套裝的最低件數，搜尋符合條件的最高面板防具方案；套裝效果不自動計分。","gt-muted"));
+    add(setPanel,node("h4","套裝件數與散件取捨"),node("p",setCounts.length?"目前防具方案："+setCounts.map(([n,c])=>zhDisplay(n)+" "+c+" 件").join("；"):"目前防具方案未包含已標記套裝。","gt-muted"),node("p","僅依客戶端套裝名稱辨識，名稱相同不保證套裝ID一致。可同時指定一至兩套裝的最低件數，搜尋符合條件的最高面板防具方案；套裝效果須使用版本相符的啟動門檻與收益，下面另有逐件比較。","gt-muted"));
     const pools=catalogSetPools(spec,data.items,data.prof,weights,options),sets=catalogSetOptions(pools);
     const weaponPicks=[...(weapon.melee?.picks||[]),...weapon.extra],exportPlan=(armor,label,total)=>{
      const text=catalogPlanText({spec:spec.name||spec.id,build:buildFor(spec.id),version:data.meta.client_build,source:model.source,filter:quality.options[quality.selectedIndex]?.text+"；"+sourceFilter.options[sourceFilter.selectedIndex]?.text+"；"+effect.options[effect.selectedIndex]?.text+"；武器："+({two:"雙手",one:"單手／副手"}[options.weaponMode]||"所有合法配置"),label,total:total+weapon.total,omitted},[...armor,...weaponPicks].map(p=>({...p,name:zhItem(p.item)})));
@@ -879,9 +911,31 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
     const share=node("div",undefined,"gt-plan-export"),shareStatus=node("p","","gt-muted");
     add(rows,button("匯出目前整套面板方案",()=>exportPlan(baseline,"最高面板防具",plan.total)),share);
     if(sets.length){
-     const setSelect=select(sets.map(([n,c])=>[n,zhDisplay(n)+"（最多 "+c+" 件）"])),target=select([]),secondSet=select([]),secondTarget=select([]),detail=node("div"),bonus=inp("留空＝未知","number");bonus.step="0.01";
+     const setSelect=select(sets.map(([n,c])=>[n,zhDisplay(n)+"（最多 "+c+" 件）"])),target=select([]),secondSet=select([]),secondTarget=select([]),detail=node("div"),tiers=node("div"),tierFields=node("div"),bonus=inp("留空＝未知","number");bonus.step="0.01";
      function targets(){const count=sets.find(([n])=>n===setSelect.value)?.[1]||2;target.replaceChildren(...Array.from({length:count-1},(_,i)=>new Option((i+2)+" 件",String(i+2))));target.value=String(Math.min(4,count));const old=secondSet.value;secondSet.replaceChildren(new Option("不指定第二套",""),...sets.filter(([n])=>n!==setSelect.value).map(([n,c])=>new Option(zhDisplay(n)+"（最多 "+c+" 件）",n)));if([...secondSet.options].some(o=>o.value===old))secondSet.value=old;secondTargets();}
      function secondTargets(){const count=sets.find(([n])=>n===secondSet.value)?.[1]||0;secondTarget.replaceChildren(...Array.from({length:Math.max(0,count-1)},(_,i)=>new Option((i+2)+" 件",String(i+2))));secondTarget.disabled=!count;if(count)secondTarget.value="2";}
+     let tierInputs=[];
+     function drawTiers(){
+      tiers.replaceChildren();
+      const name=setSelect.value,max=sets.find(([n])=>n===name)?.[1]||0;
+      const bonuses=tierInputs.map(x=>({pieces:x.pieces,value:x.input.value.trim()===""?null:Number(x.input.value)}));
+      const study=catalogSetTierComparison(pools,name,max,bonuses);if(!study)return;
+      add(tiers,node("h4","指定套裝逐件損益（相對完全不穿此套裝）"),node("p","基準：0 件指定套裝，面板分 "+study.base.total.toFixed(2)+"。其他套裝與觸發未計入；表中收益為手動輸入的額外面板等價分數，不是 DPS。","gt-muted"));
+      for(const x of study.rows){const activated=x.active.map(b=>b.pieces+"件").join("＋")||"無已知門檻";const line=node("div",undefined,"gt-card");add(line,node("p",x.count+" 件 ｜ 啟動 "+activated+" ｜ 面板 "+x.total.toFixed(2)+" ｜ 相對0件 "+(-x.loss).toFixed(2)),node("p",x.net===null?"需額外淨收益超過 "+Math.max(0,x.loss).toFixed(2)+" 分；效果未核算。":"計入已填效果後差額 "+x.net.toFixed(2)+" 分"+(x.net>0?"（勝過0件）":"")));line.append(button("匯出 "+x.count+" 件方案",()=>exportPlan(x.picks,name+" "+x.count+" 件",x.total)));tiers.append(line);}
+      tiers.append(node("p",study.firstWin===null?"尚無已填收益證明哪個件數勝過0件。":"依已填收益，最少 "+study.firstWin+" 件勝過0件（仍需原生驗證）。","gt-muted"));
+      tiers.append(button("匯出0件對照組",()=>exportPlan(study.base.picks,name+" 0 件對照",study.base.total)));
+     }
+     function setupTiers(){
+      tierFields.replaceChildren();tierInputs=[];
+      const name=setSelect.value,max=sets.find(([n])=>n===name)?.[1]||0,match=effectRows.filter(r=>r.name===name||r.alternativeName===name);
+      const thresholds=match.length===1?match[0].bonuses:[]; 
+      add(tierFields,node("h4","套裝效果啟動門檻"),node("p",thresholds.length?"來自固定版本 WoWSims 已登錄套裝實作；不保證所有遊戲效果皆已支援。":"未取得唯一對應的引擎套裝門檻。可填寫已核對的件數收益，但不能當作正式 BiS。","gt-muted"));
+      if(match.length===1&&match[0].source)tierFields.append(link("引擎套裝實作","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+match[0].source));
+      for(const row of thresholds.filter(x=>x.pieces<=max)){
+       const input=inp("未知＝留空","number");input.step="0.01";tierInputs.push({pieces:row.pieces,input});input.addEventListener("input",drawTiers);add(tierFields,field(row.pieces+" 件額外收益（面板分）",input),node("p",row.effect||"引擎實作已登錄，效果數值待核","gt-muted"));
+      }
+      drawTiers();
+     }
      function compare(){
       const requirements=[{name:setSelect.value,minimum:Number(target.value)},...(secondSet.value?[{name:secondSet.value,minimum:Number(secondTarget.value)}]:[])],result=catalogMultiSetAlternative(pools,requirements);detail.replaceChildren();
       if(!result){detail.append(node("p","未找到符合件數要求的方案。"));return;}
@@ -893,7 +947,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
       for(const p of baseline.filter(p=>!newIds.has(String(p.item.id))))detail.append(node("p","移除 "+p.slot+"｜"+zhItem(p.item)+"｜"+p.score.total.toFixed(2),"gt-muted"));
       if(result.picks.every(p=>baseIds.has(String(p.item.id)))&&baseline.every(p=>newIds.has(String(p.item.id))))detail.append(node("p","原方案已符合指定套裝件數。"));
      }
-     setSelect.addEventListener("change",()=>{bonus.value="";targets();compare();});target.addEventListener("change",()=>{bonus.value="";compare();});secondSet.addEventListener("change",()=>{bonus.value="";secondTargets();compare();});secondTarget.addEventListener("change",()=>{bonus.value="";compare();});bonus.addEventListener("input",compare);add(setPanel,field("指定防具套裝",setSelect),field("最低套裝件數",target),field("第二套裝（選填）",secondSet),field("第二套裝最低件數",secondTarget),field("額外效果淨收益（與原方案相同面板分數單位，可負值）",bonus),detail);targets();compare();
+     setSelect.addEventListener("change",()=>{bonus.value="";targets();compare();setupTiers();});target.addEventListener("change",()=>{bonus.value="";compare();});secondSet.addEventListener("change",()=>{bonus.value="";secondTargets();compare();});secondTarget.addEventListener("change",()=>{bonus.value="";compare();});bonus.addEventListener("input",compare);add(setPanel,field("指定防具套裝",setSelect),field("最低套裝件數",target),field("第二套裝（選填）",secondSet),field("第二套裝最低件數",secondTarget),field("額外效果淨收益（與原方案相同面板分數單位，可負值）",bonus),detail,tierFields,tiers);targets();compare();setupTiers();
     }else setPanel.append(node("p","此篩選條件下沒有至少兩件的已標記套裝候選。","gt-muted"));
     rows.append(setPanel);
    }
