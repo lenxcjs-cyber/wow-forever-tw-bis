@@ -1,13 +1,16 @@
 {
   "format": 1,
   "reviewed": "2026-11-28",
-  "scope": "滿等 PvE 核心技能與常用輔助；本站原創操作建議，尚非完整技能書、逐構築實測或官方翻譯。需天賦的技能以實際習得為準。",
+  "scope": "滿等 PvE 核心技能與常用輔助；本站原創操作建議，尚非完整技能書、逐構築實測或官方翻譯。需天賦的技能以實際習得為準。 技能取得分類參考 The Forever Era 的 1.60.1.71091 技能書，可能落後本站客戶端版本，仍以遊戲內為準。",
   "sources": [
     "https://foreverdb.net/classes",
     "https://www.method.gg/wow-forever/class-guides",
     "https://www.icy-veins.com/wow-forever/class-guides",
     "https://mobalytics.gg/wow-forever/classes/feral-druid-guide",
-    "https://mobalytics.gg/wow-forever/classes/feral-druid-tank-guide"
+    "https://mobalytics.gg/wow-forever/classes/feral-druid-tank-guide",
+    "https://theforeverera.com/en/spells/",
+    "https://www.method.gg/wow-forever/class-guides/feral-dps-druid/rotation-and-playstyle",
+    "https://www.wowhead.com/forever/guide/classes/druid/feral/rotation-cooldowns-pve-dps"
   ],
   "specs": {
     "spec-1": {
@@ -92,6 +95,12 @@
           "Recklessness",
           "爆發",
           "配合可持續攻擊的階段；避免危險承傷時開。"
+        ],
+        [
+          "穿刺打擊（參考譯名）",
+          "Spearing Strike",
+          "情境",
+          "僅在選用對應天賦及符合技能武器條件時使用；不把此技能當作所有狂怒構築的固定按鍵。"
         ]
       ],
       "class": "warrior"
@@ -202,7 +211,7 @@
           "憤怒聖印（參考譯名）",
           "Seal of Fury",
           "核心",
-          "若已點出，依仇恨需要維持，搭配對應審判。"
+          "已習得後依仇恨需求維持，搭配審判；留意法力及其他聖印的取捨。"
         ],
         [
           "神聖之盾",
@@ -233,6 +242,12 @@
           "Templar's Bulwark",
           "減傷",
           "已點出才使用，留給承傷高峰。"
+        ],
+        [
+          "正義之錘",
+          "Hammer of the Righteous",
+          "多目標",
+          "已習得且符合武器條件時，用於聚集敵人的仇恨；不要打破隊友控場。"
         ]
       ],
       "class": "paladin"
@@ -268,7 +283,7 @@
         [
           "聖印切換",
           "Unsealed Wrath",
-          "連動",
+          "被動連動",
           "僅在已點出且理解觸發窗口時練習；不把經典服換印秒數直接套用。"
         ],
         [
@@ -276,6 +291,12 @@
           "Exorcism",
           "情境",
           "目標符合當版施放條件時使用；不假設所有敵人皆適用。"
+        ],
+        [
+          "神聖震擊",
+          "Holy Shock",
+          "情境",
+          "混合構築已點出才使用；依戰鬥需要選擇攻擊或救援，留意法力。"
         ]
       ],
       "class": "paladin"
@@ -392,7 +413,7 @@
           "割裂（參考譯名）",
           "Lacerate",
           "持續",
-          "需對應天賦，長命目標才考慮維持。"
+          "已習得後，長命且可流血的近戰目標才考慮維持；並非一定要點天賦才能取得。"
         ],
         [
           "自動射擊",
@@ -884,6 +905,12 @@
           "Flamestrike",
           "多目標",
           "怪群停留且坦克建立仇恨後才使用。"
+        ],
+        [
+          "霜火箭",
+          "Frostfire Bolt",
+          "情境",
+          "冰火混合構築依相關天賦、抗性與施法窗口評估；不強制取代所有火球術。"
         ]
       ],
       "class": "mage"
@@ -970,6 +997,12 @@
           "Life Tap",
           "回魔",
           "選安全時機以生命換法力，避免承傷高峰。"
+        ],
+        [
+          "暗影箭",
+          "Shadow Bolt",
+          "填充",
+          "未習得 Wrack 或五人副本暗影箭流，可用於持續傷害與團隊減益不需補充的窗口。"
         ]
       ],
       "class": "warlock"
@@ -1111,7 +1144,7 @@
     },
     "spec-26": {
       "title": "野性貓",
-      "priority": "維持貓形態，依能量、連擊點與流血剩餘時間決定下一步，不固定背按鍵順序。 11/27 攻略指出撕碎及爪擊會受武器傷害影響；貓形態揮擊速度與原武器不同，勿套用一般近戰攻速模型。",
+      "priority": "維持貓形態，依能量、連擊點與流血剩餘時間決定下一步，不固定背按鍵順序。 11/27 攻略指出撕碎及爪擊會受武器傷害影響；貓形態揮擊速度與原武器不同，勿套用一般近戰攻速模型。 單體先顧流血覆蓋與能量，清晰預兆觸發時利用免費攻擊；多目標優先維持集火目標的撕扯，再對其他長命可流血敵人補掃擊。",
       "skills": [
         [
           "撕碎",
@@ -1160,6 +1193,12 @@
           "Prowl",
           "起手",
           "需要接近目標或使用潛行起手才啟動。"
+        ],
+        [
+          "能量轉換（參考譯名）",
+          "Shifting Power",
+          "回能",
+          "已點出時，以法力換取能量；在能量有足夠空間且冷卻完成時使用，避免回能溢出。先預留刷新流血的資源。"
         ]
       ],
       "class": "druid"
@@ -1294,6 +1333,12 @@
         "Disarm",
         "控制",
         "敵人持武器且可繳械時降低威脅。"
+      ],
+      [
+        "乘勝追擊",
+        "Victory Rush",
+        "觸發",
+        "符合擊殺後觸發條件時使用，短命小怪間留意技能提示。"
       ]
     ],
     "paladin": [
@@ -1430,6 +1475,12 @@
         "Totemic Recall",
         "回魔",
         "戰鬥結束或轉移位置時回收不再需要的圖騰。"
+      ],
+      [
+        "火焰新星",
+        "Fire Nova",
+        "多目標",
+        "在適用火焰圖騰與怪群位置條件下使用；避免打破控場。"
       ]
     ],
     "mage": [
@@ -1514,7 +1565,75 @@
         "Innervate",
         "回魔",
         "根據隊伍法力需求與冷卻分配；注意形態及安全。"
+      ],
+      [
+        "復活（參考譯名）",
+        "Revive",
+        "救援",
+        "戰鬥結束後復活隊友；戰鬥中依復生及團隊規則處理。"
+      ],
+      [
+        "消毒術",
+        "Abolish Poison",
+        "驅散",
+        "持續有可解除毒素時依技能效果使用；留意形態與團隊分工。"
       ]
     ]
+  },
+  "unlocks": {
+    "warrior": {
+      "Spearing Strike": "talent",
+      "Reckless Swings": "talent",
+      "Victory Rush": "trainer"
+    },
+    "hunter": {
+      "Lacerate": "trainer",
+      "Summon Hawk": "talent",
+      "Strider Kick": "talent",
+      "Sniper Shot": "talent"
+    },
+    "mage": {
+      "Arcane Blast": "talent",
+      "Ice Lance": "talent",
+      "Arcane Wrath": "talent",
+      "Frostfire Bolt": "trainer"
+    },
+    "rogue": {
+      "Shank": "trainer",
+      "Death Mark": "talent",
+      "Mutilate": "talent"
+    },
+    "priest": {
+      "Penance": "talent",
+      "Prayer of Mending": "talent",
+      "Shadow Word: Death": "trainer"
+    },
+    "warlock": {
+      "Wrack": "talent",
+      "Incinerate": "talent",
+      "Bane of Havoc": "talent"
+    },
+    "paladin": {
+      "Holy Strike": "trainer",
+      "Seal of Fury": "trainer",
+      "Hammer of the Righteous": "trainer",
+      "Templar's Bulwark": "talent",
+      "Light's Vigil": "talent",
+      "Unsealed Wrath": "passive"
+    },
+    "druid": {
+      "Revive": "trainer",
+      "Lacerate": "talent",
+      "Primal Bite": "talent",
+      "Shifting Power": "talent",
+      "Wild Growth": "talent"
+    },
+    "shaman": {
+      "Fire Nova": "trainer",
+      "Call of the Elements": "trainer",
+      "Totemic Recall": "trainer",
+      "Rage of the Farseer": "talent",
+      "Riptide": "talent"
+    }
   }
 }
