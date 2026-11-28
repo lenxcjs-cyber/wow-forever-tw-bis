@@ -1319,6 +1319,28 @@ function combatApplyEquipment(request,equipment,id,keepMatching=true){
  })};
  return copy;
 }
+function combatNativeActions(rows,metric="damage"){
+ if(!["damage","threat","healing","shielding"].includes(metric)||!Array.isArray(rows))return [];
+ return rows.filter(x=>x&&typeof x.owner==="string"&&["spellId","itemId","otherId"].includes(x.kind)&&(x.kind==="otherId"?typeof x.id==="string"||Number.isSafeInteger(x.id):Number.isSafeInteger(x.id)&&x.id>0)&&Number.isFinite(x[metric])&&x[metric]>0).sort((a,b)=>b[metric]-a[metric]).slice(0,80);
+}
+function combatNativeActionView(parent,rows,id){
+ if(!Array.isArray(rows)||!rows.length)return;
+ const d=node("details"),role=combatRole(id),metric=select([["damage","傷害"],["threat","仇恨"],["healing","治療"],["shielding","護盾吸收"]]),out=node("div");
+ metric.value=role==="tank"?"threat":role==="heal"?"healing":"damage";
+ function draw(){
+  out.replaceChildren();
+  const valid=combatNativeActions(rows,metric.value);
+  if(!valid.length){out.append(node("p","未取得此類技能貢獻資料。","gt-muted"));return;}
+  for(const x of valid){
+   const name=(x.kind==="spellId"?"技能":x.kind==="itemId"?"物品":"其他動作")+" "+x.id+(x.rank?"（等級 "+x.rank+"）":"")+(x.tag?"［"+x.tag+"］":"");
+   const row=node("p");row.append(node("span",x.owner+" ｜ "));
+   if(x.kind==="spellId"||x.kind==="itemId")row.append(link(name,"https://www.wowhead.com/forever/tw/"+(x.kind==="spellId"?"spell=":"item=")+x.id));else row.append(node("span",name));
+   row.append(node("span"," ｜ "+x[metric.value].toFixed(2)+(Number.isFinite(x.manualCasts)?" ｜ 平均手動施放目標事件 "+x.manualCasts.toFixed(2):"")+(x.passive?" ｜ 被動":"")));
+   out.append(row);
+  }
+ }
+ metric.addEventListener("change",draw);add(d,node("summary","原生技能貢獻（每場平均總量）"),field("貢獻指標",metric),node("p","依目標動作統計加總並除以迭代數；寵物獨立列出。多目標事件數不等於獨立施法次數，前80列不一定涵蓋所有傷害或仇恨。","gt-muted"),out);parent.append(d);draw();
+}
 function combatRequestPath(path,id){
  if(typeof path!=="string"||!combatEngineURL(id))return null;
  return /^combat-requests\/spec-(?:[1-9]|1[0-9]|2[0-8])-[a-f0-9]{16}\.json$/.test(path)&&path.startsWith("combat-requests/"+id+"-")?path:null;
@@ -1366,7 +1388,7 @@ function combatGearView(parent,id,build){
  }
  function save(){try{const gear=current();stored={mode:mode.value,slots:Object.fromEntries(all().map(x=>[x.name,x.id]))};localStorage.setItem(key,JSON.stringify(stored));msg.textContent="已儲存本專精／構築的 "+gear.items.filter(x=>x.id).length+" 件選擇。";}catch(e){msg.textContent="儲存失敗："+e.message;}}
  const details=node("details"),keep=node("input");keep.type="checkbox";keep.checked=true;
- add(details,node("summary","選擇配裝與匯出（17 格）"),field("武器配置",mode),button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows)selected.get(x.name).value=x.featured?String(x.featured.id):"";refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。未在本站執行引擎。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=combatApplyEquipment(combatReadJSON(request.value),current(),id,keep.checked);combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
+ add(details,node("summary","選擇配裝與匯出（17 格）"),field("武器配置",mode),button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows)selected.get(x.name).value=x.featured?String(x.featured.id):"";refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；未選欄位會清空原請求對應裝備。同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。未在本站執行引擎。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=combatApplyEquipment(combatReadJSON(request.value),current(),id,keep.checked);combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
  mode.addEventListener("change",draw);c.append(details);draw();
  return async path=>{
   const valid=combatRequestPath(path,id);if(!valid)throw Error("請求檔案路徑不合法");
@@ -1388,7 +1410,7 @@ function combatLab(){
  const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
  fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
   if(!presets.isConnected)return;const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));combatCoverageView(presets,data);
-  if(Number.isInteger(data.planned)&&data.planned>=data.cases.length)presets.append(node("p","本次快照：全站 "+data.cases.length+" / "+data.planned+" 個計畫案例已成功產出；未成功的案例不顯示假數值。","gt-muted"));
+  if(Number.isInteger(data.planned)&&Array.isArray(data.cases)&&data.planned>=data.cases.length){const failures=Array.isArray(data.failed)?data.failed.length:0;presets.append(node("p","本次快照：全站 "+data.cases.length+" / "+data.planned+" 個計畫案例已成功產出；失敗 "+failures+" 個；尚未執行或未記錄 "+Math.max(0,data.planned-data.cases.length-failures)+" 個。","gt-muted"));}
   if(Array.isArray(data.failed)){const failed=data.failed.filter(x=>x?.spec===id&&typeof x.label==="string");if(failed.length)presets.append(node("p","此專精未產出案例："+failed.map(x=>x.label).join("、"),"gt-muted"));}
   if(!cases.length){const pending=Array.isArray(data.healerPending)?data.healerPending.find(x=>x?.spec===id):null;presets.append(node("p",pending?.reason||"目前此專精沒有已成功匯入的原生引擎案例；請使用上方引擎連結。","gt-muted"));if(pending&&typeof pending.source==="string"&&/^ui\/specs\/[a-z/]+\/presets\.ts$/.test(pending.source))presets.append(link("上游治療專精原始設定","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+pending.source));return;}
   add(presets,node("p","WoWSims v1.0.12 ｜ 固定種子 "+data.seed+" ｜ 上游預設或本站明示的控制變因案例，不代表本站目前構築或最佳 BiS。CLI 未自動加入網頁生成的藥水／魔法物品 APL 行。","gt-muted"));
@@ -1425,6 +1447,7 @@ function combatLab(){
     for(const src of x.sources.slice(0,16)){if(typeof src?.path!=="string"||typeof src?.text!=="string")continue;const part=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=src.text.slice(0,24000);add(part,node("summary",src.path),pre);d.append(part);}
     d.append(node("p","設定語法保留原文以便重現；若來源有截斷或缺少檔案，請查閱上游及本站控制變因程式。","gt-muted"));c.append(d);
    }
+   combatNativeActionView(c,x.nativeActions,id);
    if(Array.isArray(x.spells)&&x.spells.length){const a=node("details"),p=node("pre");p.className="gt-combat-log";p.textContent=x.spells.filter(y=>Number.isFinite(y.dps)).map(y=>y.name+" ｜ DPS "+y.dps.toFixed(2)+(Number.isFinite(y.casts)?" ｜ 平均施放 "+y.casts.toFixed(2):"")).join("\n");add(a,node("summary","各技能傷害貢獻"),p);c.append(a);}
    if(Array.isArray(character.warnings)&&character.warnings.length){const a=node("details"),p=node("pre");p.className="gt-combat-log";p.textContent=character.warnings.join("\n");add(a,node("summary","引擎限制與警告"),p);c.append(a);}
   }
