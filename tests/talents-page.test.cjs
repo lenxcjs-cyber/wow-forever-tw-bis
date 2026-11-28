@@ -72,9 +72,17 @@ for(const p of catalog.profiles){
  assert.equal(new Set(g.skills.map(row=>row[1])).size,g.skills.length,p.id+" duplicate core skills");
 }
 for(const g of Object.values(skills.specs))coreCount+=g.skills.length;
-assert.equal(coreCount,177);
-assert.equal(Object.values(skills.common).flat().length,38);
-console.log("PASS: 28 spec skill guides, 177 core entries, 38 class utility entries, every build mapped");
+assert.equal(coreCount,183);
+assert.equal(Object.values(skills.common).flat().length,42);
+console.log("PASS: 28 spec skill guides, 183 core entries, 42 class utility entries, every build mapped");
 
 assert.ok(!skills.specs["spec-26"].skills.some(x=>x[1]==="Primal Bite"));
 assert.ok(skills.specs["spec-27"].skills.some(x=>x[1]==="Primal Bite"));
+
+assert.equal(skills.unlocks.hunter.Lacerate,"trainer");
+assert.equal(skills.unlocks.druid.Lacerate,"talent");
+assert.equal(skills.unlocks.paladin["Unsealed Wrath"],"passive");
+assert.equal(skills.unlocks.druid["Shifting Power"],"talent");
+assert.ok(skills.specs["spec-26"].skills.some(row=>row[1]==="Shifting Power"));
+for(const [cls,rows] of Object.entries(skills.unlocks)){assert.ok(classTokens.includes(cls));for(const type of Object.values(rows))assert.ok(["trainer","talent","passive"].includes(type));}
+console.log("PASS: class-specific skill acquisition, passive distinction and Shifting Power");
