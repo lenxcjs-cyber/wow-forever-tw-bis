@@ -1,5 +1,7 @@
 """Run a bounded subset of upstream WoWSims presets; never invent missing values."""
 import copy, hashlib, json, math, re, subprocess, sys, tempfile, time
+from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 RELEASE="v1.0.12"
@@ -77,10 +79,13 @@ def tank_result(cli,root,settings_file):
         path=Path(tmp)/"request.json";path.write_text(json.dumps(request),encoding="utf-8")
         result=invoke(cli,root,["sim","--infile",str(path)])
     players=[p for party in result.get("raidMetrics",{}).get("parties",[]) for p in party.get("players",[]) if finite(p.get("threat",{}).get("avg"))]
-    if len(players)!=1 or result.get("iterationsDone")!=ITERATIONS:
-        raise ValueError("Incomplete tank result")
+    if len(players)!=1 or result.get("iterationsDone")!=ITERATIONS or not raid["tanks"]:
+        raise ValueError("Incomplete tank result or no tank assignment")
     p=players[0]
-    return {k:p[field]["avg"] for k,field in (("dps","dps"),("tps","threat"),("dtps","dtps"),("hps","hps")) if finite(p.get(field,{}).get("avg"))}|{"iterations":ITERATIONS,"death":p.get("chanceOfDeath"),"logs":str(result.get("logs") or "")[:80000]}
+    if not finite(p.get("dtps",{}).get("avg")) or p["dtps"]["avg"]<0 or p["threat"]["avg"]<0:
+        raise ValueError("Missing or invalid tank threat/incoming damage")
+    death=p.get("chanceOfDeath")
+    return {k:p[field]["avg"] for k,field in (("dps","dps"),("tps","threat"),("dtps","dtps"),("hps","hps")) if finite(p.get(field,{}).get("avg")) and p[field]["avg"]>=0}|{"iterations":ITERATIONS,"death":death if finite(death) and 0<=death<=1 else None,"logs":str(result.get("logs") or "")[:80000]}
 def feral_setups(root):
     # The upstream cat/bear defaults are TypeScript, not complete SIML setups.
     # Rebuild explicit controlled, no-consumable/no-item-swap cases using the upstream
@@ -227,22 +232,42 @@ def direct_jobs():
 def common_encounter(root):
     return copy.deepcopy(read_json(root,"ui/specs/shaman/enhancement/builds/default.build.json")["encounter"])
 
+def ensure_encounter(data,root):
+    encounter=data.get("encounter")
+    if isinstance(encounter,dict) and encounter.get("targets"):
+        return False
+    data["encounter"]=common_encounter(root)
+    return True
+
+def failure_kind(error):
+    if isinstance(error,subprocess.TimeoutExpired):
+        return "timeout"
+    if isinstance(error,FileNotFoundError):
+        return "missing-source"
+    if isinstance(error,subprocess.CalledProcessError):
+        return "engine-exit"
+    if isinstance(error,json.JSONDecodeError):
+        return "invalid-json"
+    if isinstance(error,(ValueError,KeyError,TypeError)):
+        return "validation"
+    return "io"
+
 def direct_settings(root,cli,job):
     spec,label,kind,path,row=job
     if kind=="json":
         data=read_json(root,path)
-        fallback=not bool(data.get("encounter"))
-        if fallback:
-            data["encounter"]=common_encounter(root)
+        fallback=ensure_encounter(data,root)
         return data,path,path,[path],"上游完整 JSON 構築。"+("原始檔無遭遇；本站使用增強薩預設63級單體遭遇。" if fallback else "保留原始遭遇。")
     if kind=="siml":
         if path.startswith("__LOCAL__:"):
             actual=path.split(":",1)[1]
             source,apl,config=row
             data=invoke(cli,root,["siml","parse","-json",actual])
-            return data,source,apl,[actual,apl],re.sub(r"\d+±\d+秒","原始戰鬥",config)+" 使用相同完整 SIML 設定，僅調整遭遇時間。"
+            fallback=ensure_encounter(data,root)
+            return data,source,apl,[actual,apl],re.sub(r"\d+±\d+秒","原始戰鬥",config)+" 使用解析後 SIML 設定；調整名義時間或目標數。"+("原始構築未附目標，使用增強薩預設63級單體遭遇。" if fallback else "")
         data=invoke(cli,root,["siml","parse","-json",path])
-        return data,path,path,[path],"上游完整 SIML 構築，保留原始遭遇與 APL。"
+        fallback=ensure_encounter(data,root)
+        return data,path,path,[path],"上游 SIML 構築，保留原始 APL。"+("原始構築未附目標，使用增強薩預設63級單體遭遇。" if fallback else "保留原始遭遇。")
     _,_,folder,gear,apl,talents,field=row
     base="ui/specs/"+folder
     gear_path=base+"/gear_sets/"+gear+".gear.json"
@@ -428,10 +453,12 @@ def main(cli,root,output):
         seen.add(entry[0])
     all_base=first_direct+[(spec,label,"siml","__LOCAL__:"+settings,(source,apl,configuration)) for spec,label,settings,apl,source,configuration in siml_first]
     scenario_grid=[(job,60,None) for job in all_base]+[(job,60,3) for job in all_base]+[(job,30,None) for job in all_base]+[(job,120,None) for job in all_base]
-    planned=len(cases_to_run)+len(feral_extra)+len(first_direct)+len(extra_direct)+len(scenario_grid)
+    planned_by_spec=Counter([x[0] for x in cases_to_run+feral_extra+first_direct+extra_direct]+[job[0] for job,_,_ in scenario_grid])
+    planned=sum(planned_by_spec.values())
     start=time.monotonic()
-    def publish():
-        payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":planned,"failed":failed,"healerPending":[{"spec":spec,"source":"ui/specs/"+folder+"/presets.ts","reason":"尚缺可驗證的治療遭遇、完整技能策略及有效治療基準；不以 DPS 代替 HPS。"} for spec,folder in HEALERS.items()],"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
+    started_at=datetime.now(timezone.utc).isoformat()
+    def publish(complete=False):
+        payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":planned,"plannedBySpec":dict(planned_by_spec),"failed":failed,"finished":complete,"startedAt":started_at,"elapsedSeconds":round(time.monotonic()-start,1),"healerPending":[{"spec":spec,"source":"ui/specs/"+folder+"/presets.ts","reason":"尚缺可驗證的治療遭遇、完整技能策略及有效治療基準；不以 DPS 代替 HPS。"} for spec,folder in HEALERS.items()],"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
         temp=output.with_suffix(output.suffix+".tmp")
         temp.write_text(json.dumps(payload,ensure_ascii=False,allow_nan=False),encoding="utf-8")
         temp.replace(output)
@@ -444,7 +471,7 @@ def main(cli,root,output):
             print("Native raw preset:",spec,d["label"],flush=True)
         except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
             print("Native raw preset unavailable:",spec,str(e)[:300],flush=True)
-            failed.append({"spec":spec,"label":label+("／"+str(duration)+"秒" if duration else "")+("／"+str(targets)+"目標" if targets else "")})
+            failed.append({"spec":spec,"label":label+("／"+str(duration)+"秒" if duration else "")+("／"+str(targets)+"目標" if targets else ""),"reason":failure_kind(e)})
         publish()
     def run_siml_case(entry):
         spec,label,settings,apl,source,configuration=entry
@@ -460,7 +487,9 @@ def main(cli,root,output):
             # necessarily identical to the special SIML APL simulation above.
             try:
                 parsed=invoke(cli,root,["siml","parse","-json",settings])
+                fallback=ensure_encounter(parsed,root)
                 d["templateFile"]=write_request_file(output.parent,spec,direct_request(parsed))
+                if fallback:d["templateNote"]="原始構築未附目標；解析範本使用增強薩預設63級單體遭遇。"
             except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
                 print("Parsed settings template unavailable:",spec,str(e)[:200])
             # Reject invalid numeric payloads before adding them to the partial snapshot.
@@ -469,7 +498,7 @@ def main(cli,root,output):
             publish()
         except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
             print("Preset unavailable:",spec,str(e)[:400])
-            failed.append({"spec":spec,"label":label})
+            failed.append({"spec":spec,"label":label,"reason":failure_kind(e)})
             publish()
     # Publish even when no case has completed yet; failures remain visible.
     publish()
@@ -495,7 +524,7 @@ def main(cli,root,output):
     for entry in feral_extra:
         if time.monotonic()-start>1200:break
         run_siml_case(entry)
-    publish()
+    publish(complete=True)
     if not cases: raise SystemExit("No successful native engine samples")
 
 if __name__=="__main__":main(*sys.argv[1:])
