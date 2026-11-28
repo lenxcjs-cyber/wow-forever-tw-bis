@@ -1673,7 +1673,7 @@ function combatRequestPlayer(request,id){
  const index=Number(String(id).split("-")[1])-1,field=combatPlayerFields[index];
  if(!combatEngineURL(id)||!field||!request||typeof request!=="object"||request.type!=="SimTypeIndividual"&&request.type!==1)throw Error("請提供對應專精的個人 RaidSimRequest");
  const parties=request.raid?.parties;
- if(!Array.isArray(parties)||parties.some(p=>p?.players!=null&&!Array.isArray(p.players)))throw Error("RaidSimRequest 隊伍格式不合法");
+ if(!Array.isArray(parties)||parties.length<1||parties.length>5||parties.some(p=>p?.players!=null&&(!Array.isArray(p.players)||p.players.length>5)))throw Error("RaidSimRequest 隊伍格式不合法（最多5隊，每隊5人）");
  const players=parties.flatMap(p=>p?.players||[]).filter(p=>p&&typeof p==="object"&&Object.keys(p).length);
  if(players.length!==1||!players[0][field]||!players[0].rotation||!Array.isArray(request.encounter?.targets)||!request.encounter.targets.length||!request.simOptions)throw Error("引擎請求的職業、技能策略或遭遇不符");
  return players[0];
@@ -1701,7 +1701,8 @@ const guildScenarios={"guild-50k":{label:"60級單體／5萬血",level:60,health
 function combatGuildScenario(request,id,key){
  const cfg=guildScenarios[key];if(!cfg)throw Error("不明公會標準遭遇");
  const result=JSON.parse(JSON.stringify(request)),p=combatRequestPlayer(result,id),tank=combatRole(id)==="tank",stats=Array(39).fill(0);stats[29]=cfg.health;
- p.inFrontOfTarget=tank;result.raid.tanks=tank?[{type:"Player",index:0}]:[];
+ const partyIndex=result.raid.parties.findIndex(q=>q?.players?.includes(p)),playerIndex=result.raid.parties[partyIndex].players.indexOf(p);
+ p.inFrontOfTarget=tank;result.raid.tanks=tank?[{type:"Player",index:partyIndex*5+playerIndex}]:[];
  result.encounter={apiVersion:result.encounter.apiVersion??2,duration:cfg.duration,durationVariation:0,executeProportion20:.2,executeProportion35:.35,targets:Array.from({length:cfg.count},(_,i)=>({name:cfg.label+" "+(i+1),level:cfg.level,mobType:"MobTypeUnknown",stats:[...stats],minBaseDamage:cfg.level===63?1000:300,damageSpread:0,swingSpeed:2,tankIndex:tank?0:-1,canCrush:cfg.level===63,parryHaste:false}))};
  for(const k of Object.keys(result.raid.debuffs||{}))if(/sunder|exposeArmor|faerieFire|curseOfRecklessness|curseOfElements|curseOfShadow|armor|resistance/i.test(k))delete result.raid.debuffs[k];
  return result;
@@ -2060,8 +2061,8 @@ function nativeBrowserRequest(request,id,scenario,iterations,seed=1){
  if(p.database)throw Error("本站不接受匯入自訂引擎資料庫");
  const expectedClass=nativeClassNames[gearClassIndex(id)],classId=[1,2,3,4,5,7,8,9,11][gearClassIndex(id)];if(p.class!=null&&p.class!==classId&&String(p.class).toLowerCase()!=="class"+expectedClass)throw Error("原生角色職業與專精不符");
  if(!Array.isArray(p.equipment?.items)||p.equipment.items.length!==17)throw Error("缺少完整17格原生裝備");
- if(!p.rotation||typeof p.rotation!=="object")throw Error("缺少技能優先序");
- if(!Number.isInteger(result.raid.targetDummies??0)||(result.raid.targetDummies??0)<0||(result.raid.targetDummies??0)>25)throw Error("治療假人數量不合法");
+ if(!p.rotation||typeof p.rotation!=="object"||Array.isArray(p.rotation))throw Error("缺少技能優先序");
+ if(!Number.isInteger(result.raid.targetDummies??0)||(result.raid.targetDummies??0)<0||(result.raid.targetDummies??0)>24)throw Error("治療假人數量不合法");
  result.simOptions={iterations,randomSeed:String(seed),debugFirstIteration:true};
  delete result.requestId;
  if(JSON.stringify(result).length>8000000)throw Error("請求超過8MB");
@@ -2075,6 +2076,12 @@ function nativeBrowserResult(raw,id,iterations){
  if(!(result[metric]>0))throw Error("未取得正數 "+metric.toUpperCase()+"；可能是技能策略、裝備或遭遇不適用");
  return result;
 }
+// Object property order is not part of a JSON request's combat settings.
+function nativeCanonicalJSON(value){
+ if(Array.isArray(value))return "["+value.map(nativeCanonicalJSON).join(",")+"]";
+ if(value&&typeof value==="object")return "{"+Object.keys(value).sort().map(k=>JSON.stringify(k)+":"+nativeCanonicalJSON(value[k])).join(",")+"}";
+ return JSON.stringify(value);
+}
 function nativeBrowserBatchJobs(batch,id,meta,n){
  if(batch?.format!=="tomb-guild-batch/1"||batch.commit!==combatPresetCommit||batch.spec!==id||!Array.isArray(batch.cases)||![6,9,12,15,18].includes(batch.cases.length))throw Error("無效配裝批次");
  const expected=batch.cases.length/3,seen=new Set(),jobs=[];
@@ -2085,10 +2092,10 @@ function nativeBrowserBatchJobs(batch,id,meta,n){
   p.equipment=nativeImportGear(p.equipment,meta);
   jobs.push({scenario:x.scenario,variant:x.variant,name:x.name,request});
  }
- const signature=req=>{const r=JSON.parse(JSON.stringify(req));delete combatRequestPlayer(r,id).equipment;return JSON.stringify(r);};
+ const signature=req=>{const r=JSON.parse(JSON.stringify(req));delete combatRequestPlayer(r,id).equipment;return nativeCanonicalJSON(r);};
  const variantSignatures=new Map(),names=new Set();
  // The encounter may change; the actual character and each named equipment variant must not.
- const crossScenarioSignature=job=>{const r=JSON.parse(JSON.stringify(job.request));delete r.encounter;return JSON.stringify(r);};
+ const crossScenarioSignature=job=>{const r=JSON.parse(JSON.stringify(job.request));delete r.encounter;return nativeCanonicalJSON(r);};
  for(const job of jobs){
   const sig=JSON.stringify([job.name,crossScenarioSignature(job)]);
   if(variantSignatures.has(job.variant)){if(variantSignatures.get(job.variant)!==sig)throw Error("同一配裝方案在不同遭遇使用了不同角色設定或裝備");}
@@ -2120,7 +2127,7 @@ function nativeBrowserView(parent,id){
  async function importCharacter(useDefault){
   clear();const token=++active;
   try{
-   const templatePath=combatRequestPath(templatePick.value,id),raw=useDefault?null:combatReadJSON(area.value),template=templatePath?await read(templatePath):null;
+   const templatePath=combatRequestPath(templatePick.value,id),raw=useDefault?null:combatReadJSON(area.value),needsTemplate=useDefault||!(raw?.encounter&&(raw.raid||raw.player)),template=needsTemplate&&templatePath?await read(templatePath):null;
    if(token!==active||!c.isConnected)return;
    if(useDefault&&!template)throw Error("尚無此專精範本");
    character=nativeCharacterRequest(useDefault?template:raw,template,id,metadata);
@@ -2182,7 +2189,7 @@ function nativeBrowserView(parent,id){
    const job=jobs[index],cfg=guildScenarios[job.scenario],part=box(results,cfg.label+"｜"+job.name,n+"次原生迭代");
    try{
     const raw=e.data.result,m=nativeBrowserResult(raw,id,n);
-    if(batch&&Math.abs(m.duration-cfg.duration)>1e-6)throw Error("實際平均時間與標準遭遇不符，不能納入批次比較");
+    if(!Number.isFinite(m.duration)||Math.abs(m.duration-cfg.duration)>1e-6)throw Error("實際平均時間與標準遭遇不符，不能納入比較");
     for(const [key,label] of [["dps","DPS"],["tps","TPS"],["hps","HPS"],["dtps","DTPS"]])if(Number.isFinite(m[key]))part.append(node("p",label+" "+m[key].toFixed(2)+(Number.isFinite(m.stdev?.[key])?" ｜ 標準差 "+m.stdev[key].toFixed(2):"")));
     if(m.death!==null)part.append(node("p","死亡機率 "+(m.death*100).toFixed(2)+"%"));
     const targets=raw.encounterMetrics?.targets;
