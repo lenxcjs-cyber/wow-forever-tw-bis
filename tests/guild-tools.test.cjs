@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -583,3 +583,11 @@ assert.equal(combat.combatRequestPath("combat-requests/spec-1-0123456789abcdef.j
 assert.equal(combat.combatRequestPath("../combat-requests/spec-1-0123456789abcdef.json","spec-1"),null);
 assert.throws(()=>combat.combatReadJSON("not json"));
 console.log("PASS: fixed 17-slot export, duplicate rejection, native request copy/enchants/spec guards and scoped paths");
+
+
+const actionRows=[{owner:"角色",kind:"spellId",id:123,damage:30,threat:20},{owner:"寵物",kind:"spellId",id:456,damage:50,threat:10},{owner:"角色",kind:"itemId",id:789,damage:0,threat:100},{owner:"bad",kind:"spellId",id:0,damage:1000},null];
+assert.deepEqual(combat.combatNativeActions(actionRows,"damage").map(x=>x.id),[456,123]);
+assert.deepEqual(combat.combatNativeActions(actionRows,"threat").map(x=>x.id),[789,123,456]);
+assert.equal(combat.combatNativeActions(actionRows,"healing").length,0);
+assert.equal(combat.combatNativeActions(actionRows,"bad").length,0);
+console.log("PASS: native action contribution filtering and role-specific ranking");
