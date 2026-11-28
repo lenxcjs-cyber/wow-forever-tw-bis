@@ -885,7 +885,10 @@ const unevenPools=new Map([["頭部",[tierItem(1,"A",10)]],["肩部",[tierItem(2
 const uneven=tierLogic.catalogSetTierComparison(unevenPools,"A",2,[{pieces:2,value:100}]);
 assert.equal(uneven.rows[1].comparable,false);
 assert.equal(uneven.rows[1].net,null);
-assert.equal(uneven.firstWin,null);
+assert.equal(uneven.rows[0].comparable,true);
+assert.equal(uneven.rows[0].bonus,0);
+assert.equal(uneven.rows[0].net,5);
+assert.equal(uneven.firstWin,1); // Same shoulder slot wins on stats alone; two pieces remain incomparable.
 assert.equal(tierLogic.catalogSetTierComparison(tierPools,"A",3,[{pieces:2,value:5},{pieces:2,value:5}]).firstWin,null);
 assert.equal(adjacentSet.best.pieces,4);assert.equal(adjacentSet.bestConfirmed.pieces,4);
 const epHelper=new Function(section("function epProfilesFor(","let epProfilesPromise=")+";const catalogWeightFields={strength:'力量',agility:'敏捷'};const combatPresetCommit='3b9c125a9b1387cd53ce2bb12969e0c6b54b813e';return epProfilesFor;")();
