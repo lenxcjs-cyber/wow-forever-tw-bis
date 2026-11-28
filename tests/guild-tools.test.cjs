@@ -697,6 +697,25 @@ assert.equal(multiSet.catalogMultiSetAlternative(conflictSets,[{name:"A",minimum
 const conflictExact=multiSet.catalogSetAlternative(conflictSets,"A",2);
 assert.equal(conflictExact.total,220);
 assert.equal(multiSet.catalogSlotChoices([mkSet(13965,"A",10),mkSet(13966,"A",9)],"飾品",2,["A"],true).length,0);
+ // Compare the optimized slot search with literal exhaustive enumeration.
+for(let t=0;t<64;t++){
+ const pool=[13965,13966,13968,501,502,503,504,505].map((id,i)=>mkSet(id,["","A","B"][(t+i*7)%3],((t*11+i*13)%23)-3));
+ for(const names of [["A"],["A","B"]])for(const capacity of [0,1,2])for(const exact of [false,true]){
+  const allowed=pool.filter(p=>names.includes(p.item.item_set)||p.score.total>0);
+  const combos=[[]];if(capacity>=1)for(const a of allowed)combos.push([a]);
+  if(capacity>=2)for(let i=0;i<allowed.length;i++)for(let j=i+1;j<allowed.length;j++){
+   const a=allowed[i],b=allowed[j];if([13965,13966,13968].includes(a.item.id)&&[13965,13966,13968].includes(b.item.id))continue;combos.push([a,b]);
+  }
+  const expected=new Map();for(const combo of combos){
+   if(exact&&combo.length!==capacity)continue;
+   const key=names.map(n=>combo.filter(p=>p.item.item_set===n).length).join(","),total=combo.reduce((a,p)=>a+p.score.total,0),old=expected.get(key);
+   if(!old||combo.length>old[0]||combo.length===old[0]&&total>old[1])expected.set(key,[combo.length,total]);
+  }
+  const actual=new Map(multiSet.catalogSlotChoices(pool,"飾品",capacity,names,exact).map(x=>[x.counts.join(","),[x.picks.length,x.total]]));
+  assert.deepEqual([...actual].sort(),[...expected].sort());
+ }
+}
+
 console.log("PASS: simultaneous two-set piece constraints, exact compatible pairs and infeasible combination rejection");
 
 
