@@ -14,12 +14,24 @@ FIELDS="dpsWarrior dpsWarrior protectionWarrior holyPaladin protectionPaladin re
 TANKS={"spec-3","spec-5","spec-27"}
 HEALS={"spec-4","spec-13","spec-14","spec-18","spec-28"}
 def finite(v):return type(v) in (int,float) and math.isfinite(v)
-def get_player(request):
+def get_player_position(request):
     if request.get("type") not in (1,"SimTypeIndividual"):raise ValueError("Requires individual simulation")
     parties=request.get("raid",{}).get("parties",[])
-    players=[p for party in parties for p in party.get("players",[]) if p]
+    if not isinstance(parties,list) or not 1<=len(parties)<=5:raise ValueError("Invalid parties")
+    players=[]
+    for pi,party in enumerate(parties):
+        if party is None:continue
+        if not isinstance(party,dict):raise ValueError("Invalid party")
+        members=party.get("players") or []
+        if not isinstance(members,list) or len(members)>5:raise ValueError("Invalid party members")
+        for i,p in enumerate(members):
+            if p:
+                if not isinstance(p,dict):raise ValueError("Invalid player")
+                players.append((p,pi*5+i))
     if len(players)!=1:raise ValueError("Requires one character")
     return players[0]
+def get_player(request):
+    return get_player_position(request)[0]
 def controlled_signature(req,across_scenarios=False):
     base=copy.deepcopy(req);get_player(base).pop("equipment",None)
     if across_scenarios:base.pop("encounter",None)
@@ -53,7 +65,7 @@ def validate(data):
         level,hp,count,duration=SCENARIOS[key]
         e=req["encounter"];targets=e["targets"];tank=sid in TANKS
         if e.get("duration")!=duration or e.get("durationVariation",0)!=0 or e.get("executeProportion20")!=0.2 or e.get("executeProportion35")!=0.35 or len(targets)!=count or p.get("inFrontOfTarget") is not tank:raise ValueError("Guild encounter mismatch")
-        if req["raid"].get("tanks",[])!=([{"type":"Player","index":0}] if tank else []):raise ValueError("Tank assignment mismatch")
+        if req["raid"].get("tanks",[])!=([{"type":"Player","index":get_player_position(req)[1]}] if tank else []):raise ValueError("Tank assignment mismatch")
         if any(re.search(r"sunder|exposeArmor|faerieFire|curseOfRecklessness|curseOfElements|curseOfShadow|armor|resistance",name,re.I) for name in req["raid"].get("debuffs",{})):raise ValueError("External armor/resistance debuff present")
         if any(t.get("level")!=level or t.get("stats")!=[hp if i==29 else 0 for i in range(39)] or t.get("tankIndex")!=(0 if tank else -1) or t.get("id") or t.get("targetInputs") or t.get("disabledAtStart") or t.get("swingSpeed")!=2 or t.get("minBaseDamage")!=(1000 if level==63 else 300) or t.get("damageSpread",0)!=0 or t.get("mobType")!="MobTypeUnknown" or t.get("canCrush") is not (level==63) or t.get("parryHaste") for t in targets):raise ValueError("Guild target stats mismatch")
         by[key,idx]=c
