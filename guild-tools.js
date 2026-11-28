@@ -1,4 +1,4 @@
-/* 墓鐘資料庫 V21.5 beta · 2026-11-27
+/* 墓鐘資料庫 V21.6 beta · 2026-11-27
    Existing candidates plus external gear catalog; local build weights remain in the browser. */
 (function(){
 "use strict";
@@ -1036,7 +1036,7 @@ function audit(){
  const featured=matches.includes(first)?first:matches[0];add(c,itemView(featured),evidenceView(featured));const alternatives=matches.filter(x=>x!==featured);if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+visibleSlots.length+" 個已列部位","gt-muted"));if(term||acq.value||mode.value==="missing"){const other=auditOtherWeaponMatches(partition,weaponMode.value,match);if(other.count){const hint=node("div",undefined,"gt-other-weapon-matches");add(hint,node("span","另一種武器配置另有 "+other.count+" 件符合條件。"),button(other.mode==="two"?"查看雙手武器":"查看單手＋副手",()=>chooseWeaponMode(other.mode)));out.append(hint);}}out.append(grid);if(!count)out.append(node("p","沒有符合條件的候選。"));jump.replaceChildren(new Option("跳至裝備部位",""),...Array.from(grid.children).map(c=>new Option(c.dataset.slot,c.dataset.slot)));gearScroll.scrollTop=0;}
  const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);acq.addEventListener("change",draw);weaponMode.addEventListener("change",()=>chooseWeaponMode(weaponMode.value));
- const frame=node("iframe",undefined,"gt-build-talent-frame");frame.title="並排天賦流派";frame.src=talentPageURL(true)+"&layout=workspace&v=21.5";frame.loading="lazy";
+ const frame=node("iframe",undefined,"gt-build-talent-frame");frame.title="並排天賦流派";frame.src=talentPageURL(true)+"&layout=workspace&v=21.6";frame.loading="lazy";
  const leftHead=node("div",undefined,"gt-build-column-head"),rightHead=node("div",undefined,"gt-build-column-head");
  add(leftHead,node("h4","天賦流派"),link("獨立開啟天賦",talentPageURL(false)));
  const filterToggle=button("收合篩選",()=>{gearFilters.hidden=!gearFilters.hidden;filterToggle.textContent=gearFilters.hidden?"展開篩選":"收合篩選";filterToggle.setAttribute("aria-expanded",String(!gearFilters.hidden));});filterToggle.setAttribute("aria-expanded","true");gearFilters.id="gt-gear-filter-panel";filterToggle.setAttribute("aria-controls",gearFilters.id);add(rightHead,node("h4","BiS 裝備候選"),add(node("div",undefined,"gt-gear-head-actions"),filterToggle,button("回到頂端",()=>{gearScroll.scrollTop=0;jump.value="";})));
@@ -1067,7 +1067,7 @@ function talentHub(){
  if(!getSpec()){panel.append(node("p","請先在上方選擇職業及專精。"));return;}
  const frame=node("iframe");frame.title="天賦流派與野外練等";frame.style.cssText="display:block;width:100%;height:950px;border:0;border-radius:8px;background:#0e131c";
  fitEmbedded(frame);
- frame.src=talentPageURL(true)+"&v=21.5";
+ frame.src=talentPageURL(true)+"&v=21.6";
  add(panel,frame);
 }
 const renderers={audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
