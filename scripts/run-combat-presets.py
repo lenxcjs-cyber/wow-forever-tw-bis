@@ -18,7 +18,7 @@ CASES=[
  ("spec-6","懲戒／神聖震擊","ui/specs/paladin/retribution/builds/holy_shock.siml","ui/specs/paladin/retribution/apls/holy_shock.apl.siml"),
 ]
 # Exact upstream paths and talent strings verified at COMMIT. Reconstructed JSON
-# trials intentionally omit consumables; they are not copies of the UI defaults.
+# trials import verified upstream consumable selections but are not copies of the UI defaults.
 JSON_BUILDS=[
  ("spec-17","增強／上游預設","shaman/enhancement/builds/default.build.json"),
  ("spec-22","痛苦／Wrack","warlock/dps/builds/aff_wrack.build.json"),
@@ -270,6 +270,36 @@ def failure_kind(error):
         return "validation"
     return "io"
 
+CONSUMABLE_REGISTRY="ui/features/settings/model/consumables_auto_gen.ts"
+CONSUMABLE_SCALAR={"flaskId","foodId","conjuredId","explosiveId","mhImbueId","ohImbueId","mhWeaponImbueId","ohWeaponImbueId","resourcePotId","defensivePotId","offensivePotId"}
+CONSUMABLE_LIST={"extraIds","elixirIds","potions","conjuredItems"}
+def upstream_consumables(root,folder,gear):
+    """Resolve the exact checked-out upstream TS item IDs; fail rather than guess."""
+    ids={name:int(value) for name,value in re.findall(r"export const (\w+)\s*=\s*\{\s*id:\s*(\d+)\s*\}",(root/CONSUMABLE_REGISTRY).read_text(encoding="utf-8"))}
+    source=(root/"ui/specs"/folder/"presets.ts").read_text(encoding="utf-8")
+    source=re.sub(r"//[^\n]*","",source)
+    match=re.search(r"\bDefaultConsumables\s*=\s*ConsumesSpec\.create\(\{([\s\S]*?)\}\);",source)
+    if not ids or not match:raise ValueError("Upstream consumable data unavailable")
+    raw=match.group(1);out={}
+    def resolve(token):
+        token=token.strip()
+        if token=="0":return 0
+        m=re.fullmatch(r"Consumables\.(\w+)\.id",token)
+        if not m or m.group(1) not in ids:raise ValueError("Unknown upstream consumable "+token)
+        return ids[m.group(1)]
+    for field,value in re.findall(r"(\w+)\s*:\s*(\[[^\]]*\]|Consumables\.\w+\.id|0)\s*,?",raw):
+        if field in out:raise ValueError("Duplicate consumable field")
+        if field in CONSUMABLE_LIST and value.startswith("["):
+            out[field]=[resolve(token) for token in value[1:-1].split(",") if token.strip()]
+        elif field in CONSUMABLE_SCALAR and not value.startswith("["):out[field]=resolve(value)
+        else:raise ValueError("Unsupported upstream consumable field "+field)
+    if not out or len(out)!=len(re.findall(r"\b\w+\s*:",raw)):raise ValueError("Incomplete upstream consumable mapping")
+    if folder=="warrior/dps" and gear in ("prebis_arms","prebis_fury_2h"):
+        out.update({"mhImbueId":ids["DenseSharpeningStone"],"ohImbueId":0})
+    if folder=="mage/dps" and gear=="preraidFire":
+        out["mhWeaponImbueId"]=ids["ScrollOfImbueGreaterFlame"]
+    return out
+
 def direct_settings(root,cli,job):
     spec,label,kind,path,row=job
     if kind=="json":
@@ -304,15 +334,19 @@ def direct_settings(root,cli,job):
             if var.get("name")=="Use Backstab":
                 var["value"]={"const":{"val":"true"}}
     player={"apiVersion":2,"name":label,"race":"RaceOrc" if warrior else "RaceHuman","class":"ClassWarrior" if warrior else "ClassMage" if mage else "ClassRogue","equipment":read_json(root,gear_path),"talentsString":talents,"rotation":rotation,field:{"options":options},"reactionTimeMs":100,"distanceFromTarget":0 if tank else 20 if mage else 5,"profession1":"Engineering","profession2":"Enchanting","buffs":{"greaterBlessingOfKings":True,"greaterBlessingOfMight":1,"greaterBlessingOfWisdom":1}}
+    player["consumables"]=upstream_consumables(root,folder,gear)
+    if mage:
+        player["channelClipDelayMs"]=100
+        if gear=="preraidFrost":player["distanceFromTarget"]=28
     template=read_json(root,"ui/specs/shaman/enhancement/builds/default.build.json")
     data={"player":player,"encounter":copy.deepcopy(template["encounter"]),"raidBuffs":template.get("raidBuffs",{}),"partyBuffs":template.get("partyBuffs",{}),"debuffs":template.get("debuffs",{})}
     if tank:
         player["inFrontOfTarget"]=True
         player["healingModel"]={"hps":760,"cadenceSeconds":0.3,"cadenceVariation":0.64,"absorbFrac":0.015,"burstWindow":6,"inspirationUptime":0.25}
         data["tanks"]=[{"type":"Player","index":0}]
-    desc="本站控制構築：採上游裝備、天賦與 JSON APL，工程／附魔、同一團隊增減益與63級單體遭遇；戰士獸人，其他人類；無消耗品、毒藥或換裝，並非上游網頁完整預設。"
+    desc="本站控制構築：採上游裝備、天賦、JSON APL 及固定版本預設消耗品（含盜賊毒藥、武器臨時附魔）；工程／附魔、同一團隊增減益，戰士獸人，其他人類；不含換裝或網頁自動生成的藥水／魔法物品 APL 行，並非上游完整網頁預設。"
     if tank: desc+=" 採上游防戰治療模型760 HPS。"
-    return data,gear_path,apl_path,[gear_path,apl_path,base+"/presets.ts"],desc
+    return data,gear_path,apl_path,[gear_path,apl_path,base+"/presets.ts",CONSUMABLE_REGISTRY],desc
 
 def direct_request(data,duration=None,targets=None):
     p=copy.deepcopy(data.get("player"))
