@@ -1572,6 +1572,46 @@ function combatGuildBatch(request,id,variants){
  }
  return {format:"tomb-guild-batch/1",commit:combatPresetCommit,spec:id,cases};
 }
+function combatGuildBatchResults(data,id){
+ if(!data||data.format!=="tomb-guild-results/1"||data.commit!==combatPresetCommit||data.spec!==id||!Array.isArray(data.cases)||data.cases.length>18||!combatEngineURL(id))throw Error("批次結果格式、版本或專精不符");
+ const role=combatRole(id),metric=role==="tank"?"tps":role==="heal"?"hps":"dps",seen=new Set(),groups=[];
+ for(const [key,cfg] of Object.entries(guildScenarios)){
+  const rows=[];
+  for(const x of data.cases.filter(x=>x?.scenario===key)){
+   if(!Number.isInteger(x.variant)||x.variant<0||x.variant>5||typeof x.name!=="string"||!x.name.trim()||x.name.length>80||seen.has(key+":"+x.variant))throw Error("批次包含重複或無效方案");
+   seen.add(key+":"+x.variant);
+   if(x.error){rows.push({variant:x.variant,name:x.name,error:true});continue;}
+   if(!Number.isInteger(x.iterations)||x.iterations<1||x.iterations>10000||!Number.isFinite(x.duration)||Math.abs(x.duration-cfg.duration)>1e-6||!Number.isFinite(x.metrics?.[metric])||x.metrics[metric]<=0)throw Error("批次結果的迭代、時間或角色指標無效");
+   rows.push(x);
+  }
+  const base=rows.find(x=>x.variant===0&&!x.error);
+  if(base&&base.name!=="原始配裝")throw Error("原始配裝標記不合法");
+  const comparisons=rows.filter(x=>x.variant>0&&!x.error&&base&&x.iterations===base.iterations).map(x=>{
+   const delta=x.metrics[metric]-base.metrics[metric],uncertainty=nativeSetUncertainty(base,x,metric);
+   const tankOK=role!=="tank"||["dtps","death"].every(k=>[x.metrics[k],base.metrics[k]].every(v=>Number.isFinite(v)&&v>=0&&(k!=="death"||v<=1))&&x.metrics[k]<=base.metrics[k]+1e-8);
+   return {...x,delta,uncertainty,tankOK,confirmed:delta>0&&tankOK&&uncertainty!==null&&delta>uncertainty};
+  }).sort((a,b)=>b.metrics[metric]-a.metrics[metric]);
+  groups.push({key,cfg,rows,base,comparisons,best:comparisons.find(x=>x.confirmed)||null});
+ }
+ if(seen.size!==data.cases.length)throw Error("包含未知遭遇");
+ return {role,metric,groups,finished:data.finished===true};
+}
+function combatGuildBatchResultView(parent,id){
+ const c=box(parent,"多方案原生批次結果匯入","匯入本機批次工具的結果，分開比較三種遭遇。只接受對應專精及固定版本格式；本站不能證明外部檔案未遭修改。");
+ const area=node("textarea"),msg=node("p","","gt-muted"),out=node("div");area.rows=4;area.setAttribute("aria-label","三遭遇批次結果 JSON");area.placeholder="貼上 tomb-guild-results/1 JSON";
+ const render=()=>{out.replaceChildren();try{
+  const data=combatGuildBatchResults(combatReadJSON(area.value),id);
+  for(const g of data.groups){
+   const section=box(out,g.cfg.label,"各自比較原始配裝與候選；不跨遭遇排名。");
+   if(!g.base){section.append(node("p","未取得成功原始配裝，不排名。","gt-muted"));continue;}
+   const m=data.metric.toUpperCase();section.append(node("p","原始配裝 "+m+" "+g.base.metrics[data.metric].toFixed(2)));
+   for(const x of g.comparisons){section.append(node("p",x.name+" ｜ "+m+" "+x.metrics[data.metric].toFixed(2)+" ｜ 相較原裝 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+(x.uncertainty===null?" ｜ 波動未知":" ｜ 近似波動 ±"+x.uncertainty.toFixed(2))+(x.confirmed?" ｜ 超出波動門檻":!x.tankOK?" ｜ 生存不符":" ｜ 未證實勝出")));if(data.role==="tank")section.append(node("p","DTPS "+(Number.isFinite(x.metrics.dtps)?x.metrics.dtps.toFixed(2):"未知")+" ｜ 死亡 "+(Number.isFinite(x.metrics.death)?(x.metrics.death*100).toFixed(2)+"%":"未知"),"gt-muted"));}
+   const ignored=g.rows.filter(x=>x.error||x.variant>0&&!g.comparisons.some(y=>y.variant===x.variant));if(ignored.length)section.append(node("p","無法比較："+ignored.map(x=>x.name).join("、"),"gt-muted"));
+   section.append(node("p",g.best?"本次候選中具勝出證據的最高平均值："+g.best.name:"沒有候選具足夠勝出證據。","gt-muted"));
+  }msg.textContent=data.finished?"批次已結束；只排名成功且可比較的候選。":"部分快照，仍有未記錄方案。";
+ }catch(e){msg.textContent="匯入失敗："+e.message;}};
+ add(c,area,combatFileInput(area,msg,"上傳三遭遇批次結果"),button("比較三遭遇批次結果",render),msg,out);
+}
 function combatGearTrial(request,equipment,id,mode,keepMatching=true,preserveEmpty=false){
  if(!["one","two"].includes(mode))throw Error("武器模式不合法");
  combatEquipmentRows(equipment,mode);
@@ -1714,7 +1754,7 @@ function combatLab(){
  if(url)engine.append(link("開啟對應職業模擬器",url));
  add(engine,link("WoWSims 開源引擎（MIT）","https://github.com/wowsims/forever"),node("p","請在引擎內設定裝備、天賦、種族、附魔、消耗品、團隊增益、敵人數、戰鬥時間及技能優先序（APL）。用相同遭遇與迭代條件比較方案；查看戰鬥紀錄／時間軸。可在下方匯出候選配裝及替換原生請求；本站不即時代跑個人外部引擎。","gt-muted"));
  const standards=box(panel,"公會標準實戰目標","三種情境使用零基礎護甲與抗性，非坦克背後攻擊，坦克正面。首領暫定63級。");for(const x of Object.values(guildScenarios))standards.append(node("p",x.label+" ｜ "+x.count+" 個目標 ｜ 每隻 "+x.health.toLocaleString("zh-TW")+" HP ｜ 固定 "+x.duration+" 秒"));standards.append(node("p","原生引擎以時間結束，血量不是停止條件；血量／平均DPS只能估算擊殺時間。60／180秒及坦克受擊設定為本站暫定測試條件。","gt-muted"));
- const loadGearTemplate=combatGearView(panel,id,build);nativeSetTrialView(panel,id);
+ const loadGearTemplate=combatGearView(panel,id,build);nativeSetTrialView(panel,id);combatGuildBatchResultView(panel,id);
  const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
  fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
   if(!presets.isConnected)return;if(!combatSnapshotValid(data))throw Error("版本或快照格式不符");const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));combatCoverageView(presets,data);
