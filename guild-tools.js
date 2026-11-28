@@ -1307,17 +1307,21 @@ function combatApplyEquipment(request,equipment,id,keepMatching=true){
  const players=parties.flatMap(p=>p?.players||[]).filter(p=>p&&Object.keys(p).length);
  if(players.length!==1||!players[0][field]||!players[0].rotation||!copy.encounter?.targets?.length||!copy.simOptions)throw Error("引擎請求的職業、技能策略或遭遇不符");
  const p=players[0];
- if(p.enableItemSwap||p.itemSwap?.items?.some(x=>x?.id)||p.itemSwap?.swapSets?.length)throw Error("原請求含換裝；請在引擎停用換裝後再匯入，避免破壞技能策略");
+ if(p.enableItemSwap||p.itemSwap?.items?.some(x=>x?.id)||p.itemSwap?.swapSets?.length||p.rotation?.priorityList?.some(x=>x?.action?.itemSwap))throw Error("原請求含換裝；請在引擎停用換裝後再匯入，避免破壞技能策略");
  if(!Array.isArray(equipment?.items)||equipment.items.length!==17)throw Error("須為17格 EquipmentSpec");
  const seen=new Set();
  p.equipment={items:equipment.items.map((x,i)=>{
   if(!x?.id)return {};
-  if(!Number.isSafeInteger(x.id)||x.id<1||seen.has(x.id))throw Error("無效或重複的物品 ID");
+  if(!Number.isSafeInteger(x.id)||x.id<1||x.id>999999999||seen.has(x.id))throw Error("無效或重複的物品 ID");
   seen.add(x.id);
   const old=p.equipment?.items?.[i];
   return keepMatching&&old?.id===x.id?old:{id:x.id};
  })};
  return copy;
+}
+function combatRequestPath(path,id){
+ if(typeof path!=="string"||!combatEngineURL(id))return null;
+ return /^combat-requests\/spec-(?:[1-9]|1[0-9]|2[0-8])-[a-f0-9]{16}\.json$/.test(path)&&path.startsWith("combat-requests/"+id+"-")?path:null;
 }
 function combatDownloadJSON(data,name){
  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"})),a=node("a");
@@ -1364,6 +1368,13 @@ function combatGearView(parent,id,build){
  const details=node("details"),keep=node("input");keep.type="checkbox";keep.checked=true;
  add(details,node("summary","選擇配裝與匯出（17 格）"),field("武器配置",mode),button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows)selected.get(x.name).value=x.featured?String(x.featured.id):"";refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。未在本站執行引擎。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=combatApplyEquipment(combatReadJSON(request.value),current(),id,keep.checked);combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
  mode.addEventListener("change",draw);c.append(details);draw();
+ return async path=>{
+  const valid=combatRequestPath(path,id);if(!valid)throw Error("請求檔案路徑不合法");
+  const response=await fetch(valid,{cache:"no-cache"});if(!response.ok)throw Error("HTTP "+response.status);
+  const content=await response.text();combatReadJSON(content);
+  if(!c.isConnected)return;
+  request.value=content;details.open=true;msg.textContent="已載入原生案例請求；請確認天賦、技能與裝備後再匯出。";request.focus();request.scrollIntoView({block:"nearest"});
+ };
 }
 function combatLab(){
  title("實戰模擬","正式數值使用 WoWSims Forever；站內試算為自訂參數的簡化時間軸，不等於遊戲傷害公式。");
@@ -1372,8 +1383,8 @@ function combatLab(){
  combatResearchView(panel,id);
  const engine=box(panel,"完整戰鬥模擬（外部引擎）","上游網站參考版本：2026/11/27、客戶端 1.60.1.71139（71311a4）。本站預設案例使用固定 CLI v1.0.12；外部網站會更新，請核對版本與構築。");
  if(url)engine.append(link("開啟對應職業模擬器",url));
- add(engine,link("WoWSims 開源引擎（MIT）","https://github.com/wowsims/forever"),node("p","請在引擎內設定裝備、天賦、種族、附魔、消耗品、團隊增益、敵人數、戰鬥時間及技能優先序（APL）。用相同遭遇與迭代條件比較方案；查看戰鬥紀錄／時間軸。本站尚未自動同步目前候選裝備或即時代跑個人外部引擎。","gt-muted"));
- combatGearView(panel,id,build);
+ add(engine,link("WoWSims 開源引擎（MIT）","https://github.com/wowsims/forever"),node("p","請在引擎內設定裝備、天賦、種族、附魔、消耗品、團隊增益、敵人數、戰鬥時間及技能優先序（APL）。用相同遭遇與迭代條件比較方案；查看戰鬥紀錄／時間軸。可在下方匯出候選配裝及替換原生請求；本站不即時代跑個人外部引擎。","gt-muted"));
+ const loadGearTemplate=combatGearView(panel,id,build);
  const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
  fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
   if(!presets.isConnected)return;const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));combatCoverageView(presets,data);
@@ -1385,6 +1396,12 @@ function combatLab(){
    if(x.tank&&Number.isFinite(x.tank.tps))add(c,node("p","另一次完整引擎坦克測試：TPS "+x.tank.tps.toFixed(2)+(Number.isFinite(x.tank.dtps)?" ｜ DTPS "+x.tank.dtps.toFixed(2):"")+(Number.isFinite(x.tank.death)?" ｜ 死亡機率 "+(x.tank.death*100).toFixed(1)+"%":"")));
    add(c,link("裝備、天賦與設定來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.settings),link("技能優先序（APL）來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.apl));
    if(typeof x.configuration==="string"&&x.configuration){add(c,node("p",x.configuration,"gt-muted"),link("本站控制變因配置與產生程式","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-combat-presets.py"));}
+   const requestPath=combatRequestPath(x.requestFile,id),templatePath=combatRequestPath(x.templateFile,id),path=requestPath||templatePath;
+   if(path){
+    const download=node("a",requestPath?"下載完整原生 RaidSimRequest":"下載解析後的 SIML 設定範本");download.href=path;download.download=path.split("/").pop();
+    const msg=node("p",requestPath?"完整請求為本案例實際送入原生 CLI 的設定。":"此檔由 SIML 設定解析而來，未保證與上方特殊 APL 執行完全一致。","gt-muted");
+    add(c,download,msg,button("載入此案例作為配裝範本",async()=>{try{if(loadGearTemplate)await loadGearTemplate(path);}catch(e){msg.textContent="讀取失敗："+e.message;}}));
+   }
    const character=x.character||{};if(character.talents)add(c,node("p","天賦碼："+character.talents,"gt-muted"));if(character.race)add(c,node("p","種族："+character.race,"gt-muted"));
    if(x.nativeMetrics){
     const m=x.nativeMetrics,valid=k=>Number.isFinite(m[k])&&m[k]>=0;
