@@ -127,7 +127,7 @@ def run(cli,root,site):
             metrics,duration,_=mod.direct_metrics(raw)
             if row["spec"] in mod.TANKS and not all(mod.finite(metrics.get(k)) for k in ("tps","dtps","death")):raise ValueError("Tank metrics missing")
             file=mod.write_request_file(site,row["spec"],request)
-            row["cases"].append({"pieces":count,"metrics":metrics,"duration":duration,"requestFile":file})
+            row["cases"].append({"pieces":count,"metrics":metrics,"duration":duration,"iterations":raw["iterationsDone"],"requestFile":file})
             print("Set trial:",row["spec"],row["scenario"],row["setName"],count,flush=True)
         except (OSError,ValueError,KeyError,TypeError,mod.subprocess.SubprocessError) as e:
             row["failed"].append({"pieces":count,"reason":mod.failure_kind(e)})
