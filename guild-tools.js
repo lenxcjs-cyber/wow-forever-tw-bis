@@ -1766,7 +1766,7 @@ function combatApplyEquipment(request,equipment,id,keepMatching=true,preserveEmp
 }
 const guildScenarios={"guild-50k":{label:"60級單體／5萬血",level:60,health:50000,count:1,duration:60},"guild-boss":{label:"63級首領／30萬血",level:63,health:300000,count:1,duration:180},"guild-5x50k":{label:"60級五目標／各5萬血",level:60,health:50000,count:5,duration:60}};
 function combatGuildScenario(request,id,key){
- const cfg=guildScenarios[key];if(!cfg)throw Error("不明公會標準遭遇");
+ const cfg=Object.hasOwn(guildScenarios,key)?guildScenarios[key]:null;if(!cfg)throw Error("不明公會標準遭遇");
  const result=JSON.parse(JSON.stringify(request)),p=combatRequestPlayer(result,id),tank=combatRole(id)==="tank",stats=Array(39).fill(0);stats[29]=cfg.health;
  const partyIndex=result.raid.parties.findIndex(q=>q?.players?.includes(p)),playerIndex=result.raid.parties[partyIndex].players.indexOf(p);
  p.inFrontOfTarget=tank;result.raid.tanks=tank?[{type:"Player",index:partyIndex*5+playerIndex}]:[];
@@ -1791,7 +1791,7 @@ function combatNativeTargetView(parent,rows,cfg){
  parent.append(d);
 }
 function combatGuildKill(raw,key,maxSeconds=600){
- const cfg=guildScenarios[key];if(!cfg||!Number.isFinite(maxSeconds)||maxSeconds<1||maxSeconds>600)throw Error("公會目標或時間上限不合法");
+ const cfg=Object.hasOwn(guildScenarios,key)?guildScenarios[key]:null;if(!cfg||!Number.isFinite(maxSeconds)||maxSeconds<1||maxSeconds>600)throw Error("公會目標或時間上限不合法");
  const data={...raw,targets:cfg.count,duration:maxSeconds};
  const original=simulatePriority(data,false,cfg.health),reverse=simulatePriority(data,true,cfg.health);
  const better=(a,b)=>Number(b.kill.cleared)-Number(a.kill.cleared)||(a.kill.cleared?a.kill.killTime-b.kill.killTime:b.totals.damage-a.totals.damage)||a.kill.overkill-b.kill.overkill;
@@ -2122,17 +2122,23 @@ function nativeImportGear(gear,meta){
  if(!items.some(x=>x.id))throw Error("角色沒有可辨識裝備");
  return {items};
 }
+function nativeValidatePlayer(p,id){
+ if(p.database)throw Error("本站不接受匯入自訂引擎資料庫");
+ const expectedClass=nativeClassNames[gearClassIndex(id)],classId=[1,2,3,4,5,7,8,9,11][gearClassIndex(id)];
+ if(p.class!=null&&p.class!==classId&&String(p.class).toLowerCase()!=="class"+expectedClass)throw Error("原生角色職業與專精不符");
+ if(!p.rotation||typeof p.rotation!=="object"||Array.isArray(p.rotation))throw Error("缺少技能優先序");
+}
 function nativeCharacterRequest(raw,template,id,meta){
  if(!raw||typeof raw!=="object"||Array.isArray(raw))throw Error("角色資料必須是 JSON 物件");
- if(raw.raid&&raw.encounter){const r=JSON.parse(JSON.stringify(raw)),p=combatRequestPlayer(r,id);p.equipment=nativeImportGear(p.equipment,meta);return {request:r,notes:["完整原生請求；請核對技能策略與目前專精。"]};}
+ if(raw.raid&&raw.encounter){const r=JSON.parse(JSON.stringify(raw)),p=combatRequestPlayer(r,id);nativeValidatePlayer(p,id);p.equipment=nativeImportGear(p.equipment,meta);return {request:r,notes:["完整原生請求；請核對技能策略與目前專精。"]};}
  if(raw.player&&raw.encounter){
   const r={type:"SimTypeIndividual",raid:{parties:[{players:[raw.player],buffs:raw.partyBuffs||{}},{},{},{},{}],buffs:raw.raidBuffs||{},debuffs:raw.debuffs||{},tanks:raw.tanks||[],targetDummies:raw.targetDummies||0},encounter:raw.encounter,simOptions:{iterations:50,randomSeed:"1"}};
   const request=JSON.parse(JSON.stringify(r)),p=combatRequestPlayer(request,id);
-  p.equipment=nativeImportGear(p.equipment,meta);
+  nativeValidatePlayer(p,id);p.equipment=nativeImportGear(p.equipment,meta);
   return {request,notes:["完整個人設定；使用本站迭代設定。"]};
  }
  if(!template)throw Error("請先選擇本站對應專精的原生範本");
- const r=JSON.parse(JSON.stringify(template)),p=combatRequestPlayer(r,id),notes=[];
+ const r=JSON.parse(JSON.stringify(template)),p=combatRequestPlayer(r,id),notes=[];nativeValidatePlayer(p,id);
  const isAddon=typeof raw.class==="string",gear=isAddon?raw.gear:raw.items?raw:raw.equipment;
  if(isAddon){
   if(raw.flavor!=="forever")throw Error("請使用永恆版 WoWSims Exporter 匯出，不能混用其他版本");
@@ -2160,10 +2166,8 @@ function nativeCharacterRequest(raw,template,id,meta){
 function nativeBrowserRequest(request,id,scenario,iterations,seed=1){
  if(!Number.isInteger(iterations)||iterations<1||iterations>1000||!Number.isSafeInteger(seed)||seed<1)throw Error("迭代數須為1–1000，種子須為正整數");
  const result=combatGuildScenario(request,id,scenario),p=combatRequestPlayer(result,id);
- if(p.database)throw Error("本站不接受匯入自訂引擎資料庫");
- const expectedClass=nativeClassNames[gearClassIndex(id)],classId=[1,2,3,4,5,7,8,9,11][gearClassIndex(id)];if(p.class!=null&&p.class!==classId&&String(p.class).toLowerCase()!=="class"+expectedClass)throw Error("原生角色職業與專精不符");
+ nativeValidatePlayer(p,id);
  if(!Array.isArray(p.equipment?.items)||p.equipment.items.length!==17)throw Error("缺少完整17格原生裝備");
- if(!p.rotation||typeof p.rotation!=="object"||Array.isArray(p.rotation))throw Error("缺少技能優先序");
  if(!Number.isInteger(result.raid.targetDummies??0)||(result.raid.targetDummies??0)<0||(result.raid.targetDummies??0)>24)throw Error("治療假人數量不合法");
  result.simOptions={iterations,randomSeed:String(seed),debugFirstIteration:true};
  delete result.requestId;
@@ -2176,6 +2180,7 @@ function nativeBrowserResult(raw,id,iterations){
  if(players.length!==1)throw Error("無法辨識唯一角色結果");
  const result=combatResult(raw,players[0].key),metric=combatRole(id)==="tank"?"tps":combatRole(id)==="heal"?"hps":"dps";
  if(!(result[metric]>0))throw Error("未取得正數 "+metric.toUpperCase()+"；可能是技能策略、裝備或遭遇不適用");
+ if(combatRole(id)==="tank"&&(!Number.isFinite(result.dtps)||!Number.isFinite(result.death)))throw Error("坦克結果缺少有效承傷或死亡機率，不列入比較");
  return result;
 }
 // Object property order is not part of a JSON request's combat settings.
