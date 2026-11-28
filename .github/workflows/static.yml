@@ -151,6 +151,7 @@ jobs:
           git -C "$work/source" checkout --detach FETCH_HEAD
           test "$(git -C "$work/source" rev-parse HEAD)" = "3b9c125a9b1387cd53ce2bb12969e0c6b54b813e"
           python3 scripts/build-set-effects.py "$work/source" set-effects.json 3b9c125a9b1387cd53ce2bb12969e0c6b54b813e || echo "::warning::Set activation snapshot unavailable"
+          python3 scripts/build-ep-presets.py "$work/source" ep-presets.json 3b9c125a9b1387cd53ce2bb12969e0c6b54b813e || echo "::warning::Pinned EP snapshot unavailable"
           python3 scripts/run-combat-presets.py "$cli" "$work/source" combat-presets.json
       - name: Run native guild set-versus-scatter threshold trials
         continue-on-error: true
