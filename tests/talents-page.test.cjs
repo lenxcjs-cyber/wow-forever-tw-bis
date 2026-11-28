@@ -38,7 +38,16 @@ const partialRows=partial.classes.flatMap(c=>c.talents.map(t=>[c.token+":"+t.tre
 const partialIndex=Object.fromEntries(partialRows);
 assert.equal(Object.keys(partialIndex).length,partialRows.length);
 assert.equal(partialIndex["druid:1:Ferocity"].icon,132190);
-const {iconFile,talentIconURLs}=require("../talents-page.js");
+const {iconFile,talentIconURLs,talentIconCounts,mergeTalentIconIndex}=require("../talents-page.js");
+assert.deepEqual(talentIconCounts(["loaded","loading","loaded","unmapped","unavailable","unknown"]),{total:5,loaded:2,loading:1,unmapped:1,unavailable:1});
+assert.deepEqual(talentIconCounts([]),{total:0,loaded:0,loading:0,unmapped:0,unavailable:0});
+const mergedIcons=mergeTalentIconIndex({format:1,build:"1.60.1.71139",icons:{"123":"ability_one","druid:1:Example":"ability_two"}},{"123":"ability_wrong","124":"ability_three","125":"../invalid","druid:1:Example":"ability_wrong","druid:2:Example":"ability_four","__proto__":"ability_bad"});
+assert.equal(mergedIcons["123"],"ability_one");
+assert.equal(mergedIcons["124"],"ability_three");
+assert.equal(mergedIcons["125"],undefined);
+assert.equal(mergedIcons["druid:1:Example"],"ability_two");
+assert.equal(mergedIcons["druid:2:Example"],"ability_four");
+assert.equal(Object.getPrototypeOf(mergedIcons),null);
 const fallbackIcons=JSON.parse(fs.readFileSync(path.join(__dirname,"..","talent-icons-fallback.json"),"utf8"));
 assert.equal(fallbackIcons.build,partial.build);
 assert.equal(new Set(partialRows.map(([,t])=>String(t.icon))).size,116);
