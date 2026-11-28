@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel,combatGuildScenario};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -673,3 +673,32 @@ assert.equal(combat.combatFailureLabel("timeout"),"引擎逾時");
 assert.equal(combat.combatFailureLabel("constructor"),"原因未提供");
 assert.throws(()=>combat.combatGearTrial(gearRequest,gearExport,"spec-1","invalid"));
 console.log("PASS: snapshot version guards, per-spec pending accounting and safe localized failure codes");
+
+
+// User-specified guild fixtures: zero base mitigation, correct HP and orientation.
+for(const [key,level,hp,count,duration] of [["guild-50k",60,50000,1,60],["guild-boss",63,300000,1,180],["guild-5x50k",60,50000,5,60]]){
+ const input=JSON.parse(JSON.stringify(gearRequest));input.raid.debuffs={sunderArmor:true,curseOfElements:true,judgementOfWisdom:true};input.raid.parties[0].players[0].inFrontOfTarget=true;
+ const r=combat.combatGuildScenario(input,"spec-1",key);
+ assert.equal(r.encounter.duration,duration);assert.equal(r.encounter.durationVariation,0);assert.equal(r.encounter.targets.length,count);
+ assert.equal(r.raid.parties[0].players[0].inFrontOfTarget,false);assert.deepEqual(r.raid.tanks,[]);
+ for(const t of r.encounter.targets){assert.equal(t.level,level);assert.equal(t.stats.length,39);assert.equal(t.stats[29],hp);assert.ok(t.stats.every((v,i)=>i===29||v===0));assert.equal(t.tankIndex,-1);assert.equal(t.id,undefined);}
+ assert.equal(r.raid.debuffs.sunderArmor,undefined);assert.equal(r.raid.debuffs.curseOfElements,undefined);assert.equal(r.raid.debuffs.judgementOfWisdom,true);
+ assert.equal(input.raid.parties[0].players[0].inFrontOfTarget,true);
+}
+const tankFixture=JSON.parse(JSON.stringify(gearRequest));tankFixture.raid.parties[0].players[0].protectionWarrior={};
+const guildTank=combat.combatGuildScenario(tankFixture,"spec-3","guild-5x50k");
+assert.equal(guildTank.raid.parties[0].players[0].inFrontOfTarget,true);
+assert.deepEqual(guildTank.raid.tanks,[{type:"Player",index:0}]);
+assert.ok(guildTank.encounter.targets.every(x=>x.tankIndex===0&&x.minBaseDamage===300));
+assert.equal(combat.combatScenarioRequest(gearRequest,"spec-1",{guild:"guild-boss",duration:120,variation:0}).encounter.duration,120);
+const tierLogic=new Function(section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSet,catalogSetTierComparison,nativeSetComparison};")();
+const tierItem=(id,name,total)=>({item:{id,item_set:name},score:{total}});
+const tierPools=new Map([["頭部",[tierItem(1,"",10),tierItem(2,"A",8)]],["頸部",[tierItem(3,"",10),tierItem(4,"A",8)]],["肩部",[tierItem(5,"",10),tierItem(6,"A",8)]]]);
+const tierStudy=tierLogic.catalogSetTierComparison(tierPools,"A",3,[{pieces:2,value:5},{pieces:3,value:null}]);
+assert.equal(tierStudy.base.total,30);assert.equal(tierStudy.rows[1].loss,4);assert.equal(tierStudy.rows[1].net,1);assert.equal(tierStudy.rows[2].net,null);assert.equal(tierStudy.firstWin,2);
+assert.equal(tierLogic.catalogExactSet(tierPools,"A",4),null);
+const nativeTier={cases:[{pieces:0,duration:60,metrics:{dps:100,tps:100,dtps:20,death:0}},{pieces:2,duration:60,metrics:{dps:110,tps:110,dtps:30,death:0}},{pieces:4,duration:60,metrics:{dps:120,tps:120,dtps:19,death:0}},{pieces:6,duration:180,metrics:{dps:999,tps:999,dtps:0,death:0}}]};
+assert.equal(tierLogic.nativeSetComparison(nativeTier,"dps").firstWin,2);
+assert.equal(tierLogic.nativeSetComparison(nativeTier,"tank").firstWin,4);
+assert.equal(tierLogic.nativeSetComparison(nativeTier,"tank").rows.length,2);
+console.log("PASS: guild target HP/level/zero mitigation, orientation, exact set tiers and native survival-aware threshold comparison");
