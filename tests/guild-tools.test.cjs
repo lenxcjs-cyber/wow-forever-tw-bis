@@ -953,7 +953,7 @@ console.log("PASS: equal-slot coverage for set wins, duplicate bonus rejection, 
 
 // Forever addon exports can be compact and carry signed random_suffix IDs.
 // Use the pinned native item types rather than guessing positional slots.
-const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,nativeCanonicalJSON,combatEquipmentSpec,combatModifierValid,combatCandidateReplacement};")();
+const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,nativeCanonicalJSON,combatEquipmentSpec,combatModifierValid,combatCandidateReplacement,combatBrowserActionRows};")();
 const metadata={items:{1:[1,0,0,4],2:[11,0,0,0],3:[11,0,0,0],4:[12,0,0,0],5:[12,0,0,0],6:[13,4,9,0],7:[14,0,0,0],8:[13,3,7,0],9:[13,2,9,0]},enchants:{99:true},suffixes:{"-15":true}};
 const compactGear={items:[{id:1,random_suffix:-15},{id:2},{id:3},{id:4},{id:5},{id:6,enchant:99},{id:7}]};
 const nativeGear=nativeImport.nativeImportGear(compactGear,metadata);
@@ -1004,6 +1004,19 @@ const injected=JSON.parse(JSON.stringify(imported.request));injected.raid.partie
 assert.throws(()=>nativeImport.nativeBrowserRequest(injected,"spec-1","guild-50k",50));
 const nativeRaw={iterationsDone:50,avgIterationDuration:60,raidMetrics:{parties:[{players:[{name:"角色",dps:{avg:120}}]}]}};
 assert.equal(nativeImport.nativeBrowserResult(nativeRaw,"spec-1",50).dps,120);
+const actionNative={iterationsDone:50,raidMetrics:{parties:[{players:[{name:"角色",dps:{avg:120},actions:[{id:{spellId:123,rank:2},targets:[{damage:5000,threat:1000,manualCasts:100},{damage:1000,threat:500,manualCasts:50}]},{id:{itemId:456},isPassive:true,targets:[{damage:500}]},{id:{spellId:123,itemId:789},targets:[{damage:999999}]},{id:{spellId:789},targets:[{damage:-10},{damage:"400"}]}],pets:[{name:"狼",actions:[{id:{otherId:"OtherActionAttack"},targets:[{damage:2500}]}]}]},{name:"Target Dummy 1",dps:{avg:0},actions:[{id:{spellId:999},targets:[{damage:999999}]}]}]}]}};
+const browserActions=nativeImport.combatBrowserActionRows(actionNative);
+assert.equal(browserActions.length,3);
+assert.equal(browserActions[0].damage,120);
+assert.equal(browserActions[0].threat,30);
+assert.equal(browserActions[0].manualCasts,3);
+assert.equal(browserActions[0].rank,2);
+assert.equal(browserActions[1].passive,true);
+assert.equal(browserActions[2].owner,"角色／狼");
+assert.equal(browserActions[2].damage,50);
+assert.equal(nativeImport.combatBrowserActionRows(actionNative,"0:1").length,0);
+assert.equal(nativeImport.combatBrowserActionRows({...actionNative,iterationsDone:0}).length,0);
+assert.equal(nativeImport.combatBrowserActionRows({iterationsDone:50,raidMetrics:{parties:[{players:[{name:"A",dps:{avg:1}},{name:"B",dps:{avg:1}}]}]}}).length,0);
 assert.throws(()=>nativeImport.nativeBrowserResult(nativeRaw,"spec-1",200));
 assert.throws(()=>nativeImport.nativeBrowserResult(nativeRaw,"spec-13",50));
 console.log("PASS: in-site character import with compact slots, signed suffixes, class/level/spec gates and native result validation");
