@@ -433,10 +433,10 @@ const server=http.createServer((req,res)=>{
 
   await lab.getByText("匯入外部或整套面板配裝",{exact:true}).click();
   await lab.getByLabel("匯入武器模式").selectOption("two");
-  const importedGear={items:Array.from({length:17},(_,i)=>i===0?{id:123456789,enchant:22,randomSuffix:3}:i===14?{id:19323}:{})};
+  const importedGear={items:Array.from({length:17},(_,i)=>i===0?{id:123456789,enchant:22,randomSuffix:-15}:i===14?{id:19323}:{})};
   await lab.getByRole("textbox",{name:"匯入配裝 JSON"}).fill(JSON.stringify(importedGear));
   await lab.getByRole("button",{name:"載入17格配裝"}).click();
-  assert.deepEqual(JSON.parse(await lab.getByRole("textbox",{name:"模擬配裝 JSON"}).inputValue()).items[0],{id:123456789,enchant:22,randomSuffix:3});
+  assert.deepEqual(JSON.parse(await lab.getByRole("textbox",{name:"模擬配裝 JSON"}).inputValue()).items[0],{id:123456789,enchant:22,randomSuffix:-15});
 
 
   await lab.locator(".gt-combat-presets").getByText("第一輪技能時間軸（最多400個事件）",{exact:true}).click();
@@ -488,6 +488,21 @@ const server=http.createServer((req,res)=>{
   await lab.getByText("已讀取 fixture.json，請確認內容後執行。",{exact:true}).waitFor({state:"visible"});
   await lab.getByRole("button",{name:"比較已完成的模擬"}).click();
   assert.ok(await lab.getByText("DPS 500.00 ｜ TPS 700.00 ｜ HPS 未提供 ｜ DTPS 未提供",{exact:true}).isVisible());
+  // A catalog candidate survives navigation and replaces only the selected ring slot.
+  const candidateKey="gt-combat-candidate-v1:spec-26:"+await build.inputValue();
+  await page.evaluate(key=>localStorage.setItem(key,JSON.stringify({id:"123456788",position:"戒指",name:"測試任務戒指"})),candidateKey);
+  const baseRequest=JSON.parse(await gearArea.inputValue());
+  baseRequest.raid.parties[0].players[0].equipment=importedGear;
+  await openTab("audit");await openTab("combat");
+  const pending=lab.getByRole("heading",{name:"待測試的單件裝備",exact:true});
+  await pending.waitFor({state:"visible"});
+  await lab.getByRole("textbox",{name:"原生模擬請求"}).fill(JSON.stringify(baseRequest));
+  await lab.getByLabel("替換位置").selectOption("2");
+  await lab.getByRole("button",{name:"以原始角色為基準套用此候選"}).click();
+  const swapped=JSON.parse(await lab.getByRole("textbox",{name:"模擬配裝 JSON"}).inputValue());
+  assert.deepEqual(swapped.items[0],importedGear.items[0]);assert.deepEqual(swapped.items[14],importedGear.items[14]);assert.equal(swapped.items[11].id,123456788);assert.equal(swapped.items[10].id,undefined);
+  await lab.getByRole("button",{name:"清除待測候選"}).click();
+  assert.equal(await page.evaluate(key=>localStorage.getItem(key),candidateKey),null);
   await spec.selectOption("spec-27");
   assert.ok(await lab.getByRole("heading",{name:"站內原生實戰模擬",exact:true}).isVisible());
   assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).count(),0);
