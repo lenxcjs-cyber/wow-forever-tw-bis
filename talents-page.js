@@ -74,9 +74,16 @@ function skillScenarios(data,profile){
  if(!Array.isArray(rows))return [];
  return rows.filter(x=>x&&typeof x.label==="string"&&x.label.trim()&&typeof x.note==="string"&&Array.isArray(x.skills)&&x.skills.length&&x.skills.every(n=>typeof n==="string"));
 }
+function skillClientRecord(data,cls,name){
+ if(data?.build!=="1.60.1.71139")return null;
+ const x=data.classes?.[cls]?.[name];if(!x||!Array.isArray(x.records)||!x.records.length)return null;
+ const records=x.records.filter(r=>Number.isSafeInteger(r.id)&&r.id>0);if(!records.length)return null;
+ const label=typeof x.name==="string"&&/[\u3400-\u9fff]/.test(x.name)&&records.every(r=>r.name===x.name)?x.name:null;
+ return {name:label,records};
+}
 function skillGuideMatch(row,filters,condition,focus){
- const {terms=[],category="全部用途",acq="all",scenario=null,focusOnly=false}=filters;
- return (category==="全部用途"||category===row[2])&&(acq==="all"||acq===condition.kind)&&(!scenario||scenario.skills.includes(row[1]))&&(!focusOnly||focus.has(row[1]))&&terms.every(t=>row.join(" ").toLowerCase().includes(t));
+ const {terms=[],category="全部用途",acq="all",scenario=null,focusOnly=false,localizedName=""}=filters;
+ return (category==="全部用途"||category===row[2])&&(acq==="all"||acq===condition.kind)&&(!scenario||scenario.skills.includes(row[1]))&&(!focusOnly||focus.has(row[1]))&&terms.every(t=>[...row,localizedName].join(" ").toLowerCase().includes(t));
 }
 function investedTalentRows(profile,cls){
  if(!Array.isArray(profile?.talents))return [];
@@ -85,11 +92,11 @@ function investedTalentRows(profile,cls){
   return {name,points,tree:i,talent:t||null,valid:t?points<=t.maxRank&&!t.notYetAvailable:null};
  }));
 }
-if(typeof module!=="undefined"&&module.exports)module.exports={skillBuildNote,skillScenarios,skillGuideMatch,investedTalentRows,validateCommunitySnapshot,partialBuildCheck,exactProfile,zh,talentSymbol,iconFile,sumIcon,LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
+if(typeof module!=="undefined"&&module.exports)module.exports={skillBuildNote,skillScenarios,skillGuideMatch,skillClientRecord,investedTalentRows,validateCommunitySnapshot,partialBuildCheck,exactProfile,zh,talentSymbol,iconFile,sumIcon,LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
 if(typeof document!=="undefined"){
 const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;},add=(p,...xs)=>{p.append(...xs);return p;},link=(text,url)=>{const a=el("a",text);a.href=url;a.target="_blank";a.rel="noopener noreferrer";return a;};
 const options=(e,rows,value)=>{e.replaceChildren(...rows.map(([v,t])=>new Option(t,v)));if(rows.some(x=>x[0]===value))e.value=value;};
-let skillGuides=null,catalog=null,db=null,mode="build",level=10,selected=null,steps=[],ranks={};
+let skillClient=null,skillGuides=null,catalog=null,db=null,mode="build",level=10,selected=null,steps=[],ranks={};
 const classSel=$("classSelect"),specSel=$("specSelect"),buildSel=$("buildSelect");
 const q=new URLSearchParams(location.search),embedded=q.get("embed")==="1",workspaceLayout=embedded&&q.get("layout")==="workspace";
 if(embedded)document.documentElement.classList.add("embedded");if(workspaceLayout)document.documentElement.classList.add("workspace-talents");
@@ -108,7 +115,7 @@ function renderSkillGuide(profile){
  const data=skillGuides?.format===1?skillGuides:null,guide=data?.specs?.[profile.id];
  host.append(el("h2","專精技能使用指南"));
  if(!guide||guide.class!==classSel.value){host.append(el("p","逐項技能指南尚未取得；請參考遊戲技能書。","muted"));return;}
- const buildNote=skillBuildNote(data,profile),focus=new Set(buildNote?.focus||[]),scenarios=skillScenarios(data,profile);
+ const buildNote=skillBuildNote(data,profile),focus=new Set(buildNote?.focus||[]),scenarios=skillScenarios(data,profile);const client=en=>skillClientRecord(skillClient,guide.class,en);
  const entries=(list)=>Array.isArray(list)?list.filter(x=>Array.isArray(x)&&x.length===4&&x.every(v=>typeof v==="string"&&v.trim())):[];
  const core=entries(guide.skills),common=entries(data.common?.[guide.class]).filter(x=>!core.some(y=>y[1]===x[1]));
  const talentNames=new Set([...(catalog?.profiles||[]).filter(p=>p.cls===profile.cls).flatMap(p=>(p.talents||[]).flatMap(t=>Object.keys(t))),...(getClass()?.talents||[]).map(t=>t.name)]);
@@ -134,11 +141,12 @@ function renderSkillGuide(profile){
  if(scenarios.length){add(scenarioBox,el("summary","戰鬥情境快速查閱"),scenarioButtons,scenarioNote);host.append(scenarioBox);}
  const search=el("input");search.type="search";search.placeholder="搜尋技能、用途或英文原名";search.setAttribute("aria-label","搜尋專精技能");const list=el("div",undefined,"skill-list"),commonBox=el("details",undefined,"skill-common"),commonRows=el("div",undefined,"skill-list"),count=el("p",undefined,"muted");
  const filters=el("div",undefined,"skill-filters"),category=el("select"),acq=el("select");category.setAttribute("aria-label","技能用途分類");acq.setAttribute("aria-label","技能取得條件");for(const value of ["全部用途",...new Set([...core,...common].map(x=>x[2]))])category.append(new Option(value,value));for(const [value,label] of [["all","全部取得狀態"],["trainer","已標記職業習得"],["talent","參考配點已列天賦"],["unlisted","參考配點未列天賦"],["unknown","取得條件待查"]])acq.append(new Option(label,value));add(filters,category,acq);const focusButton=el("button","只看本構築重點"),reset=el("button","清除技能篩選"),actions=el("div",undefined,"skill-filter-actions");focusButton.type=reset.type="button";focusButton.setAttribute("aria-pressed","false");if(focus.size)actions.append(focusButton);actions.append(reset);add(host,search,filters,actions,count,list,commonBox);
- function card(row){const [name,en,kind,use]=row,c=el("article",undefined,"skill-card");add(c,add(el("div",undefined,"skill-name"),el("strong",name),el("small",kind,"skill-kind")),el("small",en,"muted"),el("p",use));
+ function card(row){const [name,en,kind,use]=row,c=el("article",undefined,"skill-card"),metadata=client(en);add(c,add(el("div",undefined,"skill-name"),el("strong",metadata?.name||name),el("small",kind,"skill-kind")),el("small",en+(metadata?.name?" · 客戶端繁中名稱":" · 教學參考名稱"),"muted"),el("p",use));
   const condition=acquisition(en);c.dataset.acquisition=condition.kind;c.dataset.skill=en;c.append(el("p",condition.text,"skill-condition"));if(focus.has(en))c.append(el("small","本構築重點查閱","skill-focus"));
+  if(metadata){const raw=el("details",undefined,"skill-client-records");add(raw,el("summary","客戶端技能紀錄（"+metadata.records.length+" 筆）"),el("p","同職業遮罩及英文名稱對應；不代表每筆均可習得，也不自動認定最高階級。基礎冷卻不包含天賦、觸發、共用鎖定或熱修改動。","muted"));for(const r of metadata.records){const line=el("p");add(line,link("技能 ID "+r.id,"https://www.wowhead.com/forever/spell="+r.id));const fields=[];if(Number.isSafeInteger(r.level)&&r.level>0)fields.push("技能等級欄位 "+r.level);if(Number.isSafeInteger(r.cooldownMs)&&r.cooldownMs>0)fields.push("基礎冷卻 "+r.cooldownMs/1000+" 秒");if(Number.isSafeInteger(r.categoryCooldownMs)&&r.categoryCooldownMs>0)fields.push("類別冷卻 "+r.categoryCooldownMs/1000+" 秒");if(fields.length)line.append(document.createTextNode(" ｜ "+fields.join(" ｜ ")));if(!fields.length)line.append(document.createTextNode(" ｜ 等級及冷卻待核"));raw.append(line);}c.append(raw);}
   return c;
  }
- function draw(){const terms=search.value.trim().toLowerCase().split(/\s+/).filter(Boolean),matches=x=>skillGuideMatch(x,{terms,category:category.value,acq:acq.value,scenario:selectedScenario,focusOnly},acquisition(x[1]),focus),a=core.filter(matches),b=common.filter(matches);list.replaceChildren(...a.map(card));commonRows.replaceChildren(...b.map(card));commonBox.replaceChildren(el("summary","職業共通技能（"+b.length+"）"),commonRows);commonBox.hidden=!b.length;if(terms.length||category.value!=="全部用途"||acq.value!=="all"||selectedScenario||focusOnly)commonBox.open=true;count.textContent="顯示 "+(a.length+b.length)+" / "+(core.length+common.length)+" 項已整理技能";if(!a.length&&!b.length)list.append(el("p","沒有符合條件的已整理技能。","muted"));}
+ function draw(){const terms=search.value.trim().toLowerCase().split(/\s+/).filter(Boolean),matches=x=>skillGuideMatch(x,{terms,category:category.value,acq:acq.value,scenario:selectedScenario,focusOnly,localizedName:client(x[1])?.name||""},acquisition(x[1]),focus),a=core.filter(matches),b=common.filter(matches);list.replaceChildren(...a.map(card));commonRows.replaceChildren(...b.map(card));commonBox.replaceChildren(el("summary","職業共通技能（"+b.length+"）"),commonRows);commonBox.hidden=!b.length;if(terms.length||category.value!=="全部用途"||acq.value!=="all"||selectedScenario||focusOnly)commonBox.open=true;count.textContent="顯示 "+(a.length+b.length)+" / "+(core.length+common.length)+" 項已整理技能";if(!a.length&&!b.length)list.append(el("p","沒有符合條件的已整理技能。","muted"));}
  function selectScenario(row){selectedScenario=row;for(const b of scenarioButtons.children)b.setAttribute("aria-pressed",String(b.dataset.scenario===(row?.label||"")));scenarioNote.textContent=row?row.note+"（專精共通參考，非固定施放順序）":"選擇情境即可篩選下方技能。所有情境均為專精共通參考，需配合目前構築及實際習得。";draw();}
  for(const row of [null,...scenarios]){const b=el("button",row?.label||"全部情境");b.type="button";b.dataset.scenario=row?.label||"";b.setAttribute("aria-pressed",String(!row));b.onclick=()=>selectScenario(row);scenarioButtons.append(b);}
  focusButton.onclick=()=>{focusOnly=!focusOnly;focusButton.setAttribute("aria-pressed",String(focusOnly));draw();};reset.onclick=()=>{search.value="";category.value="全部用途";acq.value="all";focusOnly=false;focusButton.setAttribute("aria-pressed","false");selectScenario(null);commonBox.open=false;};
@@ -196,7 +204,7 @@ async function loadJSON(url){const controller=new AbortController(),timer=setTim
 function snapshotStatus(source){$("status").textContent=db?(db.format==="gt-community-talents/1"?"Talents Forever 社群資料已載入（"+source+"）；各職業版本及熱修日期以來源為準，非71139完整客戶端。":"客戶端資料 1.60.1.71139 已載入（"+source+"）；舊構築將逐項核對。"):"天賦樹資料未載入，可使用原始資料入口或本機匯入。";$("dataFallback").hidden=!!db;}
 async function init(){mode=q.get("mode")==="level"?"level":"build";level=levelAt(q.get("level")||10);classSel.onchange=()=>{selected=null;syncSelectors();render();};specSel.onchange=()=>{selected=null;syncSelectors();render();};buildSel.onchange=()=>{selected=null;render();};$("buildMode").onclick=()=>{mode="build";selected=null;render();};$("levelMode").onclick=()=>{mode="level";selected=null;render();};
  try{catalog=await loadJSON("talent-builds.json");syncSelectors();render();}catch(e){$("status").textContent="構築資料載入失敗："+e.message;}
- await Promise.all([loadJSON("spec-skill-guides.json").then(v=>{if(v?.format===1&&v.specs&&v.common)skillGuides=v;}).catch(()=>{}),loadJSON("talent-icons.json").then(v=>{if(v&&typeof v==="object")iconIndex=v;}).catch(()=>{}),loadJSON("talent-reference-partial.json").then(v=>{if(v?.build==="1.60.1.71139")for(const c of v.classes||[])for(const t of c.talents||[])partialIndex[c.token+":"+t.tree+":"+t.name]=t;}).catch(()=>{}),loadJSON("talent-zhTW.json").then(v=>{if(v?.build==="1.60.1.71139"&&v.entries&&typeof v.entries==="object")localeIndex=v.entries;}).catch(()=>{})]);render();
+ await Promise.all([loadJSON("skill-client.json").then(v=>{if(v?.build==="1.60.1.71139"&&v.classes)skillClient=v;}).catch(()=>{}),loadJSON("spec-skill-guides.json").then(v=>{if(v?.format===1&&v.specs&&v.common)skillGuides=v;}).catch(()=>{}),loadJSON("talent-icons.json").then(v=>{if(v&&typeof v==="object")iconIndex=v;}).catch(()=>{}),loadJSON("talent-reference-partial.json").then(v=>{if(v?.build==="1.60.1.71139")for(const c of v.classes||[])for(const t of c.talents||[])partialIndex[c.token+":"+t.tree+":"+t.name]=t;}).catch(()=>{}),loadJSON("talent-zhTW.json").then(v=>{if(v?.build==="1.60.1.71139"&&v.entries&&typeof v.entries==="object")localeIndex=v.entries;}).catch(()=>{})]);render();
  let source="";const upload=$("clientImport");
  upload.onchange=async()=>{const file=upload.files?.[0];if(!file)return;try{if(file.size>5*1024*1024)throw Error("檔案超過5MB");const raw=await file.text(),d=JSON.parse(raw);if(!validateSnapshot(d))throw Error("版本、格式或九職業資料不完整");db=d;try{localStorage.setItem("gt-talent-client-71139",raw);}catch(e){}snapshotStatus("本機匯入");render();}catch(e){$("status").textContent="匯入失敗："+e.message;}finally{upload.value="";}};
  try{const cached=JSON.parse(localStorage.getItem("gt-talent-client-71139")||"null");if(validateSnapshot(cached)){db=cached;source="本機快取";}}catch(e){}
