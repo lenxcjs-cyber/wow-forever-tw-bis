@@ -1825,7 +1825,7 @@ function combatGuildBatch(request,id,variants,scenarios=null){
  combatRequestPlayer(request,id);
  const names=new Set(["原始配裝"]);
  for(const v of variants){
-  if(!v||typeof v.name!=="string"||!v.name.trim()||v.name.length>80||names.has(v.name)||!["one","two"].includes(v.mode))throw Error("方案名稱不得重複，且需合法武器模式");
+  if(!v||typeof v.name!=="string"||!v.name.trim()||v.name!==v.name.trim()||v.name.length>80||names.has(v.name)||!["one","two"].includes(v.mode))throw Error("方案名稱不得重複，且需合法武器模式");
   names.add(v.name);combatEquipmentRows(v.equipment,v.mode);
  }
  const cases=[],keys=combatBatchScenarios(scenarios);
@@ -1847,7 +1847,7 @@ function combatGuildBatchResults(data,id){
  for(const key of keys){const cfg=guildScenarios[key];
   const rows=[];
   for(const x of data.cases.filter(x=>x?.scenario===key)){
-   if(!Number.isInteger(x.variant)||x.variant<0||x.variant>5||data.expectedCases!=null&&x.variant>=data.expectedCases/keys.length||typeof x.name!=="string"||!x.name.trim()||x.name.length>80||seen.has(key+":"+x.variant))throw Error("批次包含重複或無效方案");
+   if(!Number.isInteger(x.variant)||x.variant<0||x.variant>5||data.expectedCases!=null&&x.variant>=data.expectedCases/keys.length||typeof x.name!=="string"||!x.name.trim()||x.name!==x.name.trim()||x.name.length>80||seen.has(key+":"+x.variant))throw Error("批次包含重複或無效方案");
    seen.add(key+":"+x.variant);
    if(x.variant===0&&x.name!=="原始配裝"||x.variant>0&&x.name==="原始配裝"||variantNames.has(x.variant)&&variantNames.get(x.variant)!==x.name||nameVariants.has(x.name)&&nameVariants.get(x.name)!==x.variant)throw Error("跨遭遇的方案名稱或編號不一致");
    variantNames.set(x.variant,x.name);nameVariants.set(x.name,x.variant);
@@ -1872,6 +1872,7 @@ function combatGuildBatchResults(data,id){
 function combatGuildBatchResultView(parent,id){
  const c=box(parent,"多方案原生批次結果匯入","匯入站內或本機批次工具的結果，分開比較所選標準遭遇。只接受對應專精及固定版本格式；本站不能證明外部檔案未遭修改。");
  const area=node("textarea"),msg=node("p","","gt-muted"),out=node("div");area.rows=4;area.setAttribute("aria-label","三遭遇批次結果 JSON");area.placeholder="貼上 tomb-guild-results/1 JSON";
+ area.addEventListener("input",()=>{out.replaceChildren();msg.textContent="結果資料已變更，請重新比較。";});
  const render=()=>{out.replaceChildren();try{
   const data=combatGuildBatchResults(combatReadJSON(area.value),id);
   for(const g of data.groups){
@@ -2030,7 +2031,7 @@ function combatGearView(parent,id,build,nativeView){
    try{
     const base=combatRequestPlayer(combatReadJSON(request.value),id).equipment;
     const gear=combatCandidateReplacement(base,mode.value,pending.position,pending.id,Number(twin.value));
-    imported.value=JSON.stringify(gear,null,2);importMode.value=mode.value;if(!loadEquipment())throw Error("配裝編輯器未接受候選");preserve.checked=false;
+    imported.value=JSON.stringify(gear,null,2);imported.dispatchEvent(new Event("input",{bubbles:true}));importMode.value=mode.value;if(!loadEquipment())throw Error("配裝編輯器未接受候選");preserve.checked=false;
     status.textContent="已載入單件替換方案；請核對附魔，加入批次或送入原生模擬。";
    }catch(e){status.textContent="無法套用："+e.message;}
   }),button("清除待測候選",clearPending),status);
@@ -2060,9 +2061,9 @@ function combatGearView(parent,id,build,nativeView){
    msg.textContent="比較 "+result.changes.length+" 個裝備位置；下載的是同一基準設定的 A／B 請求，並非模擬結果。";
   }catch(e){msg.textContent="比較失敗："+e.message;}
  }
- add(details,node("summary","選擇配裝與匯出（17 格）"),pendingBox,field("武器配置",mode),importBox,button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows){selected.get(x.name).value=x.featured?String(x.featured.id):"";modifiers.get(x.name).enchant.value="";modifiers.get(x.name).randomSuffix.value="";}refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；預設未選欄位清空原裝備，也可改為保留。同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。可將替換配裝送回上方站內原生模擬。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),scenario,add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),add(node("label",undefined,"gt-check"),preserve,node("span","未選欄位保留原裝備（單件替換模式）")),button("預覽 A／B 配裝變更",compareGear),button("在本站執行所選標準遭遇 A／B",()=>{try{if(!nativeView)throw Error("站內引擎介面未載入");if(!guildPick.value||durationPick.value)throw Error("請選公會標準目標，並將名義戰鬥時間設為沿用原遭遇；自訂時間請使用請求匯出。");if(!trial().changes.length)throw Error("裝備、附魔與詞綴均未變更，不需要重複運算 A／B。");const batch=combatGuildBatch(combatReadJSON(request.value),id,[{name:"目前替換配裝",mode:mode.value,equipment:current(),keepMatching:keep.checked,preserveEmpty:preserve.checked}],[guildPick.value]);nativeView.runBatch(batch);}catch(e){msg.textContent=e.message;}}),preview,button("將替換配裝送至本站原生模擬",()=>{try{if(!nativeView)throw Error("站內引擎介面未載入");nativeView.load(trial().candidate);msg.textContent="已送往站內原生模擬區，請核對後開始。";}catch(e){msg.textContent=e.message;}}),batchBox,button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=trial().candidate;combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
+ add(details,node("summary","選擇配裝與匯出（17 格）"),pendingBox,field("武器配置",mode),importBox,button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows){selected.get(x.name).value=x.featured?String(x.featured.id):"";modifiers.get(x.name).enchant.value="";modifiers.get(x.name).randomSuffix.value="";}refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；預設未選欄位清空原裝備，也可改為保留。同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。可將替換配裝送回上方站內原生模擬。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),scenario,add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),add(node("label",undefined,"gt-check"),preserve,node("span","未選欄位保留原裝備（單件替換模式）")),button("預覽 A／B 配裝變更",compareGear),button("在本站執行所選標準遭遇 A／B",()=>{try{if(!nativeView)throw Error("站內引擎介面未載入");if(!guildPick.value||durationPick.value)throw Error("請選公會標準目標，並將名義戰鬥時間設為沿用原遭遇；自訂時間請使用請求匯出。");if(!trial().changes.length)throw Error("裝備、附魔與詞綴均未變更，不需要重複運算 A／B。");const batch=combatGuildBatch(combatReadJSON(request.value),id,[{name:"目前替換配裝",mode:mode.value,equipment:current(),keepMatching:keep.checked,preserveEmpty:preserve.checked}],[guildPick.value]);nativeView.runBatch(batch);}catch(e){msg.textContent=e.message;}}),preview,button("將替換配裝送至本站原生模擬",async()=>{const rev=requestRevision;try{if(!nativeView)throw Error("站內引擎介面未載入");const ok=await nativeView.load(trial().candidate);if(c.isConnected&&rev===requestRevision)msg.textContent=ok?"已送往站內原生模擬區，請核對後開始。":"未完成角色匯入，請查看原生模擬區的提示。";}catch(e){if(c.isConnected&&rev===requestRevision)msg.textContent=e.message;}}),batchBox,button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=trial().candidate;combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
  mode.addEventListener("change",()=>{const old=stored.slots||{},rows=all();stored={...stored,mode:mode.value,slots:{...old,...Object.fromEntries(rows.map(x=>[x.name,x.id]))},mods:{...stored.mods,...Object.fromEntries(rows.map(x=>[x.name,{enchant:x.enchant,randomSuffix:x.randomSuffix}]))}};draw();});c.append(details);draw();if(pending)details.open=true;if(stored.source){details.open=true;msg.textContent="已帶入："+stored.source+"；請核對裝備與附魔。";}
- const receiveNative=e=>{if(!c.isConnected){parent.removeEventListener("gt-native-request",receiveNative);return;}requestRevision++;try{const p=combatRequestPlayer(e.detail.request,id);request.value=JSON.stringify(e.detail.request,null,2);details.open=true;importMode.value=e.detail.mode;imported.value=JSON.stringify(p.equipment,null,2);if(!loadEquipment())throw Error("角色配裝未能載入編輯器，請核對匯入資料");preserve.checked=false;batchVariants.splice(0);drawBatch();request.dispatchEvent(new Event("input",{bubbles:true}));msg.textContent="已帶入角色原生請求與現有裝備；修改想測試的部位後加入批次。舊批次已清空。";c.scrollIntoView({block:"start"});}catch(err){msg.textContent=err.message;}};parent.addEventListener("gt-native-request",receiveNative);
+ const receiveNative=e=>{if(!c.isConnected){parent.removeEventListener("gt-native-request",receiveNative);return;}requestRevision++;try{const p=combatRequestPlayer(e.detail.request,id);request.value=JSON.stringify(e.detail.request,null,2);details.open=true;importMode.value=e.detail.mode;imported.value=JSON.stringify(p.equipment,null,2);imported.dispatchEvent(new Event("input",{bubbles:true}));if(!loadEquipment())throw Error("角色配裝未能載入編輯器，請核對匯入資料");preserve.checked=false;batchVariants.splice(0);drawBatch();request.dispatchEvent(new Event("input",{bubbles:true}));msg.textContent="已帶入角色原生請求與現有裝備；修改想測試的部位後加入批次。舊批次已清空。";c.scrollIntoView({block:"start"});}catch(err){msg.textContent=err.message;}};parent.addEventListener("gt-native-request",receiveNative);
  return async path=>{
   const valid=combatRequestPath(path,id);if(!valid)throw Error("請求檔案路徑不合法");const token=++requestRevision;
   const response=await fetch(valid,{cache:"no-cache"});if(!response.ok)throw Error("HTTP "+response.status);
@@ -2184,20 +2185,20 @@ function nativeBrowserBatchJobs(batch,id,meta,n){
  const keys=combatBatchScenarios(batch.scenarios),expected=batch.cases.length/keys.length,seen=new Set(),jobs=[];
  if(![2,3,4,5,6].includes(expected))throw Error("無效配裝批次案例數");
  for(const x of batch.cases){
-  if(!x||!keys.includes(x.scenario)||!Number.isInteger(x.variant)||x.variant<0||x.variant>=expected||typeof x.name!=="string"||!x.name.trim()||x.name.length>80||seen.has(x.scenario+":"+x.variant))throw Error("無效或重複配裝案例");
+  if(!x||!keys.includes(x.scenario)||!Number.isInteger(x.variant)||x.variant<0||x.variant>=expected||typeof x.name!=="string"||!x.name.trim()||x.name!==x.name.trim()||x.name.length>80||seen.has(x.scenario+":"+x.variant))throw Error("無效或重複配裝案例");
   seen.add(x.scenario+":"+x.variant);
   const request=nativeBrowserRequest(x.request,id,x.scenario,n),p=combatRequestPlayer(request,id);
   p.equipment=nativeImportGear(p.equipment,meta);
   jobs.push({scenario:x.scenario,variant:x.variant,name:x.name,request});
  }
  const signature=req=>{const r=JSON.parse(JSON.stringify(req));delete combatRequestPlayer(r,id).equipment;return nativeCanonicalJSON(r);};
- const variantSignatures=new Map(),names=new Set();
+ const variantSignatures=new Map(),names=new Set(),equipmentSignatures=new Set();
  // The encounter may change; the actual character and each named equipment variant must not.
  const crossScenarioSignature=job=>{const r=JSON.parse(JSON.stringify(job.request));delete r.encounter;return nativeCanonicalJSON(r);};
  for(const job of jobs){
   const sig=JSON.stringify([job.name,crossScenarioSignature(job)]);
   if(variantSignatures.has(job.variant)){if(variantSignatures.get(job.variant)!==sig)throw Error("同一配裝方案在不同遭遇使用了不同角色設定或裝備");}
-  else{if(names.has(job.name))throw Error("配裝方案名稱不得重複");names.add(job.name);variantSignatures.set(job.variant,sig);}
+  else{if(names.has(job.name))throw Error("配裝方案名稱不得重複");const gearSig=nativeCanonicalJSON(combatRequestPlayer(job.request,id).equipment);if(equipmentSignatures.has(gearSig))throw Error("原始配裝或候選方案的裝備、附魔及詞綴完全相同，請移除重複方案");equipmentSignatures.add(gearSig);names.add(job.name);variantSignatures.set(job.variant,sig);}
  }
  for(const k of keys){
   const rows=jobs.filter(x=>x.scenario===k),base=rows.find(x=>x.variant===0);
@@ -2249,7 +2250,7 @@ function nativeBrowserView(parent,id){
    }catch(e){configMsg.textContent="修改失敗："+e.message;}});
    add(config,node("summary","核對／修改技能策略、消耗品及團隊增益"),node("p","初次使用建議沿用範本。進階使用者可修改原生 JSON；技能與消耗品使用引擎 ID，輸入內容由原生引擎驗證。","gt-muted"),rawPreview,applyConfig,button("還原為目前已套用設定",()=>{rawPreview.value=JSON.stringify(editable(),null,2);configMsg.textContent="已還原未儲存變更。";}),configMsg);preview.append(config);
    status.textContent="已匯入，請確認構築、裝備與戰鬥設定。";
-  }catch(e){if(token!==active||!c.isConnected)return;status.textContent="匯入失敗："+e.message;character=null;preview.replaceChildren();}sync();
+  }catch(e){if(token!==active||!c.isConnected)return false;status.textContent="匯入失敗："+e.message;character=null;preview.replaceChildren();}sync();return !!character;
  }
  async function run(batch=null){
   if(!ready||worker||(!batch&&!character)){if(!ready)status.textContent="站內原生引擎尚未可用。";return;}
@@ -2318,7 +2319,7 @@ function nativeBrowserView(parent,id){
  }).catch(e=>{if(!c.isConnected)return;readyText.textContent="站內原生引擎尚未發布或載入失敗："+e.message+"。不以自訂模型冒充原生模擬。";status.textContent="目前無法在本站執行原生引擎。";sync();});
  // Stop CPU work if the user navigates away from the combat view.
  const watch=new MutationObserver(()=>{if(!c.isConnected){watch.disconnect();if(worker)stop("頁面切換，已停止。");}});watch.observe(document.body,{childList:true,subtree:true});
- return {load:raw=>{if(worker){status.textContent="請先停止目前運算。";return;}area.value=JSON.stringify(raw,null,2);clear();c.scrollIntoView({block:"start"});return importCharacter(false);},runBatch:batch=>{if(worker){status.textContent="請先停止目前運算。";return;}c.scrollIntoView({block:"start"});return run(batch);}};
+ return {load:raw=>{if(worker)throw Error("請先停止目前運算。");if(!ready)throw Error("站內原生引擎尚未可用。");area.value=JSON.stringify(raw,null,2);clear();c.scrollIntoView({block:"start"});return importCharacter(false);},runBatch:batch=>{if(worker){status.textContent="請先停止目前運算。";return;}c.scrollIntoView({block:"start"});return run(batch);}};
 }
 function combatLab(){
  title("實戰模擬","站內原生引擎、角色匯入與三種公會遭遇；另保留獨立自訂簡化模型。");
