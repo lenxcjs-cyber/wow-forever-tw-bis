@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -553,3 +553,33 @@ assert.equal(combat.combatBestPriority({...healBase,skills:[healSkill,{...healSk
 assert.throws(()=>combat.simulatePriority({...healBase,healingDemand:{rate:-1}}));
 assert.throws(()=>combat.simulatePriority({...healBase,healingDemand:undefined,skills:[{...healSkill,healMin:4}]}));
 console.log("PASS: all-spec coverage, role objective defaults, raw native JSON validation and effective healing conservation");
+
+
+// Native equipment export uses 17 fixed protocol positions including empty offhand.
+const gearExport=combat.combatEquipmentSpec([{name:"戒指 1",id:"101"},{name:"戒指 2",id:"102"},{name:"飾品 1",id:"103"},{name:"飾品 2",id:"104"},{name:"雙手武器",id:"105"},{name:"遠程／聖物",id:"106"}],"two");
+assert.equal(gearExport.items.length,17);
+assert.deepEqual(gearExport.items.slice(10),[{id:101},{id:102},{id:103},{id:104},{id:105},{},{id:106}]);
+assert.throws(()=>combat.combatEquipmentSpec([{name:"雙手武器",id:"1"},{name:"副手物品",id:"2"}],"two"));
+assert.throws(()=>combat.combatEquipmentSpec([{name:"戒指 1",id:"101"},{name:"戒指 2",id:"101"}],"one"));
+assert.throws(()=>combat.combatEquipmentSpec([{name:"肩部",id:"-1"}],"one"));
+assert.throws(()=>combat.combatEquipmentSpec([{name:"肩部",id:"1"},{name:"肩部",id:"2"}],"one"));
+const gearRequest={type:"SimTypeIndividual",raid:{parties:[{players:[{dpsWarrior:{},rotation:{type:"TypeAPL"},equipment:{items:Array.from({length:17},(_,i)=>i===10?{id:101,enchant:88,randomSuffix:9}:i===14?{id:333,enchant:77}:{})},talentsString:"fixture",consumables:{foodId:12}}]}]},encounter:{targets:[{}],duration:180},simOptions:{iterations:1000}};
+const modifiedGear=combat.combatApplyEquipment(gearRequest,gearExport,"spec-1");
+const player=modifiedGear.raid.parties[0].players[0];
+assert.deepEqual(player.equipment.items[10],{id:101,enchant:88,randomSuffix:9});
+assert.deepEqual(player.equipment.items[14],{id:105});
+assert.deepEqual(player.equipment.items[15],{});
+assert.equal(player.talentsString,"fixture");
+assert.equal(player.consumables.foodId,12);
+assert.equal(modifiedGear.encounter.duration,180);
+assert.equal(gearRequest.raid.parties[0].players[0].equipment.items[14].id,333);
+assert.deepEqual(combat.combatApplyEquipment(gearRequest,gearExport,"spec-1",false).raid.parties[0].players[0].equipment.items[10],{id:101});
+assert.throws(()=>combat.combatApplyEquipment(gearRequest,gearExport,"spec-19"));
+assert.throws(()=>combat.combatApplyEquipment({...gearRequest,type:"SimTypeRaid"},gearExport,"spec-1"));
+const swapRequest=JSON.parse(JSON.stringify(gearRequest));swapRequest.raid.parties[0].players[0].enableItemSwap=true;
+assert.throws(()=>combat.combatApplyEquipment(swapRequest,gearExport,"spec-1"));
+assert.equal(combat.combatRequestPath("combat-requests/spec-1-0123456789abcdef.json","spec-1"),"combat-requests/spec-1-0123456789abcdef.json");
+assert.equal(combat.combatRequestPath("combat-requests/spec-1-0123456789abcdef.json","spec-2"),null);
+assert.equal(combat.combatRequestPath("../combat-requests/spec-1-0123456789abcdef.json","spec-1"),null);
+assert.throws(()=>combat.combatReadJSON("not json"));
+console.log("PASS: fixed 17-slot export, duplicate rejection, native request copy/enchants/spec guards and scoped paths");
