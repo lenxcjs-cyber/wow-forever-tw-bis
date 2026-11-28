@@ -23,7 +23,7 @@ def invoke(cli,root,args,payload=None):
         raise ValueError("Engine reported error: "+str(data.get("error"))[:500])
     return data
 def apl_result(data):
-    if not finite(data.get("dps",{}).get("mean")) or not finite(data.get("duration")) or data["duration"]<=0 or data.get("iterations")!=ITERATIONS:
+    if not finite(data.get("dps",{}).get("mean")) or data["dps"]["mean"]<0 or not finite(data.get("duration")) or data["duration"]<=0 or data.get("iterations")!=ITERATIONS:
         raise ValueError("Incomplete APL simulation")
     events=[{"timeMs":x["timeMs"],"label":str(x.get("label") or x.get("path") or "")[:500]} for x in data.get("timeline",[]) if isinstance(x,dict) and finite(x.get("timeMs"))]
     if not events: raise ValueError("No recorded APL actions")
@@ -196,6 +196,8 @@ def main(cli,root,output):
             if spec in ("spec-5","spec-27"):
                 try:d["tank"]=tank_result(cli,root,settings)
                 except (OSError,ValueError,subprocess.SubprocessError) as e:print("Tank metrics unavailable:",str(e)[:300])
+            # Reject invalid numeric payloads before adding them to the partial snapshot.
+            json.dumps(d,ensure_ascii=False,allow_nan=False)
             cases.append(d);print("Native engine preset:",spec,"iterations",d["iterations"],"timeline",len(d["timeline"]))
             publish()
         except (OSError,ValueError,subprocess.SubprocessError) as e:
