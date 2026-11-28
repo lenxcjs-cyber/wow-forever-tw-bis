@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -467,3 +467,25 @@ assert.equal(sanitized.dps,10);assert.equal(sanitized.tps,null);assert.equal(san
 assert.throws(()=>combat.combatResult({...invalidMetrics,error:{type:"Error"}}));
 assert.throws(()=>combat.combatResult({...invalidMetrics,raidMetrics:{parties:{}}}));
 console.log("PASS: timed priorities, resource pooling, encounter boundary, phase conservation, overcap and invalid metric handling");
+
+
+// Exact event boundaries, encounter length sweeps and delayed opening comparisons.
+const thresholdSkill={name:"Threshold",cost:10,gain:0,cd:0,cast:0,damage:100,threat:20};
+const thresholdBase={duration:10,gcd:1,cap:100,initial:0,regen:3,skills:[thresholdSkill]};
+const thresholdResult=combat.simulatePriority(thresholdBase);
+assert.ok(Math.abs(thresholdResult.events[0].time-10/3)<1e-8);
+assert.equal(combat.simulatePriority({...thresholdBase,initial:100,skills:[{...thresholdSkill,earliest:1.037}]}).events[0].time,1.037);
+assert.equal(combat.simulatePriority({...thresholdBase,regen:0}).events.length,0);
+assert.equal(combat.simulatePriority({...thresholdBase,skills:[{...thresholdSkill,reserve:100}]}).events.length,0);
+const durationRows=combat.combatDurationSweep(thresholdBase,"damage");
+assert.deepEqual(durationRows.map(x=>x.duration),[30,60,120,180]);
+assert.ok(durationRows.every(x=>x.best&&x.best.result.duration===x.duration));
+assert.equal(combat.combatDurationSweep({...thresholdBase,skills:[{...thresholdSkill,earliest:45}]},"damage")[0].original.events.length,0);
+const timingRows=combat.combatTimingSweep(thresholdBase,"Threshold","damage");
+assert.deepEqual(timingRows.rows.map(x=>x.offset),[0,1,3,5]);
+assert.ok(timingRows.best.result.rate.damage>=timingRows.baseline.rate.damage);
+assert.throws(()=>combat.combatTimingSweep(thresholdBase,"missing","damage"));
+assert.equal(combat.combatSkillStats(thresholdResult).reduce((sum,x)=>sum+x.damage,0),thresholdResult.totals.damage);
+assert.equal(combat.combatEngineURL("x-26"),null);
+assert.equal(combat.combatEngineURL("spec-026"),null);
+console.log("PASS: exact resource thresholds, encounter length comparisons, opening delay grid and skill contribution");
