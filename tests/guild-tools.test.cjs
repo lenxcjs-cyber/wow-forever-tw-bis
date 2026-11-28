@@ -754,6 +754,12 @@ assert.equal(tierLogic.catalogExactSet(tierPools,"A",4),null);
 const setScreen=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSetPlans,catalogSetTierComparison,catalogSetShortlist};")();
 const screenPools=new Map([["頭部",[tierItem(21,"A",12),tierItem(22,"",10),tierItem(23,"B",7)]],["肩部",[tierItem(24,"",10),tierItem(25,"B",9),tierItem(26,"A",8)]]]);
 const exactPlans=setScreen.catalogExactSetPlans(screenPools,"A",2);
+const sparseSetPools=new Map([["頭部",[{item:{id:900,item_set:"A"},score:{total:12}},{item:{id:901},score:{total:10}}]],["肩部",[{item:{id:902,item_set:"A"},score:{total:8}},{item:{id:903},score:{total:10}}]],["飾品",[{item:{id:904,item_set:"A"},score:{total:100}}]]]);
+const sparseBase=[{...sparseSetPools.get("頭部")[1],slot:"頭部"},{...sparseSetPools.get("肩部")[1],slot:"肩部"}];
+const coverageExact=setScreen.catalogExactSetPlans(sparseSetPools,"A",2,sparseBase).get(2);
+assert.equal(coverageExact.total,20);assert.equal(coverageExact.picks.length,2);
+assert.equal(multiSet.catalogMultiSetAlternative(sparseSetPools,[{name:"A",minimum:2}],sparseBase).total,20);
+assert.equal(setScreen.catalogSetTierComparison(sparseSetPools,"A",2,[],true).rows.find(x=>x.count===2).comparable,true);
 assert.deepEqual([...exactPlans.keys()].sort(),[0,1,2]);
 assert.equal(exactPlans.get(0).total,20);
 assert.equal(exactPlans.get(1).total,22);
@@ -780,6 +786,9 @@ const nativeTier={cases:[{pieces:0,duration:60,metrics:{dps:100,tps:100,dtps:20,
 assert.equal(tierLogic.nativeSetComparison(nativeTier,"dps").firstWin,2);
 assert.equal(tierLogic.nativeSetComparison(nativeTier,"tank").firstWin,4);
 assert.equal(tierLogic.nativeSetComparison(nativeTier,"tank").rows.length,2);
+const unequalSet={...nativeTier,cases:nativeTier.cases.map((x,i)=>({...x,iterations:i===1?50:200}))};
+assert.equal(tierLogic.nativeSetComparison(unequalSet,"dps").firstWin,4);
+assert.equal(tierLogic.nativeSetComparison(unequalSet,"dps").rows.length,1);
 console.log("PASS: guild target HP/level/zero mitigation, orientation, exact set tiers and native survival-aware threshold comparison");
 
 
