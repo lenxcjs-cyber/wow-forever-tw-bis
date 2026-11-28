@@ -120,6 +120,22 @@ class PresetTests(unittest.TestCase):
         changed_buff=mod.direct_request({**source,"raidBuffs":{"arcaneIntellect":False}})
         self.assertNotEqual(mod.direct_comparison_group(original),mod.direct_comparison_group(changed_buff))
 
+    def test_native_action_aggregation(self):
+        result={"iterationsDone":10,"raidMetrics":{"parties":[{"players":[{"dps":{"avg":100},"actions":[
+            {"id":{"spellId":123,"rank":2},"targets":[{"damage":200,"threat":300,"manualCasts":10},{"damage":400,"threat":100,"manualCasts":10}]},
+            {"id":{"itemId":99},"isPassive":True,"targets":[{"damage":100}]},
+            {"id":{"spellId":456},"targets":[{"damage":-2}]}],
+            "pets":[{"name":"Wolf","actions":[{"id":{"spellId":789},"targets":[{"damage":500}]}]}]}]}]}}
+        rows=mod.direct_action_rows(result)
+        self.assertEqual(len(rows),3)
+        self.assertEqual(rows[0]["id"],123)
+        self.assertEqual(rows[0]["damage"],60)
+        self.assertEqual(rows[0]["threat"],40)
+        self.assertEqual(rows[0]["manualCasts"],2)
+        self.assertEqual(rows[1]["owner"],"角色／Wolf")
+        self.assertEqual(rows[1]["damage"],50)
+        self.assertTrue(rows[2]["passive"])
+
     def test_direct_metrics(self):
         valid={"iterationsDone":mod.ITERATIONS,"avgIterationDuration":180,
                "raidMetrics":{"parties":[{"players":[{"dps":{"avg":321},"threat":{"avg":456},"dtps":{"avg":-5},"hps":{"avg":0},"chanceOfDeath":0.1}]}]},"logs":"fixture"}
