@@ -82,6 +82,32 @@ class PresetTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.direct_request({"player":{},"encounter":{}})
 
+    def test_native_target_variants_and_request_files(self):
+        import json
+        original={"player":{"rotation":{"type":"TypeAPL"},"talentsString":"fixture"},
+                  "encounter":{"duration":180,"durationVariation":5,"targets":[{"id":31146,"name":"Raid Target","tankIndex":0,"level":63}]},
+                  "tanks":[{"type":"Player","index":0}]}
+        request=mod.direct_request(original,60,3)
+        targets=request["encounter"]["targets"]
+        self.assertEqual(len(targets),3)
+        self.assertEqual(len(original["encounter"]["targets"]),1)
+        self.assertEqual([x["name"] for x in targets],["Raid Target 1","Raid Target 2","Raid Target 3"])
+        self.assertTrue(all(x["tankIndex"]==0 and x["level"]==63 for x in targets))
+        targets[1]["level"]=62
+        self.assertEqual(targets[0]["level"],63)
+        self.assertNotEqual(mod.direct_comparison_group(request),mod.direct_comparison_group(mod.direct_request(original,60)))
+        with self.assertRaises(ValueError):
+            mod.direct_request(original,60,9)
+        with self.assertRaises(ValueError):
+            mod.direct_request(original,0)
+        with tempfile.TemporaryDirectory() as tmp:
+            name=mod.write_request_file(tmp,"spec-3",request)
+            self.assertRegex(name,r"^combat-requests/spec-3-[a-f0-9]{16}\.json$")
+            self.assertEqual(json.loads((Path(tmp)/name).read_text(encoding="utf-8")),request)
+            self.assertEqual(mod.write_request_file(tmp,"spec-3",request),name)
+            with self.assertRaises(ValueError):
+                mod.write_request_file(tmp,"../spec-3",request)
+
     def test_direct_comparison_groups(self):
         source={"player":{"rotation":{"type":"TypeAPL"},"talentsString":"A","buffs":{"greaterBlessingOfKings":True}},
                 "encounter":{"duration":180,"durationVariation":5,"targets":[{"id":31146}]},
