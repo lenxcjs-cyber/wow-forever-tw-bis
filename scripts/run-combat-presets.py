@@ -451,70 +451,6 @@ def direct_case(cli,root,job,duration=None,output_dir=None,targets=None,scenario
     if scenario:config+=" 公會標準遭遇覆蓋原目標；零基礎護甲及抗性、固定時間、坦克正面／其他背面；坦克受擊為示意每2秒300（首領1000）基礎傷害。非擊殺模擬。"
     return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"scenario":scenario,"targetHealth":GUILD_SCENARIOS[scenario]["health"] if scenario else None,"targetLevel":GUILD_SCENARIOS[scenario]["level"] if scenario else None,"inFrontOfTarget":request["raid"]["parties"][0]["players"][0].get("inFrontOfTarget"),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeActions":direct_action_rows(result),"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
 
-def set_trial_requests(request,spec,catalog,effects):
-    """Bounded actual-engine set test on existing gear, not an exhaustive BiS search.
-    Compare exact thresholds of a set already worn, against same-subclass,
-    same-slot non-set catalog replacements, with the same other equipment.
-    """
-    p=request["raid"]["parties"][0]["players"][0]
-    gear=p.get("equipment",{}).get("items",[])
-    if len(gear)!=17 or p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or '"itemSwap":' in json.dumps(p.get("rotation",{})):
-        return []
-    records={int(x["id"]):x for x in catalog if isinstance(x,dict) and str(x.get("id","")).isdigit()}
-    def set_name(x):
-        return str(x.get("item_set") or "").strip()
-    worn={}
-    for i,item in enumerate(gear[:14]):
-        row=records.get(item.get("id"),{})
-        name=set_name(row)
-        if name and not row.get("estimated"):
-            worn.setdefault(name,[]).append((i,row))
-    choices=[]
-    for name,slots in worn.items():
-        matches=[x for x in effects if name in (x.get("name"),x.get("alternativeName"))]
-        if len(matches)!=1:continue
-        thresholds=sorted({x["pieces"] for x in matches[0].get("bonuses",[]) if type(x.get("pieces")) is int and 1<=x["pieces"]<=len(slots)})
-        if thresholds:choices.append((len(thresholds),len(slots),name,slots,thresholds))
-    if not choices:return []
-    _,_,name,slots,thresholds=max(choices,key=lambda x:(x[0],x[1],x[2]))
-    # Same armor subclass and class mask as permitted by the target class.
-    class_bits=[1,2,3,4,5,7,8,9,11]
-    bit=1<<(class_bits[min(8,(int(spec.split("-")[1])-1)//3)]-1)
-    used={item.get("id") for item in gear if item.get("id")}
-    replacements={}
-    for index,original in slots:
-        def valid(x):
-            mask=x.get("class_mask",-1)
-            try:mask=int(mask if mask is not None else -1)
-            except (TypeError,ValueError):return False
-            return (x.get("item_class")=="Armor" and x.get("slot")==original.get("slot") and x.get("subclass")==original.get("subclass") and not set_name(x) and not x.get("estimated") and str(x.get("source_summary") or "").strip() and not x.get("required_reputation") and not x.get("required_skill") and not x.get("required_profession") and finite(x.get("item_level")) and (x.get("required_level") or 0)<=60 and (mask in (-1,0) or mask&bit))
-        candidates=[x for xid,x in records.items() if xid not in used and valid(x)]
-        if not candidates:return []
-        # Conservative deterministic sample, not stat-weight or global optimization.
-        best=max(candidates,key=lambda x:(x["item_level"],-int(x["id"])))
-        replacements[index]=int(best["id"])
-        used.add(int(best["id"]))
-    family=hashlib.sha256(json.dumps({"request":request,"set":name,"replacements":replacements},sort_keys=True,allow_nan=False).encode()).hexdigest()[:16]
-    trials=[]
-    for n in sorted({0,*thresholds,len(slots)}):
-        q=copy.deepcopy(request)
-        items=q["raid"]["parties"][0]["players"][0]["equipment"]["items"]
-        for j,(index,original) in enumerate(slots):
-            # Strip enchant and suffix at every varied position for all cases,
-            # including the set-on case, so modifiers do not bias comparisons.
-            items[index]={"id":int(original["id"]) if j<n else replacements[index]}
-        trials.append((q,{"id":family,"name":name,"pieces":n,"thresholds":thresholds,"testedMax":len(slots),"method":"原預設已穿套裝；同部位同護甲類型非套裝替換（物品等級排序），變更欄位不附魔／詞綴；非全裝備最佳解"}))
-    return trials
-
-def run_set_trial(cli,root,output_dir,base,request,study):
-    with tempfile.TemporaryDirectory() as tmp:
-        path=Path(tmp)/"request.json"
-        path.write_text(json.dumps(request),encoding="utf-8")
-        result=invoke(cli,root,["sim","--infile",str(path)])
-    metrics,actual,logs=direct_metrics(result)
-    if base["spec"] in TANKS and (not finite(metrics.get("tps")) or not finite(metrics.get("dtps"))):raise ValueError("Missing tank metrics")
-    return {"spec":base["spec"],"label":study["name"]+"／"+str(study["pieces"])+"件／"+GUILD_SCENARIOS[base["scenario"]]["label"],"settings":base["settings"],"apl":base["apl"],"scenario":base["scenario"],"targetHealth":base["targetHealth"],"targetLevel":base["targetLevel"],"targetCount":base["targetCount"],"nominalDuration":base["nominalDuration"],"inFrontOfTarget":base["inFrontOfTarget"],"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeActions":direct_action_rows(result),"nativeLog":logs,"timeline":[],"requestFile":write_request_file(output_dir,base["spec"],request),"configuration":study["method"],"comparisonGroup":"套裝控制組／"+study["id"],"setStudy":study}
-
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
     cases=[]
@@ -590,42 +526,6 @@ def main(cli,root,output):
     for job,key in scenario_grid:
         if time.monotonic()-start>1200:break
         run_direct(job,scenario=key)
-    # Actual set effects are handled by the pinned engine itself. Use the
-    # successful standard boss request for one existing set per spec. Test
-    # each threshold across specs in rounds, before legacy variants.
-    set_queues=[]
-    try:
-        catalog=json.loads((output.parent/"gear-catalog.json").read_text(encoding="utf-8"))["items"]
-        effects_doc=json.loads((output.parent/"set-effects.json").read_text(encoding="utf-8"))
-        if effects_doc.get("commit")!=COMMIT:raise ValueError("Set effects version mismatch")
-        effects=effects_doc["sets"]
-        for base in list(cases):
-            if base.get("scenario")!="guild-boss" or not base.get("requestFile"):continue
-            try:
-                q=json.loads((output.parent/base["requestFile"]).read_text(encoding="utf-8"))
-                trials=set_trial_requests(q,base["spec"],catalog,effects)
-                if trials:
-                    set_queues.append((base,trials))
-                    planned_by_spec[base["spec"]]+=len(trials)
-                    planned+=len(trials)
-            except (OSError,ValueError,KeyError,TypeError) as e:
-                print("Set trial planning skipped:",base["spec"],str(e)[:200])
-    except (OSError,ValueError,KeyError,TypeError) as e:
-        print("Set trial catalog unavailable:",str(e)[:200])
-    publish()
-    for index in range(max((len(q) for _,q in set_queues),default=0)):
-        for base,queue in set_queues:
-            if time.monotonic()-start>1200:break
-            if index>=len(queue):continue
-            q,study=queue[index]
-            try:
-                row=run_set_trial(cli,root,output.parent,base,q,study)
-                json.dumps(row,ensure_ascii=False,allow_nan=False)
-                cases.append(row)
-            except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
-                failed.append({"spec":base["spec"],"label":study["name"]+"／"+str(study["pieces"])+"件","scenario":base["scenario"],"reason":failure_kind(e)})
-            publish()
-        if time.monotonic()-start>1200:break
     # Preserve legacy baseline evidence only if time remains.
     for index in range(max(len(first_direct),len(siml_first))):
         if time.monotonic()-start>1200:break
