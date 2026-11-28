@@ -727,6 +727,29 @@ function catalogSetAlternative(pools,name,minimum){
  const feasible=[...states].filter(([count])=>count>=minimum).sort((a,b)=>b[1].total-a[1].total||b[0]-a[0]);
  return feasible.length?{count:feasible[0][0],...feasible[0][1]}:null;
 }
+function catalogMultiSetAlternative(pools,requirements){
+ if(!Array.isArray(requirements)||requirements.length<1||requirements.length>2||requirements.some(r=>!r||typeof r.name!=="string"||!r.name||!Number.isInteger(r.minimum)||r.minimum<2||r.minimum>14)||new Set(requirements.map(r=>r.name)).size!==requirements.length||requirements.reduce((n,r)=>n+r.minimum,0)>14)return null;
+ const names=requirements.map(r=>r.name),minima=requirements.map(r=>r.minimum),zero=names.map(()=>0);
+ let states=new Map([[zero.join(","),{counts:zero,total:0,picks:[]}]]);
+ for(const [slot,capacity] of catalogArmorGroups){
+  const rows=pools.get(slot)||[],buckets=names.map(name=>rows.filter(p=>catalogSetName(p.item)===name));
+  const other=rows.filter(p=>!names.includes(catalogSetName(p.item))&&p.score.total>0);
+  const choices=[];
+  function choose(index,counts,remaining,selected){
+   if(index===names.length){const picks=[...selected,...other.slice(0,remaining)].map(p=>({...p,slot}));choices.push({counts,picks,total:picks.reduce((n,p)=>n+p.score.total,0)});return;}
+   for(let n=0;n<=Math.min(remaining,buckets[index].length);n++)choose(index+1,[...counts,n],remaining-n,[...selected,...buckets[index].slice(0,n)]);
+  }
+  choose(0,[],capacity,[]);
+  const next=new Map();
+  for(const prev of states.values())for(const c of choices){
+   const counts=prev.counts.map((n,i)=>n+c.counts[i]),key=counts.map((n,i)=>Math.min(n,minima[i])).join(","),total=prev.total+c.total;
+   if(!next.has(key)||total>next.get(key).total)next.set(key,{counts,total,picks:[...prev.picks,...c.picks]});
+  }
+  states=next;
+ }
+ const result=states.get(minima.join(","));
+ return result?{...result,sets:names.map((name,i)=>({name,count:result.counts[i],minimum:minima[i]}))}:null;
+}
 function catalogSetTradeoff(base,alternative,netBonus=null){
  if(!Number.isFinite(base)||!Number.isFinite(alternative)||!Number.isFinite(base-alternative))return null;
  const gap=base-alternative;
@@ -846,7 +869,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
     for(const {item:x,position,score} of [...(weapon.melee?.picks||[]),...weapon.extra])add(w,node("p",position+"｜"+score.total.toFixed(2)),link(zhItem(x)+"（"+gearType(x)+"）","https://www.wowhead.com/forever/tw/item="+x.id),node("p",score.parts.map(v=>v.label+" "+v.value+" × "+v.weight).join("；")||"無已計分屬性","gt-muted"),node("p",x.source_summary||"來源待查"));
     rows.append(w);
     const setPanel=node("section",undefined,"gt-card gt-catalog-set-plan"),baseline=plan.groups.flatMap(g=>g.picks.map(p=>({...p,slot:g.slot}))),setCounts=catalogSetCounts(baseline);
-    add(setPanel,node("h4","套裝件數與散件取捨"),node("p",setCounts.length?"目前防具方案："+setCounts.map(([n,c])=>zhDisplay(n)+" "+c+" 件").join("；"):"目前防具方案未包含已標記套裝。","gt-muted"),node("p","僅依客戶端套裝名稱辨識，名稱相同不保證套裝ID一致。指定最低件數可找出面板分數最高的防具替代方案；套裝效果不自動計分。","gt-muted"));
+    add(setPanel,node("h4","套裝件數與散件取捨"),node("p",setCounts.length?"目前防具方案："+setCounts.map(([n,c])=>zhDisplay(n)+" "+c+" 件").join("；"):"目前防具方案未包含已標記套裝。","gt-muted"),node("p","僅依客戶端套裝名稱辨識，名稱相同不保證套裝ID一致。可同時指定一至兩套裝的最低件數，搜尋符合條件的最高面板防具方案；套裝效果不自動計分。","gt-muted"));
     const pools=catalogSetPools(spec,data.items,data.prof,weights,options),sets=catalogSetOptions(pools);
     const weaponPicks=[...(weapon.melee?.picks||[]),...weapon.extra],exportPlan=(armor,label,total)=>{
      const text=catalogPlanText({spec:spec.name||spec.id,build:buildFor(spec.id),version:data.meta.client_build,source:model.source,filter:quality.options[quality.selectedIndex]?.text+"；"+sourceFilter.options[sourceFilter.selectedIndex]?.text+"；"+effect.options[effect.selectedIndex]?.text+"；武器："+({two:"雙手",one:"單手／副手"}[options.weaponMode]||"所有合法配置"),label,total:total+weapon.total,omitted},[...armor,...weaponPicks].map(p=>({...p,name:zhItem(p.item)})));
@@ -856,20 +879,21 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
     const share=node("div",undefined,"gt-plan-export"),shareStatus=node("p","","gt-muted");
     add(rows,button("匯出目前整套面板方案",()=>exportPlan(baseline,"最高面板防具",plan.total)),share);
     if(sets.length){
-     const setSelect=select(sets.map(([n,c])=>[n,zhDisplay(n)+"（最多 "+c+" 件）"])),target=select([]),detail=node("div"),bonus=inp("留空＝未知","number");bonus.step="0.01";
-     function targets(){const count=sets.find(([n])=>n===setSelect.value)?.[1]||2;target.replaceChildren(...Array.from({length:count-1},(_,i)=>new Option((i+2)+" 件",String(i+2))));target.value=String(Math.min(4,count));}
+     const setSelect=select(sets.map(([n,c])=>[n,zhDisplay(n)+"（最多 "+c+" 件）"])),target=select([]),secondSet=select([]),secondTarget=select([]),detail=node("div"),bonus=inp("留空＝未知","number");bonus.step="0.01";
+     function targets(){const count=sets.find(([n])=>n===setSelect.value)?.[1]||2;target.replaceChildren(...Array.from({length:count-1},(_,i)=>new Option((i+2)+" 件",String(i+2))));target.value=String(Math.min(4,count));const old=secondSet.value;secondSet.replaceChildren(new Option("不指定第二套",""),...sets.filter(([n])=>n!==setSelect.value).map(([n,c])=>new Option(zhDisplay(n)+"（最多 "+c+" 件）",n)));if([...secondSet.options].some(o=>o.value===old))secondSet.value=old;secondTargets();}
+     function secondTargets(){const count=sets.find(([n])=>n===secondSet.value)?.[1]||0;secondTarget.replaceChildren(...Array.from({length:Math.max(0,count-1)},(_,i)=>new Option((i+2)+" 件",String(i+2))));secondTarget.disabled=!count;if(count)secondTarget.value="2";}
      function compare(){
-      const result=catalogSetAlternative(pools,setSelect.value,Number(target.value));detail.replaceChildren();
+      const requirements=[{name:setSelect.value,minimum:Number(target.value)},...(secondSet.value?[{name:secondSet.value,minimum:Number(secondTarget.value)}]:[])],result=catalogMultiSetAlternative(pools,requirements);detail.replaceChildren();
       if(!result){detail.append(node("p","未找到符合件數要求的方案。"));return;}
       const comparison=catalogSetTradeoff(plan.total,result.total,bonus.value.trim()!==""?Number(bonus.value):null),delta=comparison.gap,baseIds=new Set(baseline.map(p=>String(p.item.id))),newIds=new Set(result.picks.map(p=>String(p.item.id)));
-      add(detail,node("p","替代防具："+result.count+" 件指定套裝｜面板分 "+result.total.toFixed(2)+"｜相較散件方案差額 "+delta.toFixed(2)+"；需比較相較原方案新增或失去的套裝／特殊效果淨收益。","gt-muted"));
+      const setLabel=result.sets.map(x=>zhDisplay(x.name)+" "+x.count+" 件（至少 "+x.minimum+"）").join("＋");add(detail,node("p","替代防具："+setLabel+"｜面板分 "+result.total.toFixed(2)+"｜相較散件方案差額 "+delta.toFixed(2)+"；需比較相較原方案新增或失去的套裝／特殊效果淨收益。","gt-muted"));
       if(comparison.net!==null)detail.append(node("p","假設淨收益後差值："+comparison.net.toFixed(2)+" 分｜"+(comparison.net>0?"替代方案較高":comparison.net<0?"原方案較高":"兩者相同")+"（使用者假設，非實測）","gt-muted"));
-      detail.append(button("匯出指定套裝替代方案",()=>exportPlan(result.picks,setSelect.value+" 至少 "+target.value+" 件（實際 "+result.count+" 件）",result.total)));
+      detail.append(button("匯出指定套裝替代方案",()=>exportPlan(result.picks,setLabel,result.total)));
       for(const p of result.picks.filter(p=>!baseIds.has(String(p.item.id))))add(detail,node("p","加入 "+p.slot+"｜"+zhItem(p.item)+"｜"+p.score.total.toFixed(2)),link("物品資料","https://www.wowhead.com/forever/tw/item="+p.item.id));
       for(const p of baseline.filter(p=>!newIds.has(String(p.item.id))))detail.append(node("p","移除 "+p.slot+"｜"+zhItem(p.item)+"｜"+p.score.total.toFixed(2),"gt-muted"));
       if(result.picks.every(p=>baseIds.has(String(p.item.id)))&&baseline.every(p=>newIds.has(String(p.item.id))))detail.append(node("p","原方案已符合指定套裝件數。"));
      }
-     setSelect.addEventListener("change",()=>{bonus.value="";targets();compare();});target.addEventListener("change",()=>{bonus.value="";compare();});bonus.addEventListener("input",compare);add(setPanel,field("指定防具套裝",setSelect),field("最低套裝件數",target),field("額外效果淨收益（與原方案相同面板分數單位，可負值）",bonus),detail);targets();compare();
+     setSelect.addEventListener("change",()=>{bonus.value="";targets();compare();});target.addEventListener("change",()=>{bonus.value="";compare();});secondSet.addEventListener("change",()=>{bonus.value="";secondTargets();compare();});secondTarget.addEventListener("change",()=>{bonus.value="";compare();});bonus.addEventListener("input",compare);add(setPanel,field("指定防具套裝",setSelect),field("最低套裝件數",target),field("第二套裝（選填）",secondSet),field("第二套裝最低件數",secondTarget),field("額外效果淨收益（與原方案相同面板分數單位，可負值）",bonus),detail);targets();compare();
     }else setPanel.append(node("p","此篩選條件下沒有至少兩件的已標記套裝候選。","gt-muted"));
     rows.append(setPanel);
    }
