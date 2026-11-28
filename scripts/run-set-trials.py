@@ -29,17 +29,35 @@ def item_set(item):
 def player(request):
     return request["raid"]["parties"][0]["players"][0]
 
-def set_plan(request,spec_id,items,registry,excluded=()):
+def prepare_catalog(items):
+    """Index source-qualified gear once, shared by all scenarios/spec trials."""
+    by_id={num(x.get("id")):x for x in items if isinstance(x,dict)}
+    classes={}
+    for cls in CLASS_IDS:
+        sets={};scatter={};class_sets=Counter();bit=1<<(CLASS_IDS[cls]-1)
+        for x in by_id.values():
+            if num(x.get("id"))<=0 or not eligible(x,cls):continue
+            name=item_set(x)
+            slot="Chest" if x.get("slot")=="Robe" else x.get("slot")
+            key=(slot,x.get("subclass"))
+            if name:
+                sets.setdefault(name,{}).setdefault(key,[]).append(x)
+                mask=num(x.get("class_mask"),-1)
+                if mask not in (-1,0) and mask&bit:class_sets[name]+=1
+            else:scatter.setdefault(key,[]).append(x)
+        classes[cls]=(sets,scatter,class_sets)
+    return by_id,classes
+
+def set_plan(request,spec_id,items,registry,excluded=(),prepared=None):
     p=player(request);gear=p.get("equipment",{}).get("items",[])
     if len(gear)!=17 or p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or '"itemSwap":' in json.dumps(p.get("rotation",{})):return None
     cls=CLASSES[int(spec_id.split("-")[1])-1]
-    index={num(x.get("id")):x for x in items}
+    index,classes=prepared if prepared is not None else prepare_catalog(items)
+    sets,scatter,class_sets=classes[cls]
     current=[index.get(num(x.get("id"))) for x in gear[:14]]
     if any(x is None and gear[i].get("id") for i,x in enumerate(current)):return None
     # Prefer worn sets, then explicitly class-restricted candidate sets.
     names=Counter(item_set(x) for x in current if x and item_set(x))
-    bit=1<<(CLASS_IDS[cls]-1)
-    class_sets=Counter(item_set(x) for x in items if item_set(x) and eligible(x,cls) and num(x.get("class_mask"),-1) not in (-1,0) and num(x.get("class_mask"),-1)&bit)
     order=list(set(names)|set(class_sets))
     order.sort(key=lambda name:(-names.get(name,0),-class_sets.get(name,0),name))
     for name in order:
@@ -49,8 +67,7 @@ def set_plan(request,spec_id,items,registry,excluded=()):
         registered=matches[0]
         thresholds=sorted({num(b.get("pieces")) for b in registered.get("bonuses",[]) if 1<num(b.get("pieces"))<=14})
         if not thresholds:continue
-        available=[x for x in items if eligible(x,cls) and num(x.get("id"))>0 and item_set(x)==name]
-        other=[x for x in items if eligible(x,cls) and num(x.get("id"))>0 and not item_set(x)]
+        available=sets.get(name,{})
         # Restrict to positions already occupied by this set or a compatible
         # same-subclass piece. No weapon, trinket or jewelry replacements.
         positions=[]
@@ -60,13 +77,13 @@ def set_plan(request,spec_id,items,registry,excluded=()):
             old=current[i]
             if not old:continue
             old_id=num(old.get("id"));old_set=item_set(old)==name
-            candidates=[x for x in available if slot_matches(x,slot) and x.get("subclass")==old.get("subclass") and (num(x["id"]) not in reserved or num(x["id"])==old_id) and num(x["id"]) not in used]
+            candidates=[x for x in available.get((slot,old.get("subclass")),[]) if (num(x["id"]) not in reserved or num(x["id"])==old_id) and num(x["id"]) not in used]
             if not candidates:continue
             # Closest item level to original piece, then quality and ID.
             key=lambda x:(abs(num(x.get("item_level"))-num(old.get("item_level"))),-num(x.get("quality")),num(x["id"]))
             chosen=old if old_set else min(candidates,key=key)
             if old_set:
-                alternatives=[x for x in other if slot_matches(x,slot) and x.get("subclass")==old.get("subclass") and num(x["id"]) not in reserved|used]
+                alternatives=[x for x in scatter.get((slot,old.get("subclass")),[]) if num(x["id"]) not in reserved|used]
                 if not alternatives:continue
                 loose=min(alternatives,key=key)
             else:
@@ -96,7 +113,7 @@ def run(cli,root,site):
     def read(name):return json.loads((site/name).read_text(encoding="utf-8"))
     snapshot=read("combat-presets.json");catalog=read("gear-catalog.json");registry=read("set-effects.json")
     if snapshot.get("commit")!=mod.COMMIT or registry.get("commit")!=mod.COMMIT:raise ValueError("Mismatched native snapshot")
-    results=[];jobs=[];seen=set()
+    results=[];jobs=[];seen=set();prepared=prepare_catalog(catalog["items"])
     # First boss, then single mob, then five mobs. Round-robin specs within each.
     order={"guild-boss":0,"guild-50k":1,"guild-5x50k":2}
     for case in sorted(snapshot.get("cases",[]),key=lambda x:(order.get(x.get("scenario"),9),num(str(x.get("spec","")).split("-")[-1]))):
@@ -106,7 +123,7 @@ def run(cli,root,site):
         try:
             request=read(file);excluded=set()
             for rank in range(3):
-                plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded)
+                plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded,prepared)
                 if not plan:break
                 excluded.add(plan["name"])
                 row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"positions":plan["positions"],"items":plan["items"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
