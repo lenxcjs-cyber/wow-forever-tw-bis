@@ -416,15 +416,16 @@ assert.equal(expansion.catalogHasSpecial({item_set:"Set"}),true);
 console.log("PASS: strict weapon slot reconciliation and empty effect handling");
 
 const feralWeights={"敏捷":1,"武器DPS":10,"雙手DPS":2};
-assert.deepEqual(expansion.effectiveGearWeights("spec-26",feralWeights),{"敏捷":1});
-assert.deepEqual(expansion.effectiveGearWeights("spec-27",feralWeights),{"敏捷":1});
+assert.deepEqual(expansion.effectiveGearWeights("spec-26",feralWeights),feralWeights);
+assert.deepEqual(expansion.effectiveGearWeights("spec-27",feralWeights),feralWeights);
 assert.deepEqual(expansion.effectiveGearWeights("spec-28",feralWeights),feralWeights);
-assert.deepEqual(expansion.omittedFeralWeights("spec-26",feralWeights),["武器DPS","雙手DPS"]);
+assert.deepEqual(expansion.omittedFeralWeights("spec-26",{...feralWeights,"副手DPS":1,"遠程DPS":2}),["副手DPS","遠程DPS"]);
+assert.deepEqual(expansion.effectiveGearWeights("spec-26",{...feralWeights,"副手DPS":1,"遠程DPS":2}),feralWeights);
 const feralWeapons=[{...weaponForPlan(501,"Two-Hand","Two-Handed Mace",100),agility:1},{...weaponForPlan(502,"Two-Hand","Two-Handed Mace",10),agility:20}];
 const feralProf={Druid:{armor:{Leather:1},weapons:["Two-Handed Mace"]}};
-assert.equal(expansion.catalogWeaponPlan({id:"spec-26"},feralWeapons,feralProf,feralWeights).melee.picks[0].item.id,502);
-assert.equal(expansion.catalogWeaponPlan({id:"spec-27"},feralWeapons,feralProf,{"武器DPS":1}).melee,null);
-console.log("PASS: raw weapon DPS excluded from unverified feral form scores");
+assert.equal(expansion.catalogWeaponPlan({id:"spec-26"},feralWeapons,feralProf,feralWeights).melee.picks[0].item.id,501);
+assert.equal(expansion.catalogWeaponPlan({id:"spec-27"},feralWeapons,feralProf,{"武器DPS":1}).melee.picks[0].item.id,501);
+console.log("PASS: official Forever form weapon DPS included for cat and bear, no off-hand/ranged damage");
 
 const sourceItems=[itemForPlan(601,"Head","Plate",50,{required_reputation:"Frostwolf - Exalted",source_summary:"Vendor"}),itemForPlan(602,"Head","Leather",20,{bonding:"Binds when equipped"}),itemForPlan(603,"Head","Plate",30,{bonding:"Binds when picked up"})];
 assert.equal(expansion.catalogArmorPlan({id:"spec-2"},sourceItems,planProf,{"敏捷":1}).total,50);
