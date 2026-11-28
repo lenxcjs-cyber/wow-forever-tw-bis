@@ -984,6 +984,11 @@ const scopedSummary=batchImport.combatGuildBatchResults(scopedResult,"spec-1");
 assert.equal(scopedSummary.groups.length,1);
 assert.equal(scopedSummary.finished,true);
 assert.equal(scopedSummary.groups[0].best.name,"方案A");
+assert.equal(scopedSummary.groups[0].best.percent,10);
+assert.throws(()=>batchImport.combatGuildBatchResults({...scopedResult,cases:[scopedResult.cases[0],{...scopedResult.cases[1],variant:5}]},"spec-1"),/無效方案/);
+assert.throws(()=>nativeImport.nativeBrowserBatchJobs({...scopedAB,cases:[scopedAB.cases[0],null]},"spec-1",metadata,200),/無效/);
+assert.throws(()=>nativeImport.nativeBrowserBatchJobs({...scopedAB,cases:[scopedAB.cases[0],{...scopedAB.cases[1],name:"A".repeat(81)}]},"spec-1",metadata,200),/無效/);
+
 assert.equal(batchImport.combatGuildBatchResults({...scopedResult,cases:scopedResult.cases.slice(0,1)},"spec-1").finished,false);
 assert.throws(()=>batchImport.combatGuildBatchResults({...scopedResult,scenarios:["guild-boss"]},"spec-1"));
 
