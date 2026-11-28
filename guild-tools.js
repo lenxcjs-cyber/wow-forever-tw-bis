@@ -1143,12 +1143,15 @@ function combatNativeTimeline(parent,timeline){
  add(d,node("summary","第一輪技能時間軸（最多400個事件）"),field("戰鬥區段",phase),field("技能／紀錄搜尋",q),count,pre,node("p","引擎的單次隨機戰鬥紀錄；不同戰鬥的觸發與資源會改變實際施放時機。","gt-muted"));parent.append(d);draw();
 }
 function combatResult(raw){
+ const validMetric=v=>Number.isFinite(v)&&v>=0,validDeath=v=>Number.isFinite(v)&&v>=0&&v<=1;
+ if(!raw||typeof raw!=="object"||raw.error)throw Error("模擬未成功或結果格式不合法");
  if(raw&&Number.isInteger(raw.iterations)&&raw.iterations>0&&Number.isFinite(raw.dps?.mean)&&raw.dps.mean>=0&&!raw.error){return {name:raw.character?.source||"SIML 模擬",iterations:raw.iterations,duration:Number.isFinite(raw.duration)&&raw.duration>0?raw.duration:null,dps:raw.dps.mean,tps:null,hps:null,dtps:null,death:null,logs:combatTimelineText(raw.timeline)};}
  if(!raw||typeof raw.error==="string"&&raw.error||raw.error?.message||raw.error?.type==="ErrorOutcomeAborted"||!Number.isInteger(raw.iterationsDone)||raw.iterationsDone<1)throw Error("請提供成功完成的 WoWSims RaidSimResult 或 SIML sim JSON");
- const players=(raw.raidMetrics?.parties||[]).flatMap(p=>p.players||[]).filter(p=>p&&[p.dps,p.threat,p.hps,p.dtps].some(m=>Number.isFinite(m?.avg)));
+ const parties=raw.raidMetrics?.parties;if(!Array.isArray(parties)||parties.some(p=>p?.players!=null&&!Array.isArray(p.players)))throw Error("隊伍資料格式不合法");
+ const players=parties.flatMap(p=>p?.players||[]).filter(p=>p&&[p.dps,p.threat,p.hps,p.dtps].some(m=>validMetric(m?.avg)));
  if(players.length!==1)throw Error("僅接受單一玩家的個人模擬結果，避免誤把團隊總值當個人值");
- const p=players[0],metric=k=>Number.isFinite(p[k]?.avg)?p[k].avg:null;
- return {name:p.name||"角色",iterations:raw.iterationsDone,duration:Number.isFinite(raw.avgIterationDuration)&&raw.avgIterationDuration>0?raw.avgIterationDuration:null,dps:metric("dps"),tps:metric("threat"),hps:metric("hps"),dtps:metric("dtps"),death:Number.isFinite(p.chanceOfDeath)?p.chanceOfDeath:null,logs:typeof raw.logs==="string"?raw.logs:""};
+ const p=players[0],metric=k=>validMetric(p[k]?.avg)?p[k].avg:null;
+ return {name:p.name||"角色",iterations:raw.iterationsDone,duration:Number.isFinite(raw.avgIterationDuration)&&raw.avgIterationDuration>0?raw.avgIterationDuration:null,dps:metric("dps"),tps:metric("threat"),hps:metric("hps"),dtps:metric("dtps"),death:validDeath(p.chanceOfDeath)?p.chanceOfDeath:null,logs:typeof raw.logs==="string"?raw.logs.slice(0,200000):""};
 }
 function combatLab(){
  title("實戰模擬","正式數值使用 WoWSims Forever；站內試算為自訂參數的簡化時間軸，不等於遊戲傷害公式。");
@@ -1168,6 +1171,16 @@ function combatLab(){
    if(typeof x.configuration==="string"&&x.configuration){add(c,node("p",x.configuration,"gt-muted"),link("本站控制變因配置與產生程式","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-combat-presets.py"));}
    const character=x.character||{};if(character.talents)add(c,node("p","天賦碼："+character.talents,"gt-muted"));if(character.race)add(c,node("p","種族："+character.race,"gt-muted"));
    combatNativeTimeline(c,x.timeline);
+   if(typeof x.tank?.logs==="string"&&x.tank.logs.trim()){
+    const d=node("details"),q=inp("搜尋威脅、傷害或技能原文"),pre=node("pre"),lines=x.tank.logs.slice(0,80000).split("\n");pre.className="gt-combat-log";
+    const count=node("p","","gt-muted");function draw(){const k=q.value.trim().toLowerCase(),matches=lines.filter(line=>!k||line.toLowerCase().includes(k));pre.textContent=matches.join("\n")||"沒有符合紀錄";count.textContent="顯示 "+matches.length+" / "+lines.length+" 行（記錄可能截斷）。";}
+    q.addEventListener("input",draw);add(d,node("summary","坦克原生戰鬥紀錄（另一次模擬）"),node("p","用於查閱仇恨、技能及承傷事件；不是上方 DPS 時間軸的同一輪。","gt-muted"),field("紀錄搜尋",q),count,pre);c.append(d);draw();
+   }
+   if(Array.isArray(x.sources)&&x.sources.length){
+    const d=node("details");d.append(node("summary","實際配裝與技能優先序設定檔（原文）"));
+    for(const src of x.sources.slice(0,16)){if(typeof src?.path!=="string"||typeof src?.text!=="string")continue;const part=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=src.text.slice(0,24000);add(part,node("summary",src.path),pre);d.append(part);}
+    d.append(node("p","設定語法保留原文以便重現；若來源有截斷或缺少檔案，請查閱上游及本站控制變因程式。","gt-muted"));c.append(d);
+   }
    if(Array.isArray(x.spells)&&x.spells.length){const a=node("details"),p=node("pre");p.className="gt-combat-log";p.textContent=x.spells.filter(y=>Number.isFinite(y.dps)).map(y=>y.name+" ｜ DPS "+y.dps.toFixed(2)+(Number.isFinite(y.casts)?" ｜ 平均施放 "+y.casts.toFixed(2):"")).join("\n");add(a,node("summary","各技能傷害貢獻"),p);c.append(a);}
    if(Array.isArray(character.warnings)&&character.warnings.length){const a=node("details"),p=node("pre");p.className="gt-combat-log";p.textContent=character.warnings.join("\n");add(a,node("summary","引擎限制與警告"),p);c.append(a);}
   }
