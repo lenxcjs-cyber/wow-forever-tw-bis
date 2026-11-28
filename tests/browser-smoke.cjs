@@ -355,6 +355,35 @@ const server=http.createServer((req,res)=>{
   assert.equal(await lab.getByRole("button",{name:"在本站開始模擬",exact:true}).isDisabled(),false);
   await lab.getByText("核對17格裝備與附魔",{exact:true}).click();
   assert.ok(await lab.getByText(/詞綴 -15/).isVisible());
+  // A stale file read must never overwrite a newer manual paste.
+  const upload=lab.getByLabel("上傳角色 JSON",{exact:true});
+  await upload.evaluate(input=>{
+   const file=new File(['{"stale":true}'],"stale.json",{type:"application/json"});
+   file.text=()=>new Promise(resolve=>{window.gtFinishStaleRead=()=>resolve('{"stale":true}');});
+   const transfer=new DataTransfer();transfer.items.add(file);input.files=transfer.files;
+   input.dispatchEvent(new Event("change",{bubbles:true}));
+  });
+  const latest=JSON.stringify({latest:true});
+  await characterArea.fill(latest);
+  await page.evaluate(async()=>{window.gtFinishStaleRead();await new Promise(resolve=>setTimeout(resolve,25));});
+  assert.equal(await characterArea.inputValue(),latest);
+  assert.equal(await lab.getByRole("button",{name:"在本站開始模擬",exact:true}).isDisabled(),true);
+  // A full native request can contain the only player in a later party.
+  await characterArea.fill(JSON.stringify({type:"SimTypeIndividual",raid:{parties:[{buffs:{fixtureWrong:true}},{players:[{feralCatDruid:{},rotation:{type:"TypeAPL"},equipment:{items:[{id:19323}]},talentsString:"0-1-0"}],buffs:{fixtureActual:true}}]},encounter:{duration:180,targets:[{}]},simOptions:{iterations:50}}));
+  await lab.getByRole("button",{name:"匯入並核對角色",exact:true}).click();
+  await lab.getByRole("heading",{name:"角色資料核對",exact:true}).waitFor({state:"visible"});
+  await lab.getByText("核對／修改技能策略、消耗品及團隊增益",{exact:true}).click();
+  const settings=lab.getByRole("textbox",{name:"原生戰鬥設定 JSON"});
+  const cfg=JSON.parse(await settings.inputValue());
+  assert.deepEqual(cfg.partyBuffs,{fixtureActual:true});
+  cfg.partyBuffs={fixtureUpdated:true};await settings.fill(JSON.stringify(cfg));
+  await lab.getByRole("button",{name:"套用戰鬥設定修改",exact:true}).click();
+  const downloadPromise=page.waitForEvent("download");
+  await lab.getByRole("button",{name:"下載已核對角色請求",exact:true}).click();
+  const downloaded=JSON.parse(fs.readFileSync(await (await downloadPromise).path(),"utf8"));
+  assert.deepEqual(downloaded.raid.parties[0].buffs,{fixtureWrong:true});
+  assert.deepEqual(downloaded.raid.parties[1].buffs,{fixtureUpdated:true});
+  console.log("PASS: stale file read and actual imported party buff editing");
   // Exercise navigation/validation only: actual worker execution is a separate real test.
   await lab.locator(".gt-combat-presets").getByText("DPS 123.45",{exact:true}).waitFor({state:"visible"});
   assert.ok(await lab.getByText("全28專精原生案例覆蓋：2 / 28",{exact:true}).isVisible());
