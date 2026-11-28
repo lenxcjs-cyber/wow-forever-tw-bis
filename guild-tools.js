@@ -1242,9 +1242,11 @@ const combatPresetCommit="3b9c125a9b1387cd53ce2bb12969e0c6b54b813e";
 const combatHealSpecs=new Set(["spec-4","spec-13","spec-14","spec-18","spec-28"]),combatTankSpecs=new Set(["spec-3","spec-5","spec-27"]);
 function combatRole(id){return combatTankSpecs.has(id)?"tank":combatHealSpecs.has(id)?"heal":"dps";}
 function combatMetric(id){return {tank:"threat",heal:"healing",dps:"damage"}[combatRole(id)];}
-function combatCoverage(data){return Array.from({length:28},(_,i)=>{const id="spec-"+(i+1);return {id,role:combatRole(id),count:combatPresetCases(data,id).length,failed:Array.isArray(data?.failed)?data.failed.filter(x=>x?.spec===id).length:0};});}
+function combatSnapshotValid(data){return !!data&&data.format===1&&data.release==="v1.0.12"&&data.commit===combatPresetCommit&&Array.isArray(data.cases);}
+function combatFailureLabel(reason){return ({timeout:"引擎逾時","missing-source":"上游設定檔缺少","engine-exit":"引擎執行失敗","invalid-json":"輸出 JSON 無效",validation:"結果或設定未通過驗證",io:"檔案讀寫失敗"})[reason]||"原因未提供";}
+function combatCoverage(data){const valid=combatSnapshotValid(data);return Array.from({length:28},(_,i)=>{const id="spec-"+(i+1),count=combatPresetCases(data,id).length,failed=valid&&Array.isArray(data.failed)?data.failed.filter(x=>x?.spec===id).length:0,planned=valid&&Number.isSafeInteger(data.plannedBySpec?.[id])&&data.plannedBySpec[id]>=count+failed?data.plannedBySpec[id]:null;return {id,role:combatRole(id),count,failed,planned,pending:planned===null?null:planned-count-failed};});}
 function combatPresetCases(data,id){
- if(data?.format!==1||data.release!=="v1.0.12"||data.commit!==combatPresetCommit||!Array.isArray(data.cases))return [];
+ if(!combatSnapshotValid(data))return [];
  return data.cases.filter(x=>x&&x.spec===id&&typeof x.label==="string"&&Number.isFinite(x.dps)&&x.dps>=0&&Number.isFinite(x.duration)&&x.duration>0&&Number.isInteger(x.iterations)&&x.iterations>0&&((Array.isArray(x.timeline)&&x.timeline.length>0)||(x.nativeMetrics&&Number.isFinite(x.nativeMetrics.dps)&&x.nativeMetrics.dps===x.dps))&&[x.settings,x.apl].every(p=>typeof p==="string"&&/^ui\/specs\/[a-zA-Z_0-9/.-]+\.(?:siml|json|ts)$/.test(p)&&!p.includes("..")));
 }
 function combatNativeGroups(cases){
@@ -1303,7 +1305,7 @@ function combatCoverageView(parent,data){
  const d=node("details");d.append(node("summary","全28專精原生案例覆蓋："+done+" / 28"));
  for(const [role,label] of [["dps","輸出"],["tank","坦克"],["heal","治療"]]){
   const filtered=rows.filter(x=>x.role===role),part=box(d,label+"專精",filtered.filter(x=>x.count>0).length+" / "+filtered.length+" 已有成功案例");
-  for(const x of filtered){const name=bySpec.get(x.id)?.name||x.id;part.append(node("p",name+" ｜ "+(x.count?x.count+" 個成功案例":role==="heal"?"待驗證治療遭遇與技能策略":"尚無成功案例")+(x.failed?" ｜ "+x.failed+" 個已失敗案例":"")));}
+  for(const x of filtered){const name=bySpec.get(x.id)?.name||x.id;part.append(node("p",name+" ｜ "+(x.count?x.count+" 個成功案例":role==="heal"?"待驗證治療遭遇與技能策略":"尚無成功案例")+(x.planned!==null?" ／ 計畫 "+x.planned+" 個":"")+(x.failed?" ｜ "+x.failed+" 個已失敗案例":"")+(x.pending?" ｜ "+x.pending+" 個未執行或未記錄":"")));}
  }
  d.append(node("p","沒有成功案例不代表該專精無法遊玩；資料缺口不以推估數值填補。","gt-muted"));parent.append(d);
 }
@@ -1535,9 +1537,10 @@ function combatLab(){
  const loadGearTemplate=combatGearView(panel,id,build);
  const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
  fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
-  if(!presets.isConnected)return;const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));combatCoverageView(presets,data);
+  if(!presets.isConnected)return;if(!combatSnapshotValid(data))throw Error("版本或快照格式不符");const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));combatCoverageView(presets,data);
   if(Number.isInteger(data.planned)&&Array.isArray(data.cases)&&data.planned>=data.cases.length){const failures=Array.isArray(data.failed)?data.failed.length:0;presets.append(node("p","本次快照：全站 "+data.cases.length+" / "+data.planned+" 個計畫案例已成功產出；失敗 "+failures+" 個；尚未執行或未記錄 "+Math.max(0,data.planned-data.cases.length-failures)+" 個。","gt-muted"));}
-  if(Array.isArray(data.failed)){const failed=data.failed.filter(x=>x?.spec===id&&typeof x.label==="string");if(failed.length)presets.append(node("p","此專精未產出案例："+failed.map(x=>x.label).join("、"),"gt-muted"));}
+  if(typeof data.finished==="boolean"){const stamp=typeof data.startedAt==="string"?new Date(data.startedAt):null;presets.append(node("p","批次狀態："+(data.finished?"已結束（可能仍有未執行案例）":"部分快照／未確認正常結束")+(stamp&&Number.isFinite(stamp.getTime())?" ｜ 開始 "+stamp.toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+"（台灣時間）":"")+(Number.isFinite(data.elapsedSeconds)&&data.elapsedSeconds>=0?" ｜ 已記錄 "+data.elapsedSeconds.toFixed(1)+" 秒":""),"gt-muted"));}
+  if(Array.isArray(data.failed)){const failed=data.failed.filter(x=>x?.spec===id&&typeof x.label==="string");if(failed.length){const d=node("details");d.append(node("summary","此專精未產出案例（"+failed.length+"）"));for(const x of failed)d.append(node("p",x.label+" ｜ "+combatFailureLabel(x.reason),"gt-muted"));presets.append(d);}}
   if(!cases.length){const pending=Array.isArray(data.healerPending)?data.healerPending.find(x=>x?.spec===id):null;presets.append(node("p",pending?.reason||"目前此專精沒有已成功匯入的原生引擎案例；請使用上方引擎連結。","gt-muted"));if(pending&&typeof pending.source==="string"&&/^ui\/specs\/[a-z/]+\/presets\.ts$/.test(pending.source))presets.append(link("上游治療專精原始設定","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+pending.source));return;}
   add(presets,node("p","WoWSims v1.0.12 ｜ 固定種子 "+data.seed+" ｜ 上游預設或本站明示的控制變因案例，不代表本站目前構築或最佳 BiS。CLI 未自動加入網頁生成的藥水／魔法物品 APL 行。","gt-muted"));
   for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));
@@ -1547,7 +1550,7 @@ function combatLab(){
    const requestPath=combatRequestPath(x.requestFile,id),templatePath=combatRequestPath(x.templateFile,id),path=requestPath||templatePath;
    if(path){
     const download=node("a",requestPath?"下載完整原生 RaidSimRequest":"下載解析後的 SIML 設定範本");download.href=path;download.download=path.split("/").pop();
-    const msg=node("p",requestPath?"完整請求為本案例實際送入原生 CLI 的設定。":"此檔由 SIML 設定解析而來，未保證與上方特殊 APL 執行完全一致。","gt-muted");
+    const msg=node("p",requestPath?"完整請求為本案例實際送入原生 CLI 的設定。":"此檔由 SIML 設定解析而來，未保證與上方特殊 APL 執行完全一致。"+(typeof x.templateNote==="string"?x.templateNote:""),"gt-muted");
     add(c,download,msg,button("載入此案例作為配裝範本",async()=>{try{if(loadGearTemplate)await loadGearTemplate(path);}catch(e){msg.textContent="讀取失敗："+e.message;}}));
    }
    const character=x.character||{};if(character.talents)add(c,node("p","天賦碼："+character.talents,"gt-muted"));if(character.race)add(c,node("p","種族："+character.race,"gt-muted"));
