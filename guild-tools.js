@@ -870,7 +870,7 @@ function nativeSetComparison(trial,role){
  const valid=c=>c&&Number.isInteger(c.pieces)&&c.pieces>=0&&c.pieces<=14&&Number.isFinite(c.duration)&&c.duration>0&&Number.isFinite(c.metrics?.[metric])&&c.metrics[metric]>=0;
  const baselines=trial.cases.filter(c=>valid(c)&&c.pieces===0);if(baselines.length!==1)return null;const baseline=baselines[0];
  const counts=new Map();for(const c of trial.cases.filter(valid))counts.set(c.pieces,(counts.get(c.pieces)||0)+1);
- const rows=trial.cases.filter(c=>valid(c)&&c.pieces>0&&counts.get(c.pieces)===1&&Math.abs(c.duration-baseline.duration)<1e-6).sort((a,b)=>a.pieces-b.pieces).map(c=>{
+ const rows=trial.cases.filter(c=>valid(c)&&c.pieces>0&&counts.get(c.pieces)===1&&Math.abs(c.duration-baseline.duration)<1e-6&&(c.iterations==null&&baseline.iterations==null||Number.isInteger(c.iterations)&&c.iterations>0&&c.iterations===baseline.iterations)).sort((a,b)=>a.pieces-b.pieces).map(c=>{
   const delta=c.metrics[metric]-baseline.metrics[metric];
   const survival=role==="tank"?(["dtps","death"].every(k=>[c.metrics[k],baseline.metrics[k]].every(v=>Number.isFinite(v)&&v>=0&&(k!=="death"||v<=1)))?c.metrics.dtps<=baseline.metrics.dtps+1e-8&&c.metrics.death<=baseline.metrics.death+1e-8:null):true;
   const uncertainty=nativeSetUncertainty(baseline,c,metric),win=delta>1e-8&&survival===true;
@@ -1870,7 +1870,8 @@ function combatReadJSON(text){
 function combatFileInput(area,status,label){
  const input=node("input");input.type="file";input.accept=".json,application/json";input.setAttribute("aria-label",label);
  let revision=0;
- area.addEventListener("input",()=>{revision++;});
+ input.invalidatePendingRead=()=>{revision++;};
+ area.addEventListener("input",input.invalidatePendingRead);
  input.addEventListener("change",async()=>{
   const file=input.files?.[0],token=++revision;input.value="";
   if(!file||input.disabled||area.disabled)return;
@@ -2128,7 +2129,7 @@ function nativeBrowserView(parent,id){
   if(report&&c.isConnected)try{report();}catch(e){message+="｜部分快照無法驗證："+e.message;}
   status.textContent=message;sync();
  }
- function clear(){if(worker)stop("角色資料已變更，停止舊模擬。");active++;character=null;preview.replaceChildren();results.replaceChildren();sync();}
+ function clear(){upload.invalidatePendingRead();if(worker)stop("角色資料已變更，停止舊模擬。");active++;character=null;preview.replaceChildren();results.replaceChildren();sync();}
  area.addEventListener("input",clear);templatePick.addEventListener("change",clear);
  async function read(url){const res=await fetch(url,{cache:"no-cache",credentials:"same-origin"});if(!res.ok)throw Error("HTTP "+res.status);return res.json();}
  async function importCharacter(useDefault){
@@ -2158,13 +2159,13 @@ function nativeBrowserView(parent,id){
    }catch(e){configMsg.textContent="修改失敗："+e.message;}});
    add(config,node("summary","核對／修改技能策略、消耗品及團隊增益"),node("p","初次使用建議沿用範本。進階使用者可修改原生 JSON；技能與消耗品使用引擎 ID，輸入內容由原生引擎驗證。","gt-muted"),rawPreview,applyConfig,button("還原為目前已套用設定",()=>{rawPreview.value=JSON.stringify(editable(),null,2);configMsg.textContent="已還原未儲存變更。";}),configMsg);preview.append(config);
    status.textContent="已匯入，請確認構築、裝備與戰鬥設定。";
-  }catch(e){status.textContent="匯入失敗："+e.message;character=null;}sync();
+  }catch(e){if(token!==active||!c.isConnected)return;status.textContent="匯入失敗："+e.message;character=null;preview.replaceChildren();}sync();
  }
  async function run(batch=null){
   if(!ready||worker||(!batch&&!character)){if(!ready)status.textContent="站內原生引擎尚未可用。";return;}
   const token=++active,n=Number(iterations.value),keys=scenario.value==="all"?Object.keys(guildScenarios):[scenario.value];
-  results.replaceChildren();
   let jobs;try{jobs=batch?nativeBrowserBatchJobs(batch,id,metadata,n):keys.map(k=>({scenario:k,name:"匯入角色",request:nativeBrowserRequest(character.request,id,k,n)}));}catch(e){status.textContent=e.message;return;}
+  upload.invalidatePendingRead();results.replaceChildren();
   const batchRows=[];let successful=0;
   function reportBatch(){
    if(!batch)return;
@@ -2182,18 +2183,18 @@ function nativeBrowserView(parent,id){
    part.append(button("下載批次比較結果",()=>combatDownloadJSON(payload,"tomb-"+id+"-guild-results.json")));
   }
   status.textContent="載入同站引擎中…";
-  let index=0;
-  try{worker=new Worker("native-engine/worker.js?v="+combatPresetCommit.slice(0,8));}catch(e){status.textContent="無法啟動 Worker："+e.message;worker=null;sync();return;}
+  let index=0,workerReady=false,pendingJob=null;
+  try{worker=new Worker("native-engine/worker.js?v="+combatPresetCommit.slice(0,8)+"-job2");}catch(e){status.textContent="無法啟動 Worker："+e.message;worker=null;sync();return;}
   const w=worker;partialReport=batch?()=>{if(batchRows.length)reportBatch();}:null;sync();
   const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(active===token)stop("模擬超過時間限制；請減少迭代數或改為單一遭遇。");},180000);};
-  const next=()=>{if(token!==active||!c.isConnected){clearTimeout(timer);w.terminate();return;}if(index>=jobs.length){clearTimeout(timer);partialReport=null;try{reportBatch();stop("運算結束：成功 "+successful+"／"+jobs.length+"；無效或失敗 "+(jobs.length-successful)+"。");}catch(e){stop("原生運算已結束，但批次排名無法驗證："+e.message);}return;}const job=jobs[index];status.textContent="原生運算 "+(index+1)+"／"+jobs.length+"："+guildScenarios[job.scenario].label+"／"+job.name+"（"+n+"次）";resetTimer();w.postMessage({type:"run",request:JSON.stringify(job.request)});};
+  const next=()=>{if(token!==active||!c.isConnected){clearTimeout(timer);w.terminate();return;}if(index>=jobs.length){clearTimeout(timer);partialReport=null;try{reportBatch();stop("運算結束：成功 "+successful+"／"+jobs.length+"；無效或失敗 "+(jobs.length-successful)+"。");}catch(e){stop("原生運算已結束，但批次排名無法驗證："+e.message);}return;}const job=jobs[index];status.textContent="原生運算 "+(index+1)+"／"+jobs.length+"："+guildScenarios[job.scenario].label+"／"+job.name+"（"+n+"次）";pendingJob=index;resetTimer();try{w.postMessage({type:"run",jobId:index,request:JSON.stringify(job.request)});}catch(e){stop("無法送出原生請求："+e.message);}};
   w.onmessage=e=>{
    if(token!==active||worker!==w)return;
    if(!c.isConnected){clearTimeout(timer);stop("頁面已切換，停止模擬。");return;}
-   if(e.data?.type==="ready"){next();return;}
-   if(e.data?.type==="error"){clearTimeout(timer);stop("原生引擎失敗："+e.data.message);return;}
-   if(e.data?.type!=="result")return;
-   clearTimeout(timer);
+   if(e.data?.type==="ready"){if(workerReady)return;workerReady=true;next();return;}
+   if(e.data?.type==="error"){if(e.data.jobId!=null&&e.data.jobId!==pendingJob)return;clearTimeout(timer);if(batch&&pendingJob!==null){const job=jobs[pendingJob];batchRows.push({scenario:job.scenario,variant:job.variant,name:job.name,error:"engine"});}pendingJob=null;stop("原生引擎失敗："+e.data.message);return;}
+   if(e.data?.type!=="result"||pendingJob===null||e.data.jobId!==pendingJob)return;
+   pendingJob=null;clearTimeout(timer);
    const job=jobs[index],cfg=guildScenarios[job.scenario],part=box(results,cfg.label+"｜"+job.name,n+"次原生迭代");
    try{
     const raw=e.data.result,m=nativeBrowserResult(raw,id,n);
