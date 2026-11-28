@@ -190,7 +190,8 @@ class PresetTests(unittest.TestCase):
         self.assertIsNotNone(plan)
         self.assertEqual(plan["thresholds"],[2,3])
         self.assertEqual(plan["registeredThresholds"],[2,3,4])
-        self.assertEqual([x[0] for x in plan["cases"]],[0,2,3])
+        self.assertEqual([x[0] for x in plan["cases"]],[0,2,3,1])
+        self.assertEqual(plan["adjacentCounts"],[1])
         self.assertEqual(len(plan["items"]),3)
         self.assertEqual(request,before)
         for n,req in plan["cases"]:
@@ -203,6 +204,23 @@ class PresetTests(unittest.TestCase):
         swapped=copy.deepcopy(request)
         sets.player(swapped)["enableItemSwap"]=True
         self.assertIsNone(sets.set_plan(swapped,"spec-1",items,registry))
+
+    def test_ring_set_adjacent_counts(self):
+        loader=importlib.util.spec_from_file_location("set_trials",SCRIPT.with_name("run-set-trials.py"))
+        sets=importlib.util.module_from_spec(loader);loader.loader.exec_module(sets)
+        def item(i,name):
+            return {"id":i,"slot":"Finger","item_class":"Armor","subclass":"Miscellaneous","item_set":name,"source_summary":"fixture","item_level":60,"quality":3,"required_level":60}
+        items=[item(1,"Ring Set"),item(2,"Ring Set"),item(3,""),item(4,"")]
+        gear=[{} for _ in range(17)]
+        gear[10]={"id":1};gear[11]={"id":2}
+        req={"raid":{"parties":[{"players":[{"equipment":{"items":gear},"rotation":{"type":"TypeAPL"}}]}]}}
+        plan=sets.set_plan(req,"spec-1",items,[{"name":"Ring Set","bonuses":[{"pieces":2}]}])
+        self.assertEqual([x[0] for x in plan["cases"]],[0,2,1])
+        self.assertEqual(sorted(plan["positions"]),[10,11])
+        for count,r in plan["cases"]:
+            ids=[x.get("id") for x in sets.player(r)["equipment"]["items"][10:12]]
+            self.assertEqual(len(set(ids)),2)
+            self.assertEqual(sum(i in (1,2) for i in ids),count)
 
     def test_guild_standard_targets(self):
         source={"player":{"rotation":{"type":"TypeAPL"},"inFrontOfTarget":True},"encounter":{"duration":180,"targets":[{}]},"debuffs":{"sunderArmor":True,"curseOfElements":True,"judgementOfWisdom":True}}
