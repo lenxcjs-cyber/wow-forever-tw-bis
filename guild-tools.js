@@ -1073,7 +1073,7 @@ function audit(){
  const research=node("details",undefined,"gt-card gt-audit-research"),tools=node("details",undefined,"gt-card gt-audit-tools");
  add(research,node("summary","配裝研究與資料核對"),bisReasonView(spec),...(spec.id==="spec-26"?[feralSetView(spec)]:[]),...(spec.id==="spec-26"&&feralWeaponMode(spec.id)==="twohand"?[catWeaponResearch(spec)]:[]),communityEvidenceView(spec,slots),candidateAuditView(spec,slots),candidateDataCoverageView(all),excludedDetails,node("p","構築排除 "+excluded.length+" 筆不適用候選。","gt-muted"),metrics,progress,node("p","完整度僅統計已列部位及文字資料，不代表已驗證。","gt-muted"));
  const armorPlan=catalogArmorPlanView(spec,()=>weaponMode.value||"auto");add(tools,node("summary","進階配裝與全裝備查詢"),armorPlan,gearCatalogView(spec),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]));
- add(panel,workspace,node("p",(model?"排序："+(model.source||"本機權重")+"（部分面板試算）":"排序：既有候選及外部攻略，非實戰BiS。")+(omittedFeralWeights(spec.id,saved?.weights).length?" 野性武器DPS未計入。":""),"gt-muted"),tools,research);draw();attachLegacy(spec);
+ add(panel,workspace,node("p",(model?"排序："+(model.source||"本機權重")+"（部分面板試算）":"排序：既有候選及外部攻略，非實戰BiS。")+(omittedFeralWeights(spec.id,saved?.weights).length?" 野性武器DPS未計入。":""),"gt-muted"),button("前往實戰模擬／配裝 JSON 匯出",()=>show("combat")),tools,research);draw();attachLegacy(spec);
 }
 function talentPageURL(embedded=false){
  const id=getSpec(),p=new URLSearchParams();
@@ -1281,6 +1281,90 @@ function combatResearchView(parent,id){
  if(research)add(c,node("p","核心技能／天賦："+research[1]),node("p",research[2]));
  add(c,link("固定版本上游構築原始碼","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/ui/specs/"+combatPaths[idx]+"/presets.ts"),node("p","上述為研究方向；只有成功執行的引擎案例才列正式模擬數據。","gt-muted"));
 }
+const combatEquipmentNames=["頭部","頸部","肩部","背部","胸部","手腕","手部","腰部","腿部","腳部","戒指 1","戒指 2","飾品 1","飾品 2","主手武器","副手物品","遠程／聖物"];
+const combatPlayerFields=["dpsWarrior","dpsWarrior","protectionWarrior","holyPaladin","protectionPaladin","retributionPaladin","hunter","hunter","hunter","rogue","rogue","rogue","healerPriest","healerPriest","dpsPriest","elementalShaman","enhancementShaman","restorationShaman","mage","mage","mage","warlock","warlock","warlock","balanceDruid","feralCatDruid","feralBearDruid","restorationDruid"];
+function combatEquipmentSpec(rows,mode){
+ if(!["one","two"].includes(mode)||!Array.isArray(rows))throw Error("配裝模式不合法");
+ const items=Array.from({length:17},()=>({})),used=new Set(),positions=new Set();
+ for(const row of rows){
+  if(!row||typeof row.name!=="string")throw Error("裝備部位不合法");
+  const index=row.name==="雙手武器"?14:combatEquipmentNames.indexOf(row.name);
+  if(index<0||positions.has(index)||mode==="two"&&(index===15||index===14&&row.name!=="雙手武器")||mode==="one"&&row.name==="雙手武器")throw Error("裝備部位重複或武器模式不符");
+  positions.add(index);
+  if(row.id==null||row.id==="")continue;
+  if(!/^[1-9]\d{0,8}$/.test(String(row.id)))throw Error("物品 ID 不合法");
+  const id=Number(row.id);
+  if(used.has(id))throw Error("同一物品 ID 不可重複選擇："+id);
+  used.add(id);items[index]={id};
+ }
+ return {items};
+}
+function combatApplyEquipment(request,equipment,id,keepMatching=true){
+ const index=Number(String(id).split("-")[1])-1,field=combatPlayerFields[index];
+ if(!combatEngineURL(id)||!field||!request||typeof request!=="object"||request.type!=="SimTypeIndividual"&&request.type!==1)throw Error("請提供對應專精的個人 RaidSimRequest");
+ const copy=JSON.parse(JSON.stringify(request)),parties=copy.raid?.parties;
+ if(!Array.isArray(parties)||parties.some(p=>p?.players!=null&&!Array.isArray(p.players)))throw Error("RaidSimRequest 隊伍格式不合法");
+ const players=parties.flatMap(p=>p?.players||[]).filter(p=>p&&Object.keys(p).length);
+ if(players.length!==1||!players[0][field]||!players[0].rotation||!copy.encounter?.targets?.length||!copy.simOptions)throw Error("引擎請求的職業、技能策略或遭遇不符");
+ const p=players[0];
+ if(p.enableItemSwap||p.itemSwap?.items?.some(x=>x?.id)||p.itemSwap?.swapSets?.length)throw Error("原請求含換裝；請在引擎停用換裝後再匯入，避免破壞技能策略");
+ if(!Array.isArray(equipment?.items)||equipment.items.length!==17)throw Error("須為17格 EquipmentSpec");
+ const seen=new Set();
+ p.equipment={items:equipment.items.map((x,i)=>{
+  if(!x?.id)return {};
+  if(!Number.isSafeInteger(x.id)||x.id<1||seen.has(x.id))throw Error("無效或重複的物品 ID");
+  seen.add(x.id);
+  const old=p.equipment?.items?.[i];
+  return keepMatching&&old?.id===x.id?old:{id:x.id};
+ })};
+ return copy;
+}
+function combatDownloadJSON(data,name){
+ const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"})),a=node("a");
+ a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function combatReadJSON(text){
+ if(typeof text!=="string"||text.length>8000000)throw Error("JSON 檔案超過 8 MB 字元限制");
+ return JSON.parse(text);
+}
+function combatFileInput(area,status,label){
+ const input=node("input");input.type="file";input.accept=".json,application/json";input.setAttribute("aria-label",label);
+ input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{if(file.size>8000000)throw Error("檔案超過 8 MB");const value=await file.text();combatReadJSON(value);area.value=value;status.textContent="已讀取 "+file.name+"，請確認內容後執行。";}catch(e){status.textContent="讀取失敗："+e.message;}finally{input.value="";}});
+ return input;
+}
+function combatGearView(parent,id,build){
+ const spec=bySpec.get(id);if(!spec)return;
+ const c=box(parent,"配裝匯出與原生模擬串接","由本站候選選擇裝備，匯出固定 17 格 EquipmentSpec，或替換已取得的個人 RaidSimRequest 的裝備；不自動宣稱 BiS。");
+ const saved=savedModel(id),weights=effectiveGearWeights(id,saved?.weights||{}),hasModel=!!saved&&Object.values(weights).some(v=>v>0);
+ const compare=(a,b)=>Number(!!a.review)-Number(!!b.review)||(hasModel?Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total:0)||Number(!!b.priority)-Number(!!a.priority)||(a.rank||999)-(b.rank||999);
+ const slots=[...expandCandidateSlots(spec)].map(([name,items])=>({name,items:items.filter(x=>allowed(id,x)).map(x=>hasModel?{...x,model:modelScore(x,weights,saved.hitBySlot?.[name])}:x).sort(compare)}));
+ const partition=auditWeaponGroups(slots,compare),mode=select((partition.modes.length?partition.modes:["one"]).map(m=>[m,m==="two"?"雙手武器":"單手／副手"]));
+ const key="gt-combat-gear-v1:"+id+":"+build,output=node("textarea"),request=node("textarea"),msg=node("p","","gt-muted"),editor=node("div"),selected=new Map();
+ let stored={};try{stored=JSON.parse(localStorage.getItem(key)||"{}")||{};}catch(e){}
+ if(!stored||typeof stored!=="object"||Array.isArray(stored))stored={};
+ if([...mode.options].some(o=>o.value===stored.mode))mode.value=stored.mode;
+ output.rows=5;output.readOnly=true;output.setAttribute("aria-label","模擬配裝 JSON");
+ request.rows=4;request.placeholder="貼上原生個人 RaidSimRequest（不是 RaidSimResult）";request.setAttribute("aria-label","原生模擬請求");
+ const all=()=>[...selected].map(([name,el])=>({name,id:el.value}));
+ const current=()=>combatEquipmentSpec(all(),mode.value);
+ function refresh(){
+  try{const gear=current();output.value=JSON.stringify(gear,null,2);msg.textContent="已選 "+gear.items.filter(x=>x.id).length+" 件；未選欄位保留空白。新物品只包含 ID，須在引擎核對附魔、隨機詞綴、套裝及資格。";}catch(e){output.value="";msg.textContent="配裝無法匯出："+e.message;}
+ }
+ function draw(){
+  editor.replaceChildren();selected.clear();
+  const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));
+  for(const row of rows){
+   const el=select([["","未選／空欄"],...row.items.map(x=>[String(x.id),zhItem(x)+"（"+x.id+"）"+(x.review?" · 待核":"")])]);
+   const old=stored.mode===mode.value?stored.slots?.[row.name]:undefined;
+   if(typeof old==="string"&&[...el.options].some(o=>o.value===old))el.value=old;
+   el.addEventListener("change",refresh);selected.set(row.name,el);editor.append(field(row.name,el));
+  }refresh();
+ }
+ function save(){try{const gear=current();stored={mode:mode.value,slots:Object.fromEntries(all().map(x=>[x.name,x.id]))};localStorage.setItem(key,JSON.stringify(stored));msg.textContent="已儲存本專精／構築的 "+gear.items.filter(x=>x.id).length+" 件選擇。";}catch(e){msg.textContent="儲存失敗："+e.message;}}
+ const details=node("details"),keep=node("input");keep.type="checkbox";keep.checked=true;
+ add(details,node("summary","選擇配裝與匯出（17 格）"),field("武器配置",mode),button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows)selected.get(x.name).value=x.featured?String(x.featured.id):"";refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。未在本站執行引擎。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=combatApplyEquipment(combatReadJSON(request.value),current(),id,keep.checked);combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
+ mode.addEventListener("change",draw);c.append(details);draw();
+}
 function combatLab(){
  title("實戰模擬","正式數值使用 WoWSims Forever；站內試算為自訂參數的簡化時間軸，不等於遊戲傷害公式。");
  const id=getSpec(),build=buildFor(id),url=combatEngineURL(id);
@@ -1289,6 +1373,7 @@ function combatLab(){
  const engine=box(panel,"完整戰鬥模擬（外部引擎）","上游網站參考版本：2026/11/27、客戶端 1.60.1.71139（71311a4）。本站預設案例使用固定 CLI v1.0.12；外部網站會更新，請核對版本與構築。");
  if(url)engine.append(link("開啟對應職業模擬器",url));
  add(engine,link("WoWSims 開源引擎（MIT）","https://github.com/wowsims/forever"),node("p","請在引擎內設定裝備、天賦、種族、附魔、消耗品、團隊增益、敵人數、戰鬥時間及技能優先序（APL）。用相同遭遇與迭代條件比較方案；查看戰鬥紀錄／時間軸。本站尚未自動同步目前候選裝備或即時代跑個人外部引擎。","gt-muted"));
+ combatGearView(panel,id,build);
  const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
  fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
   if(!presets.isConnected)return;const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));combatCoverageView(presets,data);
@@ -1342,8 +1427,8 @@ function combatLab(){
  }).catch(()=>{if(presets.isConnected)presets.replaceChildren(node("h4","開源引擎實跑預設案例"),node("p","實跑快照未取得；不顯示估算數值。可使用上方引擎連結。","gt-muted"));});
  const importBox=box(panel,"比較完整模擬結果","可貼上 WoWSims CLI 的 RaidSimResult 或 SIML sim JSON；結果來源與配置由使用者填寫，本站不替其驗證。");
  const resultInputs=[],labels=[],results=node("div"),msg=node("p","","gt-muted");
- for(const name of ["A","B"]){const label=inp("裝備／構築／遭遇與迭代條件"),area=node("textarea");area.rows=3;area.placeholder="貼上 RaidSimResult／SIML sim JSON "+name;area.setAttribute("aria-label","模擬結果 "+name);labels.push(label);resultInputs.push(area);add(importBox,field("方案 "+name+" 說明",label),area);}
- const compare=button("比較已完成的模擬",()=>{results.replaceChildren();try{const rows=resultInputs.map((v,i)=>v.value.trim()?{...combatResult(JSON.parse(v.value)),label:labels[i].value.trim()||"方案 "+["A","B"][i]}:null).filter(Boolean);if(!rows.length)throw Error("至少貼上一份結果");for(const r of rows){const b=box(results,r.label,r.iterations+" 次迭代"+(r.duration?" ｜ 平均 "+r.duration.toFixed(1)+" 秒":""));add(b,node("p",["DPS","TPS","HPS","DTPS"].map(k=>k+" "+(r[k.toLowerCase()]===null?"未提供":r[k.toLowerCase()].toFixed(2))).join(" ｜ ")));if(r.death!==null)add(b,node("p","死亡機率 "+(r.death*100).toFixed(1)+"%"));if(r.logs){const d=node("details"),pre=node("pre");pre.textContent=r.logs;pre.className="gt-combat-log";add(d,node("summary","原始戰鬥時間紀錄"),pre);b.append(d);}}if(rows.length===2){const a=rows[0],b=rows[1];add(results,node("p","B − A："+["dps","tps","hps","dtps"].filter(k=>a[k]!==null&&b[k]!==null).map(k=>k.toUpperCase()+" "+(b[k]-a[k]).toFixed(2)).join(" ｜ "),"gt-muted"));}msg.textContent="比較完成；不同遭遇、增益、迭代或生存條件的結果不可直接判為最佳。";}catch(e){msg.textContent="匯入失敗："+e.message;}});
+ for(const name of ["A","B"]){const label=inp("裝備／構築／遭遇與迭代條件"),area=node("textarea");area.rows=3;area.placeholder="貼上 RaidSimResult／SIML sim JSON "+name;area.setAttribute("aria-label","模擬結果 "+name);labels.push(label);resultInputs.push(area);add(importBox,field("方案 "+name+" 說明",label),area,combatFileInput(area,msg,"上傳模擬結果 "+name+" JSON"));}
+ const compare=button("比較已完成的模擬",()=>{results.replaceChildren();try{const rows=resultInputs.map((v,i)=>v.value.trim()?{...combatResult(combatReadJSON(v.value)),label:labels[i].value.trim()||"方案 "+["A","B"][i]}:null).filter(Boolean);if(!rows.length)throw Error("至少貼上一份結果");for(const r of rows){const b=box(results,r.label,r.iterations+" 次迭代"+(r.duration?" ｜ 平均 "+r.duration.toFixed(1)+" 秒":""));add(b,node("p",["DPS","TPS","HPS","DTPS"].map(k=>k+" "+(r[k.toLowerCase()]===null?"未提供":r[k.toLowerCase()].toFixed(2))).join(" ｜ ")));if(r.death!==null)add(b,node("p","死亡機率 "+(r.death*100).toFixed(1)+"%"));if(r.logs){const d=node("details"),pre=node("pre");pre.textContent=r.logs;pre.className="gt-combat-log";add(d,node("summary","原始戰鬥時間紀錄"),pre);b.append(d);}}if(rows.length===2){const a=rows[0],b=rows[1];add(results,node("p","B − A："+["dps","tps","hps","dtps"].filter(k=>a[k]!==null&&b[k]!==null).map(k=>k.toUpperCase()+" "+(b[k]-a[k]).toFixed(2)).join(" ｜ "),"gt-muted"));}msg.textContent="比較完成；不同遭遇、增益、迭代或生存條件的結果不可直接判為最佳。";}catch(e){msg.textContent="匯入失敗："+e.message;}});
  add(importBox,compare,msg,results);
  const local=box(panel,"自訂技能時間軸試算","使用自行填寫的每次平均傷害、仇恨、治療、冷卻及資源值；以技能清單由上到下作為優先序。可選填技能 earliest／latest（最早／最晚開始秒數）與 reserve（扣除技能消耗後至少預留的資源），用於比較開場爆發或延後技能。可選 targets（敵人數）、targetCap（技能命中上限）、group／groupCd（共用冷卻）、buff／buffs（技能／外部定時倍率）、healingDemand／healMin（合併治療需求及施法缺口門檻）。每個技能仍佔用 GCD，無命中、爆擊、DoT、連擊點、普攻、觸發、承傷、仇恨轉移等真實遊戲模型。");
  const raw=node("textarea");raw.rows=10;raw.placeholder="請輸入模型 JSON，或載入教學範例";raw.setAttribute("aria-label","自訂模擬模型");
