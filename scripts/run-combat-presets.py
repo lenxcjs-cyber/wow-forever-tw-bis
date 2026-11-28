@@ -1,5 +1,5 @@
 """Run a bounded subset of upstream WoWSims presets; never invent missing values."""
-import json, math, subprocess, sys, tempfile
+import json, math, re, subprocess, sys, tempfile
 from pathlib import Path
 
 RELEASE="v1.0.12"
@@ -110,6 +110,26 @@ encounter:
         config="本站控制變因測試；牛頭人、團隊增益、180±5秒、63級單體首領、隊友維持流血；無消耗品、無換武器。"+("熊坦承傷假設與上游預設裝備（不保證當前可取得），治療模型2200 HPS。" if bear else "同一天賦、附魔與其他裝備，只變更雙手武器。")
         out.append((spec,label,str(filename),str(apl),str(original),config))
     return out
+def collect_sources(root, *entries):
+    """Capture the exact generated and upstream SIML settings used by a case.
+    Follow only quoted use paths under the pinned checkout; limit size/count.
+    This is evidence for review, not a new executable input path.
+    """
+    seen=set()
+    out=[]
+    queue=[root/entry for entry in entries]
+    while queue and len(out)<16:
+        path=queue.pop(0).resolve()
+        if path in seen or not path.is_relative_to(root) or path.suffix!=".siml":
+            continue
+        seen.add(path)
+        try: raw=path.read_text(encoding="utf-8")
+        except (OSError,UnicodeError): continue
+        out.append({"path":str(path.relative_to(root)),"text":raw[:24000],"truncated":len(raw)>24000})
+        for match in re.finditer(r'^\s*use\s+"([^"\n]+)"',raw,re.MULTILINE):
+            queue.append(path.parent/match.group(1))
+    return out
+
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
     cases=[]
@@ -120,7 +140,7 @@ def main(cli,root,output):
         try:
             request={"siml":(root/apl).read_text(encoding="utf-8"),"path":apl,"settingsFile":settings,"iterations":ITERATIONS,"seed":SEED,"timeline":True,"timelineLimit":400}
             d=apl_result(invoke(cli,root,["siml","sim"],json.dumps(request)))
-            d.update({"spec":spec,"label":label,"settings":source,"apl":apl,"configuration":configuration})
+            d.update({"spec":spec,"label":label,"settings":source,"apl":apl,"configuration":configuration,"sources":collect_sources(root,settings,apl)})
             if spec in ("spec-5","spec-27"):
                 try:d["tank"]=tank_result(cli,root,settings)
                 except (OSError,ValueError,subprocess.SubprocessError) as e:print("Tank metrics unavailable:",str(e)[:300])
