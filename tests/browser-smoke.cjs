@@ -242,6 +242,20 @@ const server=http.createServer((req,res)=>{
   await skillsPane.getByText("野性貓 · 9 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
   assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),9);
   await talentFrame.getByRole("button",{name:"技能使用指南",exact:true}).click();
+  const pickedTalent=skillsPane.locator(".skill-invested");
+  assert.equal(await pickedTalent.getAttribute("open"),null);
+  assert.ok(await pickedTalent.locator(".skill-invested-row").count()>0);
+  await pickedTalent.locator(":scope > summary").click();
+  await pickedTalent.locator(".skill-invested-row > summary").first().click();
+  assert.ok(await pickedTalent.locator(".skill-invested-row[open] p").count()>0);
+  await pickedTalent.locator(":scope > summary").click();
+  await build.selectOption("cat_no_lotp");
+  await skillsPane.locator(".skill-build-note").getByText("參考配點移除 Leader of the Pack",{exact:false}).waitFor({state:"visible"});
+  assert.ok(await skillsPane.locator('[data-skill="Shred"] .skill-focus').isVisible());
+  await build.selectOption("general");
+  await skillsPane.getByText("野性貓 · 9 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
+  assert.equal(await skillsPane.locator(".skill-focus").count(),0);
+
   await skillsPane.getByRole("combobox",{name:"技能用途分類"}).selectOption("回能");
   assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),1);
   assert.ok((await skillsPane.locator(":scope > .skill-list").innerText()).includes("Shifting Power"));
