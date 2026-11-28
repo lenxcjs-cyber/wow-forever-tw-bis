@@ -128,6 +128,27 @@ jobs:
             rm -f skill-client.json
             echo "::warning::Class-matched skill metadata unavailable; authored guides remain available."
           fi
+      - name: Generate version-pinned native combat presets
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/wowsims-presets"
+          mkdir -p "$work/bin" "$work/source"
+          curl -fsSL --retry 1 --connect-timeout 10 --max-time 60 'https://github.com/wowsims/forever/releases/download/v1.0.12/wowsimcli_linux_amd64.zip' -o "$work/cli.zip"
+          echo "917bfcd8d046c5738040e63508b55c16b8ad63e2bb306f49b7052191dc96a009  $work/cli.zip" | sha256sum -c -
+          unzip -q "$work/cli.zip" -d "$work/bin"
+          cli="$(find "$work/bin" -type f -name 'wowsimcli*' -print -quit)"
+          test -n "$cli"
+          chmod +x "$cli"
+          git -C "$work/source" init -q
+          git -C "$work/source" remote add origin https://github.com/wowsims/forever.git
+          git -C "$work/source" sparse-checkout init --cone
+          git -C "$work/source" sparse-checkout set ui/specs sim/siml
+          git -C "$work/source" fetch --depth=1 --filter=blob:none origin 3b9c125a9b1387cd53ce2bb12969e0c6b54b813e
+          git -C "$work/source" checkout --detach FETCH_HEAD
+          test "$(git -C "$work/source" rev-parse HEAD)" = "3b9c125a9b1387cd53ce2bb12969e0c6b54b813e"
+          python3 scripts/run-combat-presets.py "$cli" "$work/source" combat-presets.json
       - name: Stamp homepage asset versions
         run: python3 scripts/stamp-assets.py
       - name: Install browser test dependency
