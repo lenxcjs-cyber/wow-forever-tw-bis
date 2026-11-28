@@ -64,7 +64,18 @@ function partialBuildCheck(p,index){
  return {issues,matched,total};
 }
 function exactProfile(profiles,cls,id,key){return (profiles||[]).find(p=>p.cls===cls&&p.id===id&&p.key===key)||null;}
-if(typeof module!=="undefined"&&module.exports)module.exports={validateCommunitySnapshot,partialBuildCheck,exactProfile,zh,talentSymbol,iconFile,sumIcon,LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
+function skillBuildNote(data,profile){
+ if(!profile||!data?.buildNotes)return null;
+ const note=data.buildNotes[profile.id+":"+profile.key];return note&&typeof note.note==="string"&&Array.isArray(note.focus)?note:null;
+}
+function investedTalentRows(profile,cls){
+ if(!Array.isArray(profile?.talents))return [];
+ return profile.talents.flatMap((tree,i)=>Object.entries(tree||{}).filter(([,n])=>Number.isInteger(n)&&n>0).map(([name,points])=>{
+  const t=cls?.talents?.find(x=>x.tree===i&&x.name.toLowerCase()===name.toLowerCase());
+  return {name,points,tree:i,talent:t||null,valid:t?points<=t.maxRank&&!t.notYetAvailable:null};
+ }));
+}
+if(typeof module!=="undefined"&&module.exports)module.exports={skillBuildNote,investedTalentRows,validateCommunitySnapshot,partialBuildCheck,exactProfile,zh,talentSymbol,iconFile,sumIcon,LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
 if(typeof document!=="undefined"){
 const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;},add=(p,...xs)=>{p.append(...xs);return p;},link=(text,url)=>{const a=el("a",text);a.href=url;a.target="_blank";a.rel="noopener noreferrer";return a;};
 const options=(e,rows,value)=>{e.replaceChildren(...rows.map(([v,t])=>new Option(t,v)));if(rows.some(x=>x[0]===value))e.value=value;};
@@ -87,6 +98,7 @@ function renderSkillGuide(profile){
  const data=skillGuides?.format===1?skillGuides:null,guide=data?.specs?.[profile.id];
  host.append(el("h2","專精技能使用指南"));
  if(!guide||guide.class!==classSel.value){host.append(el("p","逐項技能指南尚未取得；請參考遊戲技能書。","muted"));return;}
+ const buildNote=skillBuildNote(data,profile),focus=new Set(buildNote?.focus||[]);
  const entries=(list)=>Array.isArray(list)?list.filter(x=>Array.isArray(x)&&x.length===4&&x.every(v=>typeof v==="string"&&v.trim())):[];
  const core=entries(guide.skills),common=entries(data.common?.[guide.class]).filter(x=>!core.some(y=>y[1]===x[1]));
  const talentNames=new Set([...(catalog?.profiles||[]).filter(p=>p.cls===profile.cls).flatMap(p=>(p.talents||[]).flatMap(t=>Object.keys(t))),...(getClass()?.talents||[]).map(t=>t.name)]);
@@ -103,11 +115,15 @@ function renderSkillGuide(profile){
   return {kind:"unknown",text:"取得條件尚未逐項核對。"};
  }
  add(host,el("h3",guide.title+" · "+core.length+" 項核心／情境技能"),el("p",guide.priority),el("p","以下為專精共通滿等 PvE 操作參考；不是固定循環。部分技能需天賦、武器、形態、種族或任務解鎖。","muted"));
+ const buildBox=el("details",undefined,"skill-build-note");
+ add(buildBox,el("summary","目前構築："+profile.label),el("p",profile.style||"構築說明待補"),el("p",profile.rotation||"構築操作待查"),el("p",buildNote?.note||"此構築尚無獨立逐項手法；下方為專精共通建議。","muted"));
+ if(buildNote?.focus.length)buildBox.append(el("p","重點查閱標記只表示此構築的研究方向，不是技能優先序。","muted"));
+ buildBox.open=!!buildNote;host.append(buildBox);
  if(!profile.talents)host.append(el("p","此構築未收錄逐項配點：不假定已習得天賦技能。","warn"));
  const search=el("input");search.type="search";search.placeholder="搜尋技能、用途或英文原名";search.setAttribute("aria-label","搜尋專精技能");const list=el("div",undefined,"skill-list"),commonBox=el("details",undefined,"skill-common"),commonRows=el("div",undefined,"skill-list"),count=el("p",undefined,"muted");
  const filters=el("div",undefined,"skill-filters"),category=el("select"),acq=el("select");category.setAttribute("aria-label","技能用途分類");acq.setAttribute("aria-label","技能取得條件");for(const value of ["全部用途",...new Set([...core,...common].map(x=>x[2]))])category.append(new Option(value,value));for(const [value,label] of [["all","全部取得狀態"],["trainer","已標記職業習得"],["talent","參考配點已列天賦"],["unlisted","參考配點未列天賦"],["unknown","取得條件待查"]])acq.append(new Option(label,value));add(filters,category,acq);add(host,search,filters,count,list,commonBox);
  function card(row){const [name,en,kind,use]=row,c=el("article",undefined,"skill-card");add(c,add(el("div",undefined,"skill-name"),el("strong",name),el("small",kind,"skill-kind")),el("small",en,"muted"),el("p",use));
-  const condition=acquisition(en);c.dataset.acquisition=condition.kind;c.append(el("p",condition.text,"skill-condition"));
+  const condition=acquisition(en);c.dataset.acquisition=condition.kind;c.dataset.skill=en;c.append(el("p",condition.text,"skill-condition"));if(focus.has(en))c.append(el("small","本構築重點查閱","skill-focus"));
   return c;
  }
  function draw(){const terms=search.value.trim().toLowerCase().split(/\s+/).filter(Boolean),matches=x=>(category.value==="全部用途"||category.value===x[2])&&(acq.value==="all"||acq.value===acquisition(x[1]).kind)&&terms.every(t=>x.join(" ").toLowerCase().includes(t)),a=core.filter(matches),b=common.filter(matches);list.replaceChildren(...a.map(card));commonRows.replaceChildren(...b.map(card));commonBox.replaceChildren(el("summary","職業共通技能（"+b.length+"）"),commonRows);commonBox.hidden=!b.length;if(terms.length||category.value!=="全部用途"||acq.value!=="all")commonBox.open=true;count.textContent="顯示 "+(a.length+b.length)+" / "+(core.length+common.length)+" 項已整理技能";if(!a.length&&!b.length)list.append(el("p","沒有符合條件的已整理技能。","muted"));}
@@ -115,6 +131,22 @@ function renderSkillGuide(profile){
  const refs=el("details");add(refs,el("summary","資料來源與涵蓋限制"),el("p",data.scope,"muted"),el("p","整理日期："+data.reviewed,"muted"),link("職業技能書、階級與資源消耗（The Forever Era；版本可能較舊）","https://theforeverera.com/en/spells/"+guide.class+"/"),link("ForeverDB 技能資料","https://foreverdb.net/spells?cls="+[1,2,3,4,5,7,8,9,11][CLASSES.indexOf(guide.class)]),link("Method 職業攻略","https://www.method.gg/wow-forever/class-guides"),link("Icy Veins 職業攻略","https://www.icy-veins.com/wow-forever/class-guides"));
  if(profile.id==="spec-26")add(refs,link("Method 11/27 貓德輸出手法","https://www.method.gg/wow-forever/class-guides/feral-dps-druid/rotation-and-playstyle"),link("Wowhead 貓德輸出手法","https://www.wowhead.com/forever/guide/classes/druid/feral/rotation-cooldowns-pve-dps"));
  if(profile.id==="spec-26"||profile.id==="spec-27")refs.append(link("11/27 野性德實戰參考","https://mobalytics.gg/wow-forever/classes/"+(profile.id==="spec-26"?"feral-druid-guide":"feral-druid-tank-guide")));
+ const picked=investedTalentRows(profile,getClass());
+ if(picked.length){
+  const talentPanel=el("details",undefined,"skill-invested");talentPanel.append(el("summary","已投入天賦效果（"+picked.length+" 項）"));
+  talentPanel.append(el("p","按參考配點列出；天賦不一定是主動技能。格位、上限與完整前置核對結果以天賦區為準。","muted"));
+  for(const row of picked){
+   const t=row.talent,card=el("details",undefined,"skill-invested-row");
+   card.append(el("summary",(t?localized(t):zh(row.name))+" · "+row.points+" 點"));
+   if(t){
+    const effects=localizedRanks(t),raw=t.ranks?.[row.points-1],value=effects?.[row.points-1]||globalThis.GTLocale?.effect?.(raw||"")||raw;
+    add(card,el("p",row.valid?purpose(t):"參考點數超出上限或尚未開放，效果不可當作有效配點。",row.valid?"muted":"warn"),el("p",value||"目前階級效果未取得；不推算數值。"),el("small",effects?.[row.points-1]?"指定版本繁中效果": "來源效果或參考譯文，待核對","muted"));
+    const btn=el("button","查看完整天賦階級");btn.type="button";btn.onclick=()=>{detail(t);$("detail").scrollIntoView({block:"start"});};card.append(btn);
+   }else card.append(el("p","目前資料找不到同系同名天賦，保留參考配點但不借用其他天賦效果。","warn"));
+   talentPanel.append(card);
+  }
+  host.append(talentPanel);
+ }
  host.append(refs);
 }
 function syncTreeNavigation(){
