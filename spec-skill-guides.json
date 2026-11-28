@@ -1,7 +1,7 @@
 {
   "format": 1,
   "reviewed": "2026-11-28",
-  "scope": "滿等 PvE 核心技能與常用輔助；本站原創操作建議，尚非完整技能書、逐構築實測或官方翻譯。需天賦的技能以實際習得為準。 技能取得分類參考 The Forever Era 的 1.60.1.71091 技能書，可能落後本站客戶端版本，仍以遊戲內為準。",
+  "scope": "滿等 PvE 核心技能與常用輔助；本站原創操作建議，尚非完整技能書、逐構築實測或官方翻譯。需天賦的技能以實際習得為準。 技能取得分類參考 The Forever Era 的 1.60.1.71091 技能書，可能落後本站客戶端版本，仍以遊戲內為準。 戰鬥情境整理以本站既有技能說明為基礎，技能排列不是經模擬驗證的施放順序。",
   "sources": [
     "https://foreverdb.net/classes",
     "https://www.method.gg/wow-forever/class-guides",
@@ -1838,5 +1838,790 @@
       "note": "此為武器替代比較，不是獨立天賦或已驗證坦克手法；熊形態技能仍需確認實際習得。",
       "focus": []
     }
+  },
+  "scenarios": {
+    "spec-1": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Mortal Strike",
+          "Overpower",
+          "Rend",
+          "Slam"
+        ],
+        "note": "怒氣優先留給主力技能，依觸發及敵人存活時間安排其餘攻擊。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Whirlwind"
+        ],
+        "note": "確認坦克仇恨與控場後再打怪群。"
+      },
+      {
+        "label": "斬殺階段",
+        "skills": [
+          "Execute"
+        ],
+        "note": "符合斬殺條件時重新分配怒氣。"
+      }
+    ],
+    "spec-2": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Bloodthirst",
+          "Whirlwind",
+          "Heroic Strike"
+        ],
+        "note": "先確保主力技能有怒氣，再使用額外耗怒攻擊。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Whirlwind"
+        ],
+        "note": "怪群聚集且仇恨穩定時使用。"
+      },
+      {
+        "label": "爆發與收尾",
+        "skills": [
+          "Death Wish",
+          "Recklessness",
+          "Execute"
+        ],
+        "note": "選擇能持續攻擊且承傷安全的窗口。"
+      }
+    ],
+    "spec-3": [
+      {
+        "label": "單體坦克",
+        "skills": [
+          "Shield Slam",
+          "Revenge",
+          "Sunder Armor"
+        ],
+        "note": "先建立仇恨，補足團隊需要的破甲。"
+      },
+      {
+        "label": "多目標坦克",
+        "skills": [
+          "Thunder Clap",
+          "Revenge",
+          "Taunt"
+        ],
+        "note": "依構築、姿態與怪群位置處理仇恨，嘲諷留給失控目標。"
+      },
+      {
+        "label": "高承傷",
+        "skills": [
+          "Shield Block",
+          "Shield Wall",
+          "Last Stand"
+        ],
+        "note": "在預期承傷前安排減傷，保命優先。"
+      }
+    ],
+    "spec-4": [
+      {
+        "label": "穩定治療",
+        "skills": [
+          "Flash of Light",
+          "Holy Light"
+        ],
+        "note": "按缺血量與法力選擇治療。"
+      },
+      {
+        "label": "急救",
+        "skills": [
+          "Holy Shock",
+          "Divine Favor",
+          "Lay on Hands"
+        ],
+        "note": "符合天賦條件時安排急救，避免過量治療。"
+      },
+      {
+        "label": "團隊輔助",
+        "skills": [
+          "Cleanse",
+          "Blessing of Protection",
+          "Blessing of Freedom"
+        ],
+        "note": "依團隊分工解除危險效果。"
+      }
+    ],
+    "spec-5": [
+      {
+        "label": "單體坦克",
+        "skills": [
+          "Righteous Fury",
+          "Seal of Fury",
+          "Judgement",
+          "Holy Strike"
+        ],
+        "note": "確認仇恨增益與聖印，再穩定建立仇恨。"
+      },
+      {
+        "label": "多目標坦克",
+        "skills": [
+          "Consecration",
+          "Hammer of the Righteous"
+        ],
+        "note": "等怪群集中，避免打破控場。"
+      },
+      {
+        "label": "高承傷",
+        "skills": [
+          "Holy Shield",
+          "Templar's Bulwark"
+        ],
+        "note": "依盾牌、天賦及承傷窗口安排。"
+      }
+    ],
+    "spec-6": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Seal of Command",
+          "Judgement",
+          "Holy Strike"
+        ],
+        "note": "確認聖印及法力，依構築使用近戰攻擊。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Consecration"
+        ],
+        "note": "怪群能留在效果範圍且法力充足時使用。"
+      },
+      {
+        "label": "特殊條件",
+        "skills": [
+          "Exorcism",
+          "Holy Shock",
+          "Unsealed Wrath"
+        ],
+        "note": "確認目標與天賦條件；被動效果不是獨立按鍵。"
+      }
+    ],
+    "spec-7": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Auto Shot",
+          "Serpent Sting",
+          "Summon Hawk"
+        ],
+        "note": "維持射擊節奏與寵物接觸，技能依天賦安排。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Multi-Shot"
+        ],
+        "note": "先確認不會破壞控場。"
+      },
+      {
+        "label": "爆發與寵物",
+        "skills": [
+          "Bestial Wrath",
+          "Mend Pet"
+        ],
+        "note": "選擇寵物存活且可持續攻擊的窗口。"
+      }
+    ],
+    "spec-8": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Auto Shot",
+          "Aimed Shot",
+          "Sniper Shot",
+          "Arcane Shot"
+        ],
+        "note": "依射擊窗口與天賦安排，避免中斷自動射擊。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Multi-Shot"
+        ],
+        "note": "確認額外目標與控場。"
+      },
+      {
+        "label": "爆發與支援",
+        "skills": [
+          "Rapid Fire",
+          "Trueshot Aura"
+        ],
+        "note": "安排站定輸出，與隊伍協調增益。"
+      }
+    ],
+    "spec-9": [
+      {
+        "label": "近戰窗口",
+        "skills": [
+          "Raptor Strike",
+          "Mongoose Bite",
+          "Strider Kick",
+          "Lacerate"
+        ],
+        "note": "依觸發與目標存活時間選擇近戰技能。"
+      },
+      {
+        "label": "遠程窗口",
+        "skills": [
+          "Auto Shot"
+        ],
+        "note": "只有遠近穿插構築才要求安排射擊窗口。"
+      },
+      {
+        "label": "控場與移動",
+        "skills": [
+          "Wing Clip",
+          "Freezing Trap",
+          "Feign Death"
+        ],
+        "note": "保留控制技能以安全轉移位置。"
+      }
+    ],
+    "spec-10": [
+      {
+        "label": "集星與維持",
+        "skills": [
+          "Mutilate",
+          "Slice and Dice",
+          "Shank"
+        ],
+        "note": "確認雙匕首與天賦，依能量維持攻速增益。"
+      },
+      {
+        "label": "終結技",
+        "skills": [
+          "Rupture",
+          "Eviscerate"
+        ],
+        "note": "按連擊點、流血有效性與目標存活時間選擇。"
+      },
+      {
+        "label": "起手與救援",
+        "skills": [
+          "Garrote",
+          "Kick",
+          "Vanish"
+        ],
+        "note": "依潛行條件起手，保留打斷與脫離危險手段。"
+      }
+    ],
+    "spec-11": [
+      {
+        "label": "集星與維持",
+        "skills": [
+          "Sinister Strike",
+          "Backstab",
+          "Slice and Dice",
+          "Shank"
+        ],
+        "note": "依主手武器與構築選擇集星技能，不混用固定循環。"
+      },
+      {
+        "label": "爆發",
+        "skills": [
+          "Blade Flurry",
+          "Adrenaline Rush"
+        ],
+        "note": "確認天賦、能量空間與額外目標安全。"
+      },
+      {
+        "label": "終結與控制",
+        "skills": [
+          "Eviscerate",
+          "Kick",
+          "Feint"
+        ],
+        "note": "維持增益之餘處理終結技、打斷與仇恨。"
+      }
+    ],
+    "spec-12": [
+      {
+        "label": "起手與集星",
+        "skills": [
+          "Ambush",
+          "Backstab",
+          "Hemorrhage",
+          "Premeditation"
+        ],
+        "note": "依武器、潛行與天賦選擇合法技能。"
+      },
+      {
+        "label": "終結與維持",
+        "skills": [
+          "Slice and Dice",
+          "Death Mark"
+        ],
+        "note": "依連擊點及當前增益安排。"
+      },
+      {
+        "label": "爆發與保命",
+        "skills": [
+          "Preparation",
+          "Vanish",
+          "Evasion"
+        ],
+        "note": "確認可重置技能及本場承傷需要。"
+      }
+    ],
+    "spec-13": [
+      {
+        "label": "預判承傷",
+        "skills": [
+          "Power Word: Shield",
+          "Renew"
+        ],
+        "note": "在可有效吸收或持續治療的目標上使用。"
+      },
+      {
+        "label": "單體急救",
+        "skills": [
+          "Penance",
+          "Greater Heal"
+        ],
+        "note": "依天賦、受傷程度及引導窗口選擇。"
+      },
+      {
+        "label": "團隊支援",
+        "skills": [
+          "Power Infusion",
+          "Inner Focus",
+          "Dispel Magic"
+        ],
+        "note": "協調團隊爆發、資源及驅散分工。"
+      }
+    ],
+    "spec-14": [
+      {
+        "label": "單體治療",
+        "skills": [
+          "Heal",
+          "Flash Heal",
+          "Greater Heal",
+          "Renew"
+        ],
+        "note": "以掉血速度、缺血量及法力決定治療。"
+      },
+      {
+        "label": "群體治療",
+        "skills": [
+          "Prayer of Healing",
+          "Prayer of Mending"
+        ],
+        "note": "確認受益目標數與觸發條件。"
+      },
+      {
+        "label": "救援與驅散",
+        "skills": [
+          "Dispel Magic",
+          "Abolish Disease",
+          "Fade"
+        ],
+        "note": "依機制及仇恨狀況處理。"
+      }
+    ],
+    "spec-15": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Shadowform",
+          "Shadow Word: Pain",
+          "Mind Blast",
+          "Mind Flay"
+        ],
+        "note": "維持適用傷害效果，利用安全引導窗口。"
+      },
+      {
+        "label": "移動與收尾",
+        "skills": [
+          "Shadow Word: Death"
+        ],
+        "note": "確認施放與反傷條件，勿危及自身。"
+      },
+      {
+        "label": "團隊輔助",
+        "skills": [
+          "Vampiric Embrace",
+          "Dispel Magic",
+          "Fade"
+        ],
+        "note": "依形態限制、仇恨及團隊分工選用。"
+      }
+    ],
+    "spec-16": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Lightning Bolt",
+          "Flame Shock"
+        ],
+        "note": "依構築、目標存活時間及法力安排。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Chain Lightning"
+        ],
+        "note": "確認跳躍目標安全及法力。"
+      },
+      {
+        "label": "爆發與打斷",
+        "skills": [
+          "Elemental Mastery",
+          "Earth Shock",
+          "Call of the Elements"
+        ],
+        "note": "選擇施法窗口，預留打斷及圖騰。"
+      }
+    ],
+    "spec-17": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Windfury Weapon",
+          "Stormstrike",
+          "Earth Shock",
+          "Lightning Bolt"
+        ],
+        "note": "維持武器增益；法術依天賦、觸發及安全窗口穿插。"
+      },
+      {
+        "label": "爆發",
+        "skills": [
+          "Rage of the Farseer"
+        ],
+        "note": "確認已習得與實際效果後安排。"
+      },
+      {
+        "label": "團隊支援",
+        "skills": [
+          "Windfury Totem",
+          "Purge",
+          "Fire Nova"
+        ],
+        "note": "依隊伍圖騰分工、驅散及怪群位置選擇。"
+      }
+    ],
+    "spec-18": [
+      {
+        "label": "單體治療",
+        "skills": [
+          "Healing Wave",
+          "Lesser Healing Wave",
+          "Riptide"
+        ],
+        "note": "按缺血與時間壓力選擇。"
+      },
+      {
+        "label": "群體治療",
+        "skills": [
+          "Chain Heal"
+        ],
+        "note": "確認受傷隊友及跳轉範圍。"
+      },
+      {
+        "label": "急救與回魔",
+        "skills": [
+          "Nature's Swiftness",
+          "Mana Tide Totem"
+        ],
+        "note": "預留瞬發救援與團隊法力支援。"
+      }
+    ],
+    "spec-19": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Arcane Blast",
+          "Arcane Missiles",
+          "Arcane Wrath",
+          "Fireball"
+        ],
+        "note": "依純秘法或混合構築、層數及法力選擇。"
+      },
+      {
+        "label": "爆發",
+        "skills": [
+          "Arcane Power"
+        ],
+        "note": "選擇可持續施法的窗口。"
+      },
+      {
+        "label": "回魔與保命",
+        "skills": [
+          "Evocation",
+          "Blink",
+          "Counterspell"
+        ],
+        "note": "留出安全回魔時間及打斷機會。"
+      }
+    ],
+    "spec-20": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Fireball",
+          "Scorch",
+          "Pyroblast",
+          "Frostfire Bolt"
+        ],
+        "note": "按構築、減益分工及觸發選擇法術。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Flamestrike"
+        ],
+        "note": "怪群停留且仇恨穩定時使用。"
+      },
+      {
+        "label": "爆發與移動",
+        "skills": [
+          "Combustion",
+          "Fire Blast",
+          "Blink"
+        ],
+        "note": "安排安全爆發與走位。"
+      }
+    ],
+    "spec-21": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Frostbolt",
+          "Ice Lance"
+        ],
+        "note": "依冰霜觸發與目標條件安排。"
+      },
+      {
+        "label": "多目標控場",
+        "skills": [
+          "Frost Nova",
+          "Cone of Cold",
+          "Blizzard"
+        ],
+        "note": "先確認怪群位置與控制免疫。"
+      },
+      {
+        "label": "保命與打斷",
+        "skills": [
+          "Ice Block",
+          "Blink",
+          "Counterspell"
+        ],
+        "note": "預留給危險機制。"
+      }
+    ],
+    "spec-22": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Corruption",
+          "Bane of Agony",
+          "Curse of the Elements",
+          "Wrack",
+          "Shadow Bolt",
+          "Siphon Life"
+        ],
+        "note": "按詛咒分工及構築選擇引導或填充。"
+      },
+      {
+        "label": "轉火與短命目標",
+        "skills": [
+          "Shadow Bolt",
+          "Corruption"
+        ],
+        "note": "目標太短命時不強制補齊所有持續效果。"
+      },
+      {
+        "label": "回魔與生存",
+        "skills": [
+          "Life Tap",
+          "Healthstone"
+        ],
+        "note": "選安全血量與承傷窗口。"
+      }
+    ],
+    "spec-23": [
+      {
+        "label": "寵物安排",
+        "skills": [
+          "Summon Imp",
+          "Summon Succubus",
+          "Demonic Sacrifice"
+        ],
+        "note": "依構築選擇寵物或犧牲；確認實際效果。"
+      },
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Shadow Bolt",
+          "Immolate"
+        ],
+        "note": "按暗影或火焰構築選擇填充。"
+      },
+      {
+        "label": "回魔與救援",
+        "skills": [
+          "Life Tap",
+          "Soulstone",
+          "Healthstone"
+        ],
+        "note": "管理血量、法力及隊伍救援。"
+      }
+    ],
+    "spec-24": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Immolate",
+          "Incinerate",
+          "Conflagrate",
+          "Shadow Bolt"
+        ],
+        "note": "依火焰或暗影構築與持續效果安排。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Bane of Havoc"
+        ],
+        "note": "已習得且兩個有效目標並存時考慮。"
+      },
+      {
+        "label": "收尾與保命",
+        "skills": [
+          "Shadowburn",
+          "Healthstone"
+        ],
+        "note": "按碎片、目標狀態及生存需求安排。"
+      }
+    ],
+    "spec-25": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Moonkin Form",
+          "Moonfire",
+          "Insect Swarm",
+          "Wrath",
+          "Starfire"
+        ],
+        "note": "依實際日月蝕、法力與目標存活時間選法術。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Hurricane"
+        ],
+        "note": "怪群安全聚集且可完成引導時使用。"
+      },
+      {
+        "label": "團隊輔助",
+        "skills": [
+          "Faerie Fire",
+          "Innervate",
+          "Rebirth"
+        ],
+        "note": "依減益、回魔及戰復分工處理。"
+      }
+    ],
+    "spec-26": [
+      {
+        "label": "單體持續輸出",
+        "skills": [
+          "Faerie Fire",
+          "Rake",
+          "Rip",
+          "Shred",
+          "Claw",
+          "Ferocious Bite"
+        ],
+        "note": "依站位、能量、連擊點及流血時間決定下一步，不固定背按鍵。"
+      },
+      {
+        "label": "多目標",
+        "skills": [
+          "Rip",
+          "Rake",
+          "Shred"
+        ],
+        "note": "以集火與長命可流血目標為主，不為短命目標強補流血。"
+      },
+      {
+        "label": "回能與起手",
+        "skills": [
+          "Shifting Power",
+          "Tiger's Fury",
+          "Prowl"
+        ],
+        "note": "確認已習得、資源空間及可攻擊窗口。"
+      }
+    ],
+    "spec-27": [
+      {
+        "label": "單體坦克",
+        "skills": [
+          "Maul",
+          "Lacerate",
+          "Primal Bite"
+        ],
+        "note": "依怒氣、天賦及承傷安排仇恨技能。"
+      },
+      {
+        "label": "多目標坦克",
+        "skills": [
+          "Swipe",
+          "Demoralizing Roar",
+          "Growl"
+        ],
+        "note": "集中怪群並照顧失控目標，維持必要減益。"
+      },
+      {
+        "label": "高承傷與移動",
+        "skills": [
+          "Frenzied Regeneration",
+          "Feral Charge"
+        ],
+        "note": "留意怒氣、位置及治療距離。"
+      }
+    ],
+    "spec-28": [
+      {
+        "label": "持續與單體治療",
+        "skills": [
+          "Rejuvenation",
+          "Regrowth",
+          "Healing Touch"
+        ],
+        "note": "預判承傷，按缺血量及法力決定直接或持續治療。"
+      },
+      {
+        "label": "群體治療",
+        "skills": [
+          "Wild Growth",
+          "Rejuvenation"
+        ],
+        "note": "需天賦及適合的傷害分布，不強制全員上持續治療。"
+      },
+      {
+        "label": "急救與回魔",
+        "skills": [
+          "Swiftmend",
+          "Nature's Swiftness",
+          "Innervate",
+          "Rebirth"
+        ],
+        "note": "預留急救、回魔與戰復，確認施法條件。"
+      }
+    ]
   }
 }
