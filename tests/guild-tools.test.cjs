@@ -134,6 +134,8 @@ assert.equal(expansion.gearCatalogEligible({id:"spec-1"},{item_class:"Armor",slo
 assert.ok(gate.skillGate("spec-13",{slot:"胸部",type:"皮甲"}));
 assert.equal(gate.skillGate("spec-4",{slot:"胸部",type:"布甲"}),"");
 assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Armor",slot:"Chest",subclass:"Leather",class_mask:1},p),false);
+for(const bad of [{required_level:"invalid"},{required_level:-1},{required_level:60.5},{class_mask:-2},{class_mask:1024.5},{class_mask:4294967296}])assert.equal(expansion.gearCatalogEligible(cat,{item_class:"Armor",slot:"Chest",subclass:"Leather",...bad},p),false);
+assert.equal(expansion.gearCatalogEligible(cat,null,p),false);
 assert.deepEqual(expansion.gearCatalogTags({source_summary:"World drop",bonding:"Binds when equipped"}),["世界掉落","裝綁"]);
 assert.deepEqual(expansion.gearCatalogTags({source_summary:"Crafted: Leatherworking",bonding:"Binds when equipped"}),["裝綁","製作"]);
 console.log("PASS: expanded gear candidates, feral reputation weapon, class eligibility, source and binding filters");
@@ -204,6 +206,13 @@ assert.equal(leather.total,50);assert.equal(plate.total,30);
 assert.ok(leather.total>plate.total);
 assert.equal(expansion.catalogWeightScore({armor:400},{"護甲":2}).total,800);
 assert.equal(expansion.catalogWeightScore({hit:10},{"命中機率":2}).used,0);
+for(const bad of [false,true,"", "not a stat",[],{},Infinity,"0x10"]){
+ const score=expansion.catalogWeightScore({agility:bad,strength:10},{"敏捷":2,"力量":1});
+ assert.equal(score.incomplete,true);
+ assert.equal(expansion.catalogPositionRankScore({agility:bad,strength:10,source_summary:"Quest"},"胸部",{"敏捷":2,"力量":1}).rankable,false);
+}
+assert.equal(expansion.catalogWeightScore({agility:" 12.5 ",strength:2},{"敏捷":2,"力量":1}).total,27);
+assert.equal(expansion.catalogWeightScore({strength:2},{"敏捷":2,"力量":1}).incomplete,false);
 
 // Expanded raw stat fields are independent; ambiguous ratings are still excluded.
 assert.equal(expansion.catalogWeightScore({attack_power:30,ranged_attack_power:20,spell_power:15,spell_damage:10,healing:40,mp5:5,block_value:8},{"攻擊強度":1,"遠程攻強":2,"法術能量":3,"法術傷害":4,"治療加成":5,"每5秒法力":6,"格擋值":7}).total,441);
@@ -222,6 +231,11 @@ assert.equal(expansion.catalogSourceRecorded({source_summary:" "}),false);
 assert.equal(expansion.catalogSourceRecorded({source_summary:"World drop"}),true);
 assert.equal(expansion.catalogSourceRecorded({source_types:["quest"],estimated:0}),true);
 assert.deepEqual(expansion.gearCatalogTags({source_types:"quest, vendor;container"}),["任務","商人","寶箱／容器"]);
+assert.deepEqual(expansion.gearCatalogTags({source_types:"world drop;vendor"}),["世界掉落","商人"]);
+assert.deepEqual(expansion.gearCatalogTags({source_types:["World Drop"],required_reputation:{}}),["世界掉落"]);
+assert.deepEqual(expansion.gearCatalogTags({required_reputation:false}),["待查"]);
+assert.equal(expansion.catalogSourceRecorded({source_summary:"Unknown"}),false);
+assert.equal(expansion.catalogSourceRecorded({source_summary:"待查",source_types:["quest"]}),true);
 assert.deepEqual(expansion.gearCatalogTags({source_types:["crafted","drop"],bonding:"Binds when picked up"}),["製作","掉落"]);
 assert.equal(expansion.catalogSourceRecorded({source_types:"bogus"}),false);
 const normalized=expansion.normalizeGearCatalog({items:[null,{id:0},{id:1,estimated:1,agility:99},{id:1,estimated:0,agility:10,source_types:"quest"},{id:"2",agility:3,source_summary:"Quest reward"},{id:2,agility:3,source_types:"vendor"},{id:3,agility:2,source_summary:"Drop"},{id:3,agility:4,source_summary:"Drop"}]});
@@ -845,6 +859,9 @@ const duplicateTier=tierLogic.nativeSetComparison({...nativeTier,thresholds:[2,4
 assert.equal(duplicateTier.firstWin,4);
 assert.deepEqual(duplicateTier.missing,[2]);
 assert.equal(tierLogic.nativeSetComparison({cases:[nativeTier.cases[0],nativeTier.cases[0]]},"dps"),null);
+assert.equal(tierLogic.nativeSetComparison({cases:[nativeTier.cases[0],{pieces:0,error:"failed"},nativeTier.cases[1]]},"dps"),null);
+assert.equal(tierLogic.nativeSetComparison({cases:[{...nativeTier.cases[0],metrics:{dps:0}},nativeTier.cases[1]]},"dps"),null);
+assert.deepEqual(tierLogic.nativeSetComparison({thresholds:[2,4],cases:[...nativeTier.cases,{pieces:2,error:"failed"}]},"dps").missing,[2]);
 const invalidSurvival={cases:[nativeTier.cases[0],{...nativeTier.cases[1],metrics:{dps:110,tps:110,dtps:-1,death:0}}]};
 assert.equal(tierLogic.nativeSetComparison(invalidSurvival,"tank").firstWin,null);
 console.log("PASS: missing and ambiguous native set thresholds, invalid tank survival safeguards");
