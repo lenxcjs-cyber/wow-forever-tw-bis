@@ -784,3 +784,20 @@ assert.equal(adjacentSet.rows[2].previousDelta,null);
 assert.deepEqual(adjacentSet.missingAdjacent,[3]);
 assert.deepEqual(adjacentSet.missing,[]);
 console.log("PASS: native set activation threshold versus adjacent-count controls and marginal deltas");
+
+
+// An empty scatter slot cannot masquerade as set-effect improvement.
+const unevenPools=new Map([["頭部",[tierItem(1,"A",10)]],["肩部",[tierItem(2,"A",10),tierItem(3,"",5)]]]);
+const uneven=tierLogic.catalogSetTierComparison(unevenPools,"A",2,[{pieces:2,value:100}]);
+assert.equal(uneven.rows[1].comparable,false);
+assert.equal(uneven.rows[1].net,null);
+assert.equal(uneven.firstWin,null);
+assert.equal(tierLogic.catalogSetTierComparison(tierPools,"A",3,[{pieces:2,value:5},{pieces:2,value:5}]).firstWin,null);
+assert.equal(adjacentSet.best.pieces,4);assert.equal(adjacentSet.bestConfirmed.pieces,4);
+const epHelper=new Function(section("function epProfilesFor(","let epProfilesPromise=")+";const catalogWeightFields={strength:'力量',agility:'敏捷'};const combatPresetCommit='3b9c125a9b1387cd53ce2bb12969e0c6b54b813e';return epProfilesFor;")();
+const ep={spec:"spec-1",label:"武器戰",variant:"arms",source:"ui/specs/warrior/dps/presets.ts",declaration:"PreBiSArmsEpWeights",panelWeights:{"力量":2.2,"敏捷":1.76}};
+const epData={commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",profiles:[ep,{...ep,label:"duplicate"},{...ep,variant:"bad",panelWeights:{"命中":1}}]};
+assert.deepEqual(epHelper(epData,"spec-1"),[ep]);
+assert.deepEqual(epHelper(epData,"spec-2"),[]);
+assert.deepEqual(epHelper({...epData,commit:"old"},"spec-1"),[]);
+console.log("PASS: equal-slot coverage for set wins, duplicate bonus rejection, best tested threshold and versioned EP presets");
