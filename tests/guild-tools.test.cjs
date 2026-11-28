@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -661,3 +661,15 @@ assert.equal(resultDelta.rows[1].delta,-2);
 assert.equal(resultDelta.warnings.length,2);
 assert.equal(combat.combatResultDelta({dps:0,iterations:1,duration:60},{dps:20,iterations:1,duration:60},"dps").rows[0].percent,null);
 console.log("PASS: shared A/B encounter, explicit native character selection, healer metrics and comparison warnings");
+
+
+// Distinguish a valid empty snapshot from version mismatches and pending native trials.
+const pendingSnapshot={...native,cases:[],failed:[{spec:"spec-1",reason:"timeout"}],plannedBySpec:{"spec-1":3},finished:false};
+assert.equal(combat.combatSnapshotValid(pendingSnapshot),true);
+assert.deepEqual(combat.combatCoverage(pendingSnapshot)[0],{id:"spec-1",role:"dps",count:0,failed:1,planned:3,pending:2});
+assert.equal(combat.combatCoverage({...pendingSnapshot,commit:"wrong"})[0].failed,0);
+assert.equal(combat.combatCoverage({...pendingSnapshot,plannedBySpec:{"spec-1":0}})[0].planned,null);
+assert.equal(combat.combatFailureLabel("timeout"),"引擎逾時");
+assert.equal(combat.combatFailureLabel("constructor"),"原因未提供");
+assert.throws(()=>combat.combatGearTrial(gearRequest,gearExport,"spec-1","invalid"));
+console.log("PASS: snapshot version guards, per-spec pending accounting and safe localized failure codes");
