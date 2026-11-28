@@ -801,3 +801,42 @@ assert.deepEqual(epHelper(epData,"spec-1"),[ep]);
 assert.deepEqual(epHelper(epData,"spec-2"),[]);
 assert.deepEqual(epHelper({...epData,commit:"old"},"spec-1"),[]);
 console.log("PASS: equal-slot coverage for set wins, duplicate bonus rejection, best tested threshold and versioned EP presets");
+
+
+// Forever addon exports can be compact and carry signed random_suffix IDs.
+// Use the pinned native item types rather than guessing positional slots.
+const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,combatEquipmentSpec};")();
+const metadata={items:{1:[1,0,0,4],2:[11,0,0,0],3:[11,0,0,0],4:[12,0,0,0],5:[12,0,0,0],6:[13,4,9,0],7:[14,0,0,0],8:[13,3,7,0],9:[13,2,9,0]},enchants:{99:true},suffixes:{"-15":true}};
+const compactGear={items:[{id:1,random_suffix:-15},{id:2},{id:3},{id:4},{id:5},{id:6,enchant:99},{id:7}]};
+const nativeGear=nativeImport.nativeImportGear(compactGear,metadata);
+assert.equal(nativeGear.items.length,17);assert.equal(nativeGear.items[0].randomSuffix,-15);
+assert.equal(nativeGear.items[10].id,2);assert.equal(nativeGear.items[11].id,3);
+assert.equal(nativeGear.items[12].id,4);assert.equal(nativeGear.items[13].id,5);
+assert.equal(nativeGear.items[14].id,6);assert.equal(nativeGear.items[15].id,undefined);assert.equal(nativeGear.items[16].id,7);
+assert.deepEqual(nativeImport.nativeImportGear(nativeGear,metadata),nativeGear);
+const gapGear={items:Array.from({length:17},(_,i)=>i===11?{id:3}:i===15?{id:9}:{})};
+assert.deepEqual(nativeImport.nativeImportGear(gapGear,metadata),gapGear);
+assert.throws(()=>nativeImport.nativeImportGear({items:[{id:6},{id:8}]},metadata));
+assert.throws(()=>nativeImport.nativeImportGear({items:[{id:888}]},metadata));
+assert.throws(()=>nativeImport.nativeImportGear({items:[{id:1,random_suffix:-99}]},metadata));
+assert.equal(nativeImport.combatEquipmentSpec([{name:"頭部",id:1,randomSuffix:-15}],"one").items[0].randomSuffix,-15);
+const addon={class:"warrior",flavor:"forever",level:60,name:"測試",spec:"arms",race:"Orc",talents:"3-2-1",professions:[{name:"Engineering",level:300}],gear:compactGear};
+const imported=nativeImport.nativeCharacterRequest(addon,gearRequest,"spec-1",metadata);
+const importedPlayer=imported.request.raid.parties[0].players[0];
+assert.equal(importedPlayer.race,"RaceOrc");assert.equal(importedPlayer.talentsString,"3-2-1");assert.equal(importedPlayer.profession1,"Engineering");assert.equal(importedPlayer.prof2Rank,0);
+assert.deepEqual(importedPlayer.equipment,nativeGear);
+assert.throws(()=>nativeImport.nativeCharacterRequest({...addon,flavor:"era"},gearRequest,"spec-1",metadata));
+assert.throws(()=>nativeImport.nativeCharacterRequest({...addon,level:59},gearRequest,"spec-1",metadata));
+assert.throws(()=>nativeImport.nativeCharacterRequest({...addon,class:"mage"},gearRequest,"spec-1",metadata));
+assert.throws(()=>nativeImport.nativeCharacterRequest({...addon,spec:"fury"},gearRequest,"spec-1",metadata));
+const localReq=nativeImport.nativeBrowserRequest(imported.request,"spec-1","guild-5x50k",50);
+assert.equal(localReq.simOptions.iterations,50);assert.equal(localReq.encounter.targets.length,5);
+assert.equal(localReq.raid.parties[0].players[0].inFrontOfTarget,false);
+assert.throws(()=>nativeImport.nativeBrowserRequest(imported.request,"spec-1","guild-50k",1001));
+const injected=JSON.parse(JSON.stringify(imported.request));injected.raid.parties[0].players[0].database={};
+assert.throws(()=>nativeImport.nativeBrowserRequest(injected,"spec-1","guild-50k",50));
+const nativeRaw={iterationsDone:50,avgIterationDuration:60,raidMetrics:{parties:[{players:[{name:"角色",dps:{avg:120}}]}]}};
+assert.equal(nativeImport.nativeBrowserResult(nativeRaw,"spec-1",50).dps,120);
+assert.throws(()=>nativeImport.nativeBrowserResult(nativeRaw,"spec-1",200));
+assert.throws(()=>nativeImport.nativeBrowserResult(nativeRaw,"spec-13",50));
+console.log("PASS: in-site character import with compact slots, signed suffixes, class/level/spec gates and native result validation");
