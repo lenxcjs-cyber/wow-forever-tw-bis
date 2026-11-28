@@ -18,7 +18,7 @@ def map_icons(data, lines):
         for t in c["talents"]:
             name = icons.get(str(t.get("icon")))
             if name:
-                icons[c["token"].lower() + ":" + t["name"]] = name
+                icons[c["token"].lower() + ":" + str(t["tree"]) + ":" + t["name"]] = name
     return icons
 
 if __name__ == "__main__":
