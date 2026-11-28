@@ -110,6 +110,47 @@ encounter:
         config="本站控制變因測試；牛頭人、團隊增益、180±5秒、63級單體首領、隊友維持流血；無消耗品、無換武器。"+("熊坦承傷假設與上游預設裝備（不保證當前可取得），治療模型2200 HPS。" if bear else "同一天賦、附魔與其他裝備，只變更雙手武器。")
         out.append((spec,label,str(filename),str(apl),str(original),config))
     return out
+def feral_variants(root, base_cases):
+    """Additional controlled trials: keep the base gear, buffs and APL fixed
+    except for the explicitly changed encounter length or energy threshold."""
+    variants=[]
+    for spec,label,settings,apl,source,configuration in base_cases:
+        if spec!="spec-26":
+            continue
+        path=Path(settings)
+        raw=(root/path).read_text(encoding="utf-8")
+        if raw.count("  duration 180\n")!=1:
+            print("Feral duration template changed:",label)
+            continue
+        for duration in (30,60,120):
+            target=path.with_name(path.stem+f"_d{duration}.siml")
+            (root/target).write_text(raw.replace("  duration 180\n",f"  duration {duration}\n"),encoding="utf-8")
+            config=configuration.replace("180±5秒",f"{duration}±5秒")
+            variants.append((spec,label+f"／{duration}秒",str(target),apl,source,config))
+        # Test the verified upstream Shifting Power threshold on one weapon only.
+        if path.stem!="gt_the_unstoppable_force":
+            continue
+        ap=Path(apl)
+        ar=(root/ap).read_text(encoding="utf-8")
+        declaration="var $"+ "{Shifting Power energy ceiling} = 53"
+        if ar.count(declaration)!=1 or raw.count('use "apls/adaptive.apl.siml"')!=1:
+            print("Feral APL threshold template changed:",label)
+            continue
+        for threshold in (40,65):
+            target_ap=ap.with_name(f"gt_shift_{threshold}.apl.siml")
+            (root/target_ap).write_text(ar.replace(declaration,declaration.rsplit(" ",1)[0]+f" {threshold}"),encoding="utf-8")
+            target=path.with_name(path.stem+f"_shift{threshold}.siml")
+            (root/target).write_text(raw.replace('use "apls/adaptive.apl.siml"',f'use "apls/{target_ap.name}"'),encoding="utf-8")
+            config=configuration+" 本案例僅與無堅不摧之力基準比較：Shifting Power 能量門檻由53改為"+str(threshold)+"，其他條件不變。"
+            variants.append((spec,label+f"／變形門檻{threshold}",str(target),str(target_ap),source,config))
+    return variants
+
+def comparison_group(spec, settings):
+    if spec!="spec-26":
+        return None
+    match=re.search(r"_d(30|60|120)$",Path(settings).stem)
+    return "貓德 "+(match.group(1) if match else "180")+"±5秒／相同遭遇"
+
 def collect_sources(root, *entries):
     """Capture the exact generated and upstream SIML settings used by a case.
     Follow only quoted use paths under the pinned checkout; limit size/count.
@@ -134,20 +175,33 @@ def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
     cases=[]
     cases_to_run=[(*case,case[2],"") for case in CASES]
-    try:cases_to_run=feral_setups(root)+cases_to_run
+    try:
+        base=feral_setups(root)
+        cases_to_run=base+cases_to_run
+        try:cases_to_run+=feral_variants(root,base)
+        except (OSError,ValueError) as e:print("Feral variants unavailable:",str(e)[:400])
     except (OSError,ValueError) as e:print("Feral setup unavailable:",str(e)[:400])
+    failed=[]
+    def publish():
+        payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":len(cases_to_run),"failed":failed,"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
+        temp=output.with_suffix(output.suffix+".tmp")
+        temp.write_text(json.dumps(payload,ensure_ascii=False,allow_nan=False),encoding="utf-8")
+        temp.replace(output)
     for spec,label,settings,apl,source,configuration in cases_to_run:
         try:
             request={"siml":(root/apl).read_text(encoding="utf-8"),"path":apl,"settingsFile":settings,"iterations":ITERATIONS,"seed":SEED,"timeline":True,"timelineLimit":400}
             d=apl_result(invoke(cli,root,["siml","sim"],json.dumps(request)))
-            d.update({"spec":spec,"label":label,"settings":source,"apl":apl,"configuration":configuration,"sources":collect_sources(root,settings,apl)})
+            apl_source=str(Path(apl).with_name("adaptive.apl.siml")) if Path(apl).name.startswith("gt_shift_") else apl
+            d.update({"spec":spec,"label":label,"settings":source,"apl":apl_source,"configuration":configuration,"comparisonGroup":comparison_group(spec,settings),"sources":collect_sources(root,settings,apl)})
             if spec in ("spec-5","spec-27"):
                 try:d["tank"]=tank_result(cli,root,settings)
                 except (OSError,ValueError,subprocess.SubprocessError) as e:print("Tank metrics unavailable:",str(e)[:300])
             cases.append(d);print("Native engine preset:",spec,"iterations",d["iterations"],"timeline",len(d["timeline"]))
-            output.write_text(json.dumps({"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"scope":"Upstream presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."},ensure_ascii=False,allow_nan=False),encoding="utf-8")
+            publish()
         except (OSError,ValueError,subprocess.SubprocessError) as e:
             print("Preset unavailable:",spec,str(e)[:400])
+            failed.append({"spec":spec,"label":label})
+            if cases:publish()
     if not cases: raise SystemExit("No successful native engine samples")
 
 if __name__=="__main__":main(*sys.argv[1:])
