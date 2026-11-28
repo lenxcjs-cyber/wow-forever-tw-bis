@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogPlanSourceAllowed,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,effectiveGearWeights,omittedFeralWeights,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogPlanSourceAllowed,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,catalogRankableWeights,catalogPositionRankScore,catalogPositionCompare,effectiveGearWeights,omittedFeralWeights,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -284,6 +284,13 @@ const questWeapon={id:507,item_class:"Weapon",slot:"One-Hand",subclass:"Dagger",
 const questWeaponBad={...questWeapon,id:508,dps:100,dps_approx:1};
 const qrWeapons=questReview({id:"spec-10"},[questWeapon,questWeaponBad],rogue,{"武器DPS":1});
 assert.equal(qrWeapons.total,2);
+assert.equal(expansion.catalogRankableWeights({"武器DPS":1}),true);
+assert.equal(expansion.catalogRankableWeights({"命中機率":1}),false);
+assert.equal(expansion.catalogPositionRankScore(questWeapon,"主手",{"主手DPS":2,"副手DPS":1}).total,80);
+assert.equal(expansion.catalogPositionRankScore(questWeapon,"副手",{"主手DPS":2,"副手DPS":1}).total,40);
+assert.equal(expansion.catalogPositionRankScore(questWeaponBad,"主手",{"武器DPS":1}).rankable,false);
+assert.ok(expansion.catalogPositionCompare(expansion.catalogPositionRankScore(questWeapon,"主手",{"武器DPS":1}),expansion.catalogPositionRankScore(questWeaponBad,"主手",{"武器DPS":1}))<0);
+assert.equal(questReview({id:"spec-2"},questItems,planProf,{"命中機率":1}).hasWeights,false);
 for(const hand of ["主手","副手"]){const g=qrWeapons.groups.find(x=>x.position===hand);assert.equal(g.ranked[0].item.id,507);assert.equal(g.unranked[0].id,508);}
 const mutuallyExclusive=[itemForPlan(13965,"Trinket","Miscellaneous",20,{source_summary:"Quest reward"}),itemForPlan(13966,"Trinket","Miscellaneous",19,{source_summary:"Quest reward"}),itemForPlan(13968,"Trinket","Miscellaneous",18,{source_summary:"Quest reward"}),itemForPlan(509,"Trinket","Miscellaneous",10)];
 assert.deepEqual(expansion.catalogArmorPlan({id:"spec-2"},mutuallyExclusive,planProf,{"敏捷":1}).groups.find(g=>g.slot==="飾品").picks.map(x=>x.item.id),[13965,509]);
@@ -875,7 +882,7 @@ console.log("PASS: equal-slot coverage for set wins, duplicate bonus rejection, 
 
 // Forever addon exports can be compact and carry signed random_suffix IDs.
 // Use the pinned native item types rather than guessing positional slots.
-const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,combatEquipmentSpec};")();
+const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,combatEquipmentSpec,combatModifierValid,combatCandidateReplacement};")();
 const metadata={items:{1:[1,0,0,4],2:[11,0,0,0],3:[11,0,0,0],4:[12,0,0,0],5:[12,0,0,0],6:[13,4,9,0],7:[14,0,0,0],8:[13,3,7,0],9:[13,2,9,0]},enchants:{99:true},suffixes:{"-15":true}};
 const compactGear={items:[{id:1,random_suffix:-15},{id:2},{id:3},{id:4},{id:5},{id:6,enchant:99},{id:7}]};
 const nativeGear=nativeImport.nativeImportGear(compactGear,metadata);
@@ -890,6 +897,21 @@ assert.throws(()=>nativeImport.nativeImportGear({items:[{id:6},{id:8}]},metadata
 assert.throws(()=>nativeImport.nativeImportGear({items:[{id:888}]},metadata));
 assert.throws(()=>nativeImport.nativeImportGear({items:[{id:1,random_suffix:-99}]},metadata));
 assert.equal(nativeImport.combatEquipmentSpec([{name:"頭部",id:1,randomSuffix:-15}],"one").items[0].randomSuffix,-15);
+assert.equal(nativeImport.combatModifierValid("randomSuffix","-15"),true);
+assert.equal(nativeImport.combatModifierValid("enchant","-15"),false);
+assert.equal(nativeImport.combatModifierValid("randomSuffix","-2147483647"),true);
+assert.equal(nativeImport.combatModifierValid("randomSuffix","-2147483648"),false);
+const oneSwap=nativeImport.combatCandidateReplacement(nativeGear,"two","戒指",99,2);
+assert.equal(oneSwap.items[11].id,99);
+assert.deepEqual(oneSwap.items[10],nativeGear.items[10]);
+assert.deepEqual(oneSwap.items[0],nativeGear.items[0]);
+assert.deepEqual(oneSwap.items[14],nativeGear.items[14]);
+assert.deepEqual(nativeImport.combatCandidateReplacement(nativeGear,"two","頭部",1),nativeGear);
+assert.deepEqual(nativeImport.combatCandidateReplacement(nativeGear,"two","頭部",99).items[0],{id:99});
+assert.throws(()=>nativeImport.combatCandidateReplacement(nativeGear,"two","副手",99));
+assert.throws(()=>nativeImport.combatCandidateReplacement(nativeGear,"two","戒指",2,2));
+assert.throws(()=>nativeImport.combatCandidateReplacement(nativeGear,"two","戒指",99,3));
+assert.equal(nativeGear.items[11].id,3);
 assert.throws(()=>nativeImport.combatEquipmentSpec([{name:"飾品 1",id:13965},{name:"飾品 2",id:13968}],"one"),/三選一/);
 const exclusiveMeta={...metadata,items:{...metadata.items,13965:[12,0,0,0],13966:[12,0,0,0]}};
 assert.throws(()=>nativeImport.nativeImportGear({items:[{id:13965},{id:13966}]},exclusiveMeta),/三選一/);
