@@ -22,6 +22,10 @@ assert.equal(score(x,w,{base:4,talent:3,cap:9}).total,50.5);
 assert.equal(score(x,w,{base:9,talent:3,cap:9}).parts["命中機率"],0);
 assert.equal(score(x,w,{}).parts["命中機率"],6);
 assert.equal(score({...x,wm:{}},w).incomplete,true);
+for(const bad of ["-42.5","42-50","approx 42","0","NaN","42.5.1"]){
+ const result=score({...x,wm:{DPS:bad}},w);assert.equal(result.incomplete,true);assert.equal(result.parts["武器DPS"],undefined);
+}
+assert.equal(score({...x,wm:{DPS:"42.5 DPS"}},w).total,50.5);
 for(const name of ["rogueTalentBuilds","plateTalentBuilds","hunterShamanTalentBuilds","casterFeralTalentBuilds","variantTalentBuilds"]){
  const match=src.match(new RegExp("const "+name+"=(.*?);"));
  assert.ok(match,name);
@@ -54,6 +58,7 @@ assert.equal(combo.weaponSets([mh,oh,th],()=>true,"general").length,2);
 assert.equal(combo.weaponSets([mh,oh,th,sh],()=>true,"dual").length,1);
 assert.equal(combo.weaponSets([mh,oh,th],()=>true,"twohand").length,1);
 assert.equal(combo.weaponSets([mh,{...oh,id:"1"}],()=>true,"dual").length,0);
+assert.equal(combo.weaponSets([mh,{...oh,id:1}],()=>true,"dual").length,0);
 assert.equal(combo.weaponSets([mh,oh,th],x=>x.id!=="2","general").length,1);
 assert.equal(combo.weaponPosition({...mh,slot:"遠程武器",type:"弓"}),"");
 assert.equal(combo.weaponPosition({...oh,type:"主手武器"}),"");
@@ -891,6 +896,8 @@ assert.equal(perTarget[0].timeEstimate,500);
 assert.equal(combat.combatNativeTargetRows([{index:0,health:50000,dps:0}],{count:1,health:50000})[0].timeEstimate,null);
 assert.deepEqual(combat.combatNativeTargetRows([{index:0,health:50000,dps:100},{index:0,health:50000,dps:100}],{count:2,health:50000}),[]);
 assert.deepEqual(combat.combatNativeTargetRows([{index:0,health:300000,dps:100}],{count:1,health:50000}),[]);
+assert.deepEqual(combat.combatNativeTargetRows([{index:0,health:50000,dps:Number.MIN_VALUE}],{count:1,health:50000}),[]);
+assert.deepEqual(combat.combatNativeTargetRows([{index:0,health:0,dps:100}],{count:1,health:0}),[]);
 const confidence=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {nativeSetComparison,nativeSetUncertainty};")();
 const cRow=(pieces,dps)=>({pieces,duration:60,iterations:1000,metrics:{dps,dpsStdev:100}});
 const cStudy=confidence.nativeSetComparison({cases:[cRow(0,1000),cRow(2,1001),cRow(4,1020)]},"dps");
@@ -985,6 +992,10 @@ assert.deepEqual(nativeImport.nativeImportGear(gapGear,metadata),gapGear);
 assert.throws(()=>nativeImport.nativeImportGear({items:[{id:6},{id:8}]},metadata));
 assert.throws(()=>nativeImport.nativeImportGear({items:[{id:888}]},metadata));
 assert.throws(()=>nativeImport.nativeImportGear({items:[{id:1,random_suffix:-99}]},metadata));
+for(const item of [{id:0,enchant:99},{id:0,random_suffix:-15},{id:0,randomSuffix:-15},[]]){
+ assert.throws(()=>nativeImport.nativeImportGear({items:[{id:1},item]},metadata));
+}
+assert.deepEqual(nativeImport.nativeImportGear({items:[{id:1},{id:0,enchant:0,randomSuffix:0}]},metadata).items[0],{id:1});
 assert.equal(nativeImport.combatEquipmentSpec([{name:"頭部",id:1,randomSuffix:-15}],"one").items[0].randomSuffix,-15);
 assert.equal(nativeImport.combatModifierValid("randomSuffix","-15"),true);
 assert.equal(nativeImport.combatModifierValid("enchant","-15"),false);
