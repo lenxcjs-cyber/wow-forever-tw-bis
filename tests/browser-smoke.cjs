@@ -24,7 +24,7 @@ const server=http.createServer((req,res)=>{
   await page.route("**/*",route=>route.request().url().startsWith(origin+"/")?route.continue():route.abort());
   // Isolate UI behavior from actual external icon availability with explicit test fixtures.
   await page.route("**/skill-client.json",route=>route.fulfill({json:{build:"1.60.1.71139",classes:{druid:{Shred:{name:"撕碎（測試名稱）",records:[{id:5221,name:"撕碎（測試名稱）",level:22,cooldownMs:6000,categoryCooldownMs:0}]}}}}}));
-  await page.route("**/combat-presets.json",route=>route.fulfill({json:{format:1,release:"v1.0.12",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",seed:1,cases:[{spec:"spec-26",label:"測試引擎案例",dps:123.45,duration:180,iterations:1000,timeline:[{timeMs:-1500,label:"Fixture prepull"},{timeMs:0,label:"Fixture attack"},{timeMs:12000,label:"Fixture second burst"},{timeMs:35000,label:"Fixture late attack"}],sources:[{path:"ui/specs/druid/feralcat/gt_test.siml",text:"siml 1\n# fixture"}],settings:"ui/specs/druid/feralcat/gear_sets/pre_raid.gear.siml",apl:"ui/specs/druid/feralcat/apls/adaptive.apl.siml",configuration:"測試設定"}]}}));
+  await page.route("**/combat-presets.json",route=>route.fulfill({json:{format:1,release:"v1.0.12",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",seed:1,cases:[{spec:"spec-26",label:"測試引擎案例",dps:123.45,duration:180,iterations:1000,timeline:[{timeMs:-1500,label:"Fixture prepull"},{timeMs:0,label:"Fixture attack"},{timeMs:12000,label:"Fixture second burst"},{timeMs:35000,label:"Fixture late attack"}],sources:[{path:"ui/specs/druid/feralcat/gt_test.siml",text:"siml 1\n# fixture"}],settings:"ui/specs/druid/feralcat/gear_sets/pre_raid.gear.siml",apl:"ui/specs/druid/feralcat/apls/adaptive.apl.siml",configuration:"測試設定"},{spec:"spec-27",label:"原生坦克測試案例",dps:111,duration:180,iterations:1000,timeline:[],nativeMetrics:{dps:111,tps:600,dtps:300,death:0.1},nativeLog:"[0.00] Fixture tank attack",settings:"ui/specs/druid/feralbear/gear_sets/default.gear.siml",apl:"ui/specs/druid/feralbear/apls/adaptive.apl.siml"}],healerPending:[{spec:"spec-28",source:"ui/specs/druid/restoration/presets.ts",reason:"尚缺可驗證治療遭遇"}]}}));
   await page.route("**/item-icons.json",route=>route.fulfill({json:{build:"1.60.1.71139",items:{"19323":"fixture_mace","252484":"fixture_missing"}}}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_mace.jpg",route=>route.fulfill({contentType:"image/svg+xml",body:'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="green"/></svg>'}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_missing.jpg",route=>route.abort());
@@ -341,6 +341,8 @@ const server=http.createServer((req,res)=>{
   assert.ok(await lab.getByRole("heading",{name:"實戰模擬",exact:true}).isVisible());
   assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).getAttribute("href"),"https://www.wowsims.com/forever/druid/feralcat/");
   await lab.locator(".gt-combat-presets").getByText("DPS 123.45",{exact:true}).waitFor({state:"visible"});
+  assert.ok(await lab.getByText("全28專精原生案例覆蓋：2 / 28",{exact:true}).isVisible());
+  assert.ok(await lab.getByRole("heading",{name:"此專精的配裝與循環研究",exact:true}).isVisible());
   await lab.locator(".gt-combat-presets").getByText("第一輪技能時間軸（最多400個事件）",{exact:true}).click();
   const nativeCard=lab.locator(".gt-combat-presets");
   const nativeLog=nativeCard.locator(".gt-combat-log").first();
@@ -375,12 +377,28 @@ const server=http.createServer((req,res)=>{
   await lab.getByText("本組最佳施放時間軸",{exact:true}).click();
   assert.ok(await lab.getByText(/本組最佳：延後/).isVisible());
 
+  await lab.getByRole("button",{name:"載入群體／增益教學範例（非遊戲數值）"}).click();
+  await lab.getByRole("button",{name:"比較 1／2／3／5／8 個目標"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"多目標技能優先序比較",exact:true}).isVisible());
+  assert.ok(await lab.getByRole("heading",{name:"8 個目標",exact:true}).isVisible());
   await lab.getByRole("textbox",{name:"模擬結果 A"}).fill(JSON.stringify({iterationsDone:1000,avgIterationDuration:180,raidMetrics:{parties:[{players:[{dps:{avg:500},threat:{avg:700}}]}]}}));
   await lab.getByRole("button",{name:"比較已完成的模擬"}).click();
   assert.ok(await lab.getByText("DPS 500.00 ｜ TPS 700.00 ｜ HPS 未提供 ｜ DTPS 未提供",{exact:true}).isVisible());
   await spec.selectOption("spec-27");
   assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).getAttribute("href"),"https://www.wowsims.com/forever/druid/feralbear/");
-  console.log("PASS: real engine route, user-defined time axis, priority search, result import and spec switching");
+  assert.equal(await lab.getByLabel("最佳化目標").inputValue(),"threat");
+  await lab.getByText("TPS 600.00 ｜ DTPS 300.00 ｜ 死亡機率 10.0%",{exact:true}).waitFor({state:"visible"});
+  await lab.getByText("原生引擎戰鬥時間紀錄",{exact:true}).click();
+  assert.ok((await lab.locator(".gt-combat-presets .gt-combat-log").first().textContent()).includes("Fixture tank attack"));
+  await spec.selectOption("spec-28");
+  assert.equal(await lab.getByLabel("最佳化目標").inputValue(),"healing");
+  await lab.getByText("尚缺可驗證治療遭遇",{exact:true}).waitFor({state:"visible"});
+  await lab.getByRole("button",{name:"載入治療教學範例（非遊戲數值）"}).click();
+  await lab.getByRole("button",{name:"比較有效治療及溢補"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"治療情境比較",exact:true}).isVisible());
+  await lab.getByText("治療需求、有效治療與溢補（假設模型）",{exact:true}).first().click();
+  assert.ok(await lab.getByText(/累積治療需求/).first().isVisible());
+  console.log("PASS: native JSON and SIML display, all-spec coverage, multi-target and healer role comparison");
   await page.locator("#gt-mode-blue").click();
   for(const selector of ["#class-select","#spec-select","#gt-build-bar","#guild-tools .gt-tabs"]){assert.equal(await page.locator(selector).isVisible(),false,selector);}
   assert.equal(await page.locator("section.spec:visible").count(),0);
