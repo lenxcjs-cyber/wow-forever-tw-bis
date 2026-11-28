@@ -1198,9 +1198,13 @@ function combatSkillView(parent,result){
  parent.append(d);
 }
 const combatPresetCommit="3b9c125a9b1387cd53ce2bb12969e0c6b54b813e";
+const combatHealSpecs=new Set(["spec-4","spec-13","spec-14","spec-18","spec-28"]),combatTankSpecs=new Set(["spec-3","spec-5","spec-27"]);
+function combatRole(id){return combatTankSpecs.has(id)?"tank":combatHealSpecs.has(id)?"heal":"dps";}
+function combatMetric(id){return {tank:"threat",heal:"healing",dps:"damage"}[combatRole(id)];}
+function combatCoverage(data){return Array.from({length:28},(_,i)=>{const id="spec-"+(i+1);return {id,role:combatRole(id),count:combatPresetCases(data,id).length,failed:Array.isArray(data?.failed)?data.failed.filter(x=>x?.spec===id).length:0};});}
 function combatPresetCases(data,id){
  if(data?.format!==1||data.release!=="v1.0.12"||data.commit!==combatPresetCommit||!Array.isArray(data.cases))return [];
- return data.cases.filter(x=>x.spec===id&&typeof x.label==="string"&&Number.isFinite(x.dps)&&x.dps>=0&&Number.isFinite(x.duration)&&x.duration>0&&Number.isInteger(x.iterations)&&x.iterations>0&&Array.isArray(x.timeline)&&x.timeline.length>0&&[x.settings,x.apl].every(p=>typeof p==="string"&&/^ui\/specs\/[a-z_0-9/.-]+\.siml$/.test(p)&&!p.includes("..")));
+ return data.cases.filter(x=>x&&x.spec===id&&typeof x.label==="string"&&Number.isFinite(x.dps)&&x.dps>=0&&Number.isFinite(x.duration)&&x.duration>0&&Number.isInteger(x.iterations)&&x.iterations>0&&((Array.isArray(x.timeline)&&x.timeline.length>0)||(x.nativeMetrics&&Number.isFinite(x.nativeMetrics.dps)&&x.nativeMetrics.dps===x.dps))&&[x.settings,x.apl].every(p=>typeof p==="string"&&/^ui\/specs\/[a-zA-Z_0-9/.-]+\.(?:siml|json|ts)$/.test(p)&&!p.includes("..")));
 }
 function combatNativeGroups(cases){
  const groups=new Map();
@@ -1241,26 +1245,52 @@ function combatResult(raw){
  const p=players[0],metric=k=>validMetric(p[k]?.avg)?p[k].avg:null;
  return {name:p.name||"角色",iterations:raw.iterationsDone,duration:Number.isFinite(raw.avgIterationDuration)&&raw.avgIterationDuration>0?raw.avgIterationDuration:null,dps:metric("dps"),tps:metric("threat"),hps:metric("hps"),dtps:metric("dtps"),death:validDeath(p.chanceOfDeath)?p.chanceOfDeath:null,logs:typeof raw.logs==="string"?raw.logs.slice(0,200000):""};
 }
+function combatCoverageView(parent,data){
+ const rows=combatCoverage(data),done=rows.filter(x=>x.count>0).length;
+ const d=node("details");d.append(node("summary","全28專精原生案例覆蓋："+done+" / 28"));
+ for(const [role,label] of [["dps","輸出"],["tank","坦克"],["heal","治療"]]){
+  const filtered=rows.filter(x=>x.role===role),part=box(d,label+"專精",filtered.filter(x=>x.count>0).length+" / "+filtered.length+" 已有成功案例");
+  for(const x of filtered){const name=bySpec.get(x.id)?.name||x.id;part.append(node("p",name+" ｜ "+(x.count?x.count+" 個成功案例":role==="heal"?"待驗證治療遭遇與技能策略":"尚無成功案例")+(x.failed?" ｜ "+x.failed+" 個已失敗案例":"")));}
+ }
+ d.append(node("p","沒有成功案例不代表該專精無法遊玩；資料缺口不以推估數值填補。","gt-muted"));parent.append(d);
+}
+function combatResearchView(parent,id){
+ const idx=Number(id.split("-")[1])-1,guide=guides[idx],research=talentResearch[idx],role=combatRole(id);
+ if(!guide)return;
+ const c=box(parent,"此專精的配裝與循環研究",guide[0]);
+ add(c,node("p",guide[1]),node("p",role==="tank"?"優先比最低單目標 TPS、承傷、死亡機率與團隊治療需求；高 TPS 不等同最佳生存。":role==="heal"?"分開比較坦克持續承傷、團隊群傷、爆發救急、法力續航及溢補；不可只看總治療量。":"比較不同武器或裝備套裝、技能優先序、30–180 秒爆發及單體／多目標。"));
+ if(research)add(c,node("p","核心技能／天賦："+research[1]),node("p",research[2]));
+ add(c,link("固定版本上游構築原始碼","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/ui/specs/"+combatPaths[idx]+"/presets.ts"),node("p","上述為研究方向；只有成功執行的引擎案例才列正式模擬數據。","gt-muted"));
+}
 function combatLab(){
  title("實戰模擬","正式數值使用 WoWSims Forever；站內試算為自訂參數的簡化時間軸，不等於遊戲傷害公式。");
  const id=getSpec(),build=buildFor(id),url=combatEngineURL(id);
  panel.append(specLabel());
+ combatResearchView(panel,id);
  const engine=box(panel,"完整戰鬥模擬（外部引擎）","上游網站參考版本：2026/11/27、客戶端 1.60.1.71139（71311a4）。本站預設案例使用固定 CLI v1.0.12；外部網站會更新，請核對版本與構築。");
  if(url)engine.append(link("開啟對應職業模擬器",url));
  add(engine,link("WoWSims 開源引擎（MIT）","https://github.com/wowsims/forever"),node("p","請在引擎內設定裝備、天賦、種族、附魔、消耗品、團隊增益、敵人數、戰鬥時間及技能優先序（APL）。用相同遭遇與迭代條件比較方案；查看戰鬥紀錄／時間軸。本站尚未自動同步目前候選裝備或即時代跑個人外部引擎。","gt-muted"));
  const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
  fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
-  if(!presets.isConnected)return;const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));
+  if(!presets.isConnected)return;const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));combatCoverageView(presets,data);
   if(Number.isInteger(data.planned)&&data.planned>=data.cases.length)presets.append(node("p","本次快照：全站 "+data.cases.length+" / "+data.planned+" 個計畫案例已成功產出；未成功的案例不顯示假數值。","gt-muted"));
   if(Array.isArray(data.failed)){const failed=data.failed.filter(x=>x?.spec===id&&typeof x.label==="string");if(failed.length)presets.append(node("p","此專精未產出案例："+failed.map(x=>x.label).join("、"),"gt-muted"));}
-  if(!cases.length){presets.append(node("p","目前此專精沒有已成功匯入的原生引擎案例；請使用上方引擎連結。","gt-muted"));return;}
+  if(!cases.length){const pending=Array.isArray(data.healerPending)?data.healerPending.find(x=>x?.spec===id):null;presets.append(node("p",pending?.reason||"目前此專精沒有已成功匯入的原生引擎案例；請使用上方引擎連結。","gt-muted"));if(pending&&typeof pending.source==="string"&&/^ui\/specs\/[a-z/]+\/presets\.ts$/.test(pending.source))presets.append(link("上游治療專精原始設定","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+pending.source));return;}
   add(presets,node("p","WoWSims v1.0.12 ｜ 固定種子 "+data.seed+" ｜ 上游預設或本站明示的控制變因案例，不代表本站目前構築或最佳 BiS。CLI 未自動加入網頁生成的藥水／魔法物品 APL 行。","gt-muted"));
   for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));
    if(x.tank&&Number.isFinite(x.tank.tps))add(c,node("p","另一次完整引擎坦克測試：TPS "+x.tank.tps.toFixed(2)+(Number.isFinite(x.tank.dtps)?" ｜ DTPS "+x.tank.dtps.toFixed(2):"")+(Number.isFinite(x.tank.death)?" ｜ 死亡機率 "+(x.tank.death*100).toFixed(1)+"%":"")));
    add(c,link("裝備、天賦與設定來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.settings),link("技能優先序（APL）來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.apl));
    if(typeof x.configuration==="string"&&x.configuration){add(c,node("p",x.configuration,"gt-muted"),link("本站控制變因配置與產生程式","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-combat-presets.py"));}
    const character=x.character||{};if(character.talents)add(c,node("p","天賦碼："+character.talents,"gt-muted"));if(character.race)add(c,node("p","種族："+character.race,"gt-muted"));
-   combatNativeTimeline(c,x.timeline);
+   if(x.nativeMetrics){
+    const m=x.nativeMetrics,valid=k=>Number.isFinite(m[k])&&m[k]>=0;
+    add(c,node("p",["tps","dtps","hps"].filter(valid).map(k=>k.toUpperCase()+" "+m[k].toFixed(2)).join(" ｜ ")+(Number.isFinite(m.death)&&m.death>=0&&m.death<=1?" ｜ 死亡機率 "+(100*m.death).toFixed(1)+"%":"")));
+    if(typeof x.nativeLog==="string"&&x.nativeLog.trim()){
+     const d=node("details"),q=inp("輸入技能或事件關鍵字"),pre=node("pre"),lines=x.nativeLog.slice(0,80000).split("\n");pre.className="gt-combat-log";
+     const draw=()=>{const term=q.value.trim().toLowerCase();pre.textContent=lines.filter(l=>!term||l.toLowerCase().includes(term)||zhDisplay(l).toLowerCase().includes(term)).join("\n")||"沒有符合的紀錄。";};
+     q.addEventListener("input",draw);add(d,node("summary","原生引擎戰鬥時間紀錄"),field("技能／紀錄搜尋",q),pre,node("p","單次原生紀錄可能截斷，不是固定循環或平均施放次數。","gt-muted"));c.append(d);draw();
+    }else c.append(node("p","此原生案例未取得可顯示的單次戰鬥紀錄。","gt-muted"));
+   }else combatNativeTimeline(c,x.timeline);
    if(typeof x.tank?.logs==="string"&&x.tank.logs.trim()){
     const d=node("details"),q=inp("搜尋威脅、傷害或技能原文"),pre=node("pre"),lines=x.tank.logs.slice(0,80000).split("\n");pre.className="gt-combat-log";
     const count=node("p","","gt-muted");function draw(){const k=q.value.trim().toLowerCase(),matches=lines.filter(line=>!k||line.toLowerCase().includes(k));pre.textContent=matches.join("\n")||"沒有符合紀錄";count.textContent="顯示 "+matches.length+" / "+lines.length+" 行（記錄可能截斷）。";}
@@ -1276,7 +1306,7 @@ function combatLab(){
   }
   if(cases.length>1){
    const tankSpec=["spec-3","spec-5","spec-27"].includes(id),healSpec=["spec-4","spec-13","spec-14","spec-18","spec-28"].includes(id);
-   const metric=tankSpec?"TPS":healSpec?"HPS":"DPS",value=x=>tankSpec?x.tank?.tps:healSpec?x.tank?.hps:x.dps;
+   const metric=tankSpec?"TPS":healSpec?"HPS":"DPS",value=x=>tankSpec?(x.nativeMetrics?.tps??x.tank?.tps):healSpec?(x.nativeMetrics?.hps??x.tank?.hps):x.dps;
    const comparison=box(presets,"方案數值比較",tankSpec?"坦克以 TPS 為輸出指標，同時核對承傷、死亡機率與治療模型；不以最高 DPS 作為坦克推薦。":healSpec?"治療方案須核對 HPS、有效治療與團隊承傷。":"只對標示為同遭遇的案例做組內比較；不同戰鬥長度不混合排名。");
    const groups=combatNativeGroups(cases);
    for(const group of groups){
@@ -1297,11 +1327,11 @@ function combatLab(){
  const raw=node("textarea");raw.rows=10;raw.placeholder="請輸入模型 JSON，或載入教學範例";raw.setAttribute("aria-label","自訂模擬模型");
  const key="gt-combat-model-v1:"+id+":"+build;try{raw.value=localStorage.getItem(key)||"";}catch(e){}
  const demo={duration:30,gcd:1.5,cap:100,initial:100,regen:10,skills:[{name:"示意技能 A",cost:40,gain:0,cd:6,cast:0,damage:300,threat:450,healing:0},{name:"示意技能 B",cost:20,gain:0,cd:0,cast:0,damage:100,threat:100,healing:0}]};
- const modelResult=node("div"),status=node("p","","gt-muted"),objective=select([["damage","最大每秒傷害"],["threat","最大每秒仇恨"],["healing","最大每秒治療"]]);
+ const modelResult=node("div"),status=node("p","","gt-muted"),objective=select([["damage","最大每秒傷害"],["threat","最大每秒仇恨"],["healing","最大每秒治療"]]);objective.value=combatMetric(id);
  const run=button("執行 A／B 優先序試算",()=>{modelResult.replaceChildren();try{const data=JSON.parse(raw.value),a=simulatePriority(data),b=simulatePriority(data,true);try{localStorage.setItem(key,raw.value);}catch(e){}for(const [name,r] of [["A：原優先序",a],["B：反轉優先序",b]]){const c=box(modelResult,name,"假設模型 ｜ 非遊戲實測");add(c,node("p","每秒傷害 "+r.rate.damage.toFixed(2)+" ｜ 每秒仇恨 "+r.rate.threat.toFixed(2)+" ｜ 每秒治療 "+r.rate.healing.toFixed(2)),node("p","施放 "+r.events.length+" 次 ｜ 無技能可用等待 "+r.idle.toFixed(1)+" 秒","gt-muted"));const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=r.events.map(e=>e.time.toFixed(2)+"s → "+e.finish.toFixed(2)+"s ｜ "+e.name+" ｜ 資源 "+e.before.toFixed(1)+" → "+e.after.toFixed(1)+" ｜ 累積傷害 "+e.damage.toFixed(0)+" ｜ 累積仇恨 "+e.threat.toFixed(0)).join("\n");add(d,node("summary","逐次施放時間軸"),pre);c.append(d);combatPhaseView(c,r);}status.textContent="A、B 僅比較這兩個自訂優先序，沒有證明全域最佳。";}catch(e){status.textContent="試算失敗："+e.message;}});
  const optimize=button("搜尋最佳固定優先序（最多5技能）",()=>{modelResult.replaceChildren();try{const data=JSON.parse(raw.value),best=combatBestPriority(data,objective.value),r=best.result,c=box(modelResult,"假設模型最佳固定優先序",best.count+" 種排列已比較；僅限本模型，非遊戲最大值。");add(c,node("p",best.order.join(" → ")),node("p","每秒傷害 "+r.rate.damage.toFixed(2)+" ｜ 每秒仇恨 "+r.rate.threat.toFixed(2)+" ｜ 每秒治療 "+r.rate.healing.toFixed(2)));const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=r.events.map(e=>e.time.toFixed(2)+"s ｜ "+e.name+" ｜ 資源 "+e.before.toFixed(1)+" → "+e.after.toFixed(1)+" ｜ 累積傷害 "+e.damage.toFixed(0)+" ｜ 累積仇恨 "+e.threat.toFixed(0)).join("\n");add(d,node("summary","最佳方案施放時間軸"),pre);c.append(d);combatPhaseView(c,r);status.textContent="已比較全部固定優先序；未搜尋任意等待、條件式技能策略或裝備組合。";}catch(e){status.textContent="試算失敗："+e.message;}});
  const advancedDemo={duration:30,gcd:1.5,cap:100,initial:100,regen:15,targets:3,buffs:[{name:"示意團隊增益",start:10,duration:10,damage:1.2}],skills:[{name:"示意爆發",cost:0,gain:0,cd:60,cast:0,damage:0,threat:0,group:"示意共用組",groupCd:20,buff:{name:"示意個人增益",duration:10,damage:1.5,threat:1.5}},{name:"示意群體技能",cost:20,gain:0,cd:3,cast:0,damage:90,threat:160,targetCap:5},{name:"示意單體技能",cost:20,gain:0,cd:0,cast:0,damage:180,threat:220}]};
- const targetMode=select([["total","總傷害／總仇恨／總治療"],["weakest","最低單一目標 TPS（僅仇恨目標）"]]);
+ const targetMode=select([["total","總傷害／總仇恨／總治療"],["weakest","最低單一目標 TPS（僅仇恨目標）"]]);if(combatRole(id)==="tank")targetMode.value="weakest";
  const targetSweep=button("比較 1／2／3／5／8 個目標",()=>{modelResult.replaceChildren();try{
   const data=JSON.parse(raw.value),metric=objective.value,mode=targetMode.value,rows=combatTargetSweep(data,metric,mode);
   const label=metric==="threat"&&mode==="weakest"?"最低單目標 TPS":objectiveLabel();
