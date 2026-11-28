@@ -221,5 +221,16 @@ class PresetTests(unittest.TestCase):
         self.assertTrue(request["raid"]["parties"][0]["players"][0]["inFrontOfTarget"])
         self.assertEqual(len(request["encounter"]["targets"]),1)
 
+    def test_native_per_target_damage(self):
+        request={"encounter":{"targets":[{"stats":[0]*29+[50000]+[0]*9} for _ in range(5)]}}
+        result={"encounterMetrics":{"targets":[{"dtps":{"avg":v}} for v in (1000,500,250,100,0)]}}
+        rows=mod.native_target_damage(result,request)
+        self.assertEqual(len(rows),5)
+        self.assertEqual([r["timeEstimate"] for r in rows],[50,100,200,500,None])
+        self.assertEqual([r["index"] for r in rows],list(range(5)))
+        self.assertEqual(mod.native_target_damage({"encounterMetrics":{"targets":[]}},request),[])
+        result["encounterMetrics"]["targets"][0]["dtps"]["avg"]=-1
+        self.assertEqual(mod.native_target_damage(result,request),[])
+
 if __name__=="__main__":
     unittest.main()
