@@ -773,16 +773,17 @@ function catalogSetAlternative(pools,name,minimum){
  const feasible=[...states].filter(([count])=>count>=minimum).sort((a,b)=>b[1].total-a[1].total||b[0]-a[0]);
  return feasible.length?{count:feasible[0][0],...feasible[0][1]}:null;
 }
-function catalogMultiSetAlternative(pools,requirements){
+function catalogMultiSetAlternative(pools,requirements,coverage=null){
  if(!Array.isArray(requirements)||requirements.length<1||requirements.length>2||requirements.some(r=>!r||typeof r.name!=="string"||!r.name||!Number.isInteger(r.minimum)||r.minimum<2||r.minimum>14)||new Set(requirements.map(r=>r.name)).size!==requirements.length||requirements.reduce((n,r)=>n+r.minimum,0)>14)return null;
  const names=requirements.map(r=>r.name),minima=requirements.map(r=>r.minimum),zero=names.map(()=>0);
  let states=new Map([[zero.join(","),{counts:zero,total:0,picks:[]}]]);
- for(const [slot,capacity] of catalogArmorGroups){
+ for(const [slot,maxCapacity] of catalogArmorGroups){
+  const capacity=coverage?coverage.filter(p=>p.slot===slot).length:maxCapacity;if(capacity>maxCapacity)return null;
   const rows=pools.get(slot)||[],buckets=names.map(name=>rows.filter(p=>catalogSetName(p.item)===name));
   const other=rows.filter(p=>!names.includes(catalogSetName(p.item))&&p.score.total>0);
   const choices=[];
   function choose(index,counts,remaining,selected){
-   if(index===names.length){const picks=[...selected,...catalogCompatiblePicks(other,remaining,selected)].map(p=>({...p,slot}));choices.push({counts,picks,total:picks.reduce((n,p)=>n+p.score.total,0)});return;}
+   if(index===names.length){const picks=[...selected,...catalogCompatiblePicks(other,remaining,selected)].map(p=>({...p,slot}));if(!coverage||picks.length===capacity)choices.push({counts,picks,total:picks.reduce((n,p)=>n+p.score.total,0)});return;}
    for(let n=0;n<=Math.min(remaining,buckets[index].length);n++){const chosen=catalogCompatiblePicks(buckets[index],n,selected);if(chosen.length===n)choose(index+1,[...counts,n],remaining-n,[...selected,...chosen]);}
   }
   choose(0,[],capacity,[]);
@@ -800,14 +801,16 @@ function catalogSameCoverage(a,b){
  const count=picks=>catalogArmorGroups.map(([slot])=>picks.filter(x=>x.slot===slot).length).join(",");
  return Array.isArray(a)&&Array.isArray(b)&&count(a)===count(b);
 }
-function catalogExactSetPlans(pools,name,max){
+function catalogExactSetPlans(pools,name,max,coverage=null){
  if(typeof name!=="string"||!name||!Number.isInteger(max)||max<0||max>14)return new Map();
  let states=new Map([[0,{total:0,picks:[]}]]);
- for(const [slot,capacity] of catalogArmorGroups){
+ for(const [slot,maxCapacity] of catalogArmorGroups){
+  const capacity=coverage?coverage.filter(p=>p.slot===slot).length:maxCapacity;if(capacity>maxCapacity)return new Map();
   const rows=pools.get(slot)||[],yes=rows.filter(p=>catalogSetName(p.item)===name),no=rows.filter(p=>catalogSetName(p.item)!==name&&p.score.total>0),next=new Map();
   for(const [old,prev] of states)for(let n=0;n<=Math.min(max-old,capacity,yes.length);n++){
    const chosenYes=catalogCompatiblePicks(yes,n);if(chosenYes.length!==n)continue;
    const picks=[...chosenYes,...catalogCompatiblePicks(no,capacity-n,chosenYes)].map(p=>({...p,slot}));
+   if(coverage&&picks.length!==capacity)continue;
    const total=prev.total+picks.reduce((sum,p)=>sum+p.score.total,0),k=old+n;
    const combined=[...prev.picks,...picks],prior=next.get(k);
    if(!prior||combined.length>prior.picks.length||combined.length===prior.picks.length&&total>prior.total)next.set(k,{total,picks:combined});
@@ -820,9 +823,9 @@ function catalogExactSet(pools,name,count){const r=catalogExactSetPlans(pools,na
 function catalogSetTierComparison(pools,name,max,bonuses=[],thresholdsKnown=Array.isArray(bonuses)&&bonuses.length>0){
  if(!Number.isInteger(max)||max<1||max>14||!Array.isArray(bonuses))return null;
  const plans=catalogExactSetPlans(pools,name,max),basePlan=plans.get(0);if(!basePlan)return null;
- const base={count:0,...basePlan},rows=[];
+ const base={count:0,...basePlan},rows=[],matched=catalogExactSetPlans(pools,name,max,base.picks);
  for(let n=1;n<=max;n++){
-  const exact=plans.get(n);if(!exact)continue;const plan={count:n,...exact};
+  const exact=matched.get(n)||plans.get(n);if(!exact)continue;const plan={count:n,...exact};
   const active=bonuses.filter(b=>b&&Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=n);
   const validThresholds=bonuses.every(b=>b&&Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=14)&&new Set(bonuses.map(b=>b.pieces)).size===bonuses.length;
   const complete=validThresholds&&(active.length>0||thresholdsKnown)&&active.every(b=>Number.isFinite(b.value));
@@ -842,7 +845,7 @@ function catalogSetShortlist(pools,effects,baseline){
   if(match.length!==1||!Array.isArray(match[0].bonuses))continue;
   const thresholds=[...new Set(match[0].bonuses.map(b=>b?.pieces).filter(n=>Number.isInteger(n)&&n>=1&&n<=max))].sort((a,b)=>a-b);
   if(!thresholds.length)continue;
-  const plans=catalogExactSetPlans(pools,name,thresholds[thresholds.length-1]);
+  const plans=catalogExactSetPlans(pools,name,thresholds[thresholds.length-1],baseline);
   for(const count of thresholds){
    const plan=plans.get(count);
    if(!plan||!catalogSameCoverage(baseline,plan.picks)||!Number.isFinite(plan.total))continue;
@@ -1061,11 +1064,13 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
      const scan=button("掃描全部已登錄套裝門檻",()=>{
       try{
        const candidates=catalogSetShortlist(pools,effectRows,baseline);
-       shortlist.replaceChildren(node("p",candidates.length?"共 "+candidates.length+" 組同欄位候選，依面板損失排序；最多顯示20組。":"此篩選下無版本相符、同欄位可比較的套裝門檻。","gt-muted"));
-       for(const x of candidates.slice(0,20)){
+       shortlist.replaceChildren(node("p",candidates.length?"共 "+candidates.length+" 組同欄位候選，依面板損失排序；可逐批展開全部。":"此篩選下無版本相符、同欄位可比較的套裝門檻。","gt-muted"));
+       let visible=0;const more=button("顯示更多20組",()=>appendMore());function appendMore(){
+       for(const x of candidates.slice(visible,visible+20)){
         const row=node("div",undefined,"gt-card");
-        add(row,node("p",zhDisplay(x.name)+" ｜ 恰好 "+x.count+" 件 ｜ 面板 "+x.total.toFixed(2)),node("p","相較最高面板方案，需新增淨效果收益超過 "+x.required.toFixed(2)+" 分才可勝出。"+(x.profession?"｜專業要求："+zhDisplay(x.profession):""),"gt-muted"),button("匯出此門檻方案",()=>exportPlan(x.picks,x.name+" "+x.count+" 件",x.total)));shortlist.append(row);
-       }
+        add(row,node("p",zhDisplay(x.name)+" ｜ 恰好 "+x.count+" 件 ｜ 面板 "+x.total.toFixed(2)),node("p","相較最高面板方案，需新增淨效果收益超過 "+x.required.toFixed(2)+" 分才可勝出。"+(x.profession?"｜專業要求："+zhDisplay(x.profession):""),"gt-muted"),button("匯出此門檻方案",()=>exportPlan(x.picks,x.name+" "+x.count+" 件",x.total)));shortlist.insertBefore(row,more);
+       }visible=Math.min(visible+20,candidates.length);more.hidden=visible>=candidates.length;}
+       shortlist.append(more);appendMore();
       }catch(e){shortlist.replaceChildren(node("p","掃描失敗："+e.message,"gt-muted"));}
      });
      add(setPanel,node("p","自動掃描只使用已登錄的啟動件數。效果未量化，不以面板損失宣稱 BiS；原方案已有的套裝收益也須扣除。","gt-muted"),scan,shortlist);
@@ -1107,7 +1112,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
       drawTiers();
      }
      function compare(){
-      const requirements=[{name:setSelect.value,minimum:Number(target.value)},...(secondSet.value?[{name:secondSet.value,minimum:Number(secondTarget.value)}]:[])],result=catalogMultiSetAlternative(pools,requirements);detail.replaceChildren();
+      const requirements=[{name:setSelect.value,minimum:Number(target.value)},...(secondSet.value?[{name:secondSet.value,minimum:Number(secondTarget.value)}]:[])],result=catalogMultiSetAlternative(pools,requirements,baseline)||catalogMultiSetAlternative(pools,requirements);detail.replaceChildren();
       if(!result){detail.append(node("p","未找到符合件數要求的方案。"));return;}
       const sameCoverage=catalogSameCoverage(baseline,result.picks),comparison=catalogSetTradeoff(plan.total,result.total,bonus.value.trim()!==""?Number(bonus.value):null),delta=comparison.gap,baseIds=new Set(baseline.map(p=>String(p.item.id))),newIds=new Set(result.picks.map(p=>String(p.item.id)));
       const setLabel=result.sets.map(x=>zhDisplay(x.name)+" "+x.count+" 件（至少 "+x.minimum+"）").join("＋");add(detail,node("p","替代防具："+setLabel+"｜面板分 "+result.total.toFixed(2)+"｜"+(sameCoverage?"相較原面板方案差額 "+delta.toFixed(2):"欄位覆蓋不同，不比較勝負")+"；需比較相較原方案新增或失去的套裝／特殊效果淨收益。","gt-muted"));
