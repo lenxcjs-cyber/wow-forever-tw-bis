@@ -26,6 +26,18 @@ function iconFile(t,cls,index=iconIndex){
  const mapped=raw!=null&&/^\d+$/.test(String(raw))?index[String(raw)]:index[cls+":"+t?.tree+":"+t?.name];
  return valid(mapped)?mapped.toLowerCase():"";
 }
+function mergeTalentIconIndex(base,generated){
+ const out=Object.create(null);
+ const valid=v=>typeof v==="string"&&/^[a-z][a-z0-9_]+$/i.test(v)&&!/^inv_misc_questionmark$/i.test(v);
+ for(const map of [base?.format===1&&base.build==="1.60.1.71139"?base.icons:null,generated]){
+  if(!map||typeof map!=="object"||Array.isArray(map))continue;
+  for(const [k,v] of Object.entries(map))if((/^\d+$/.test(k)||/^(warrior|paladin|hunter|rogue|priest|shaman|mage|warlock|druid):[012]:.+$/.test(k))&&valid(v)){
+   if(Object.hasOwn(out,k)&&out[k]!==v.toLowerCase())continue;
+   out[k]=v.toLowerCase();
+  }
+ }
+ return out;
+}
 function talentIconURLs(t,cls,index=iconIndex){
  const key=iconFile(t,cls,index);return key?["https://render-classic-us.worldofwarcraft.com/icons/56/"+key+".jpg","https://render-us.worldofwarcraft.com/icons/56/"+key+".jpg","https://wow.zamimg.com/images/wow/icons/large/"+key+".jpg"]:[];
 }
@@ -101,7 +113,7 @@ function investedTalentRows(profile,cls){
   return {name,points,tree:i,talent:t||null,valid:t?points<=t.maxRank&&!t.notYetAvailable:null};
  }));
 }
-if(typeof module!=="undefined"&&module.exports)module.exports={skillBuildNote,skillScenarios,skillGuideMatch,skillClientRecord,investedTalentRows,validateCommunitySnapshot,partialBuildCheck,exactProfile,zh,talentSymbol,iconFile,sumIcon,talentIconURLs,LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
+if(typeof module!=="undefined"&&module.exports)module.exports={skillBuildNote,skillScenarios,skillGuideMatch,skillClientRecord,investedTalentRows,validateCommunitySnapshot,partialBuildCheck,exactProfile,zh,talentSymbol,iconFile,sumIcon,talentIconURLs,mergeTalentIconIndex,LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
 if(typeof document!=="undefined"){
 const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;},add=(p,...xs)=>{p.append(...xs);return p;},link=(text,url)=>{const a=el("a",text);a.href=url;a.target="_blank";a.rel="noopener noreferrer";return a;};
 const options=(e,rows,value)=>{e.replaceChildren(...rows.map(([v,t])=>new Option(t,v)));if(rows.some(x=>x[0]===value))e.value=value;};
@@ -221,11 +233,11 @@ async function loadJSON(url){const controller=new AbortController(),timer=setTim
 function snapshotStatus(source){$("status").textContent=db?(db.format==="gt-community-talents/1"?"Talents Forever 社群資料已載入（"+source+"）；各職業版本及熱修日期以來源為準，非71139完整客戶端。":"客戶端資料 1.60.1.71139 已載入（"+source+"）；舊構築將逐項核對。"):"天賦樹資料未載入，可使用原始資料入口或本機匯入。";$("dataFallback").hidden=!!db;}
 async function init(){mode=q.get("mode")==="level"?"level":"build";level=levelAt(q.get("level")||10);classSel.onchange=()=>{selected=null;syncSelectors();render();};specSel.onchange=()=>{selected=null;syncSelectors();render();};buildSel.onchange=()=>{selected=null;render();};$("buildMode").onclick=()=>{mode="build";selected=null;render();};$("levelMode").onclick=()=>{mode="level";selected=null;render();};
  try{catalog=await loadJSON("talent-builds.json");syncSelectors();render();}catch(e){$("status").textContent="構築資料載入失敗："+e.message;}
- await Promise.all([loadJSON("skill-client.json").then(v=>{if(v?.build==="1.60.1.71139"&&v.classes)skillClient=v;}).catch(()=>{}),loadJSON("spec-skill-guides.json").then(v=>{if(v?.format===1&&v.specs&&v.common)skillGuides=v;}).catch(()=>{}),Promise.all([loadJSON("talent-icons-fallback.json").catch(()=>null),loadJSON("talent-icons.json").catch(()=>null)]).then(([base,generated])=>{iconIndex={...(base?.format===1&&base.build==="1.60.1.71139"?base.icons:{}),...(generated&&typeof generated==="object"&&!Array.isArray(generated)?generated:{})};}),loadJSON("talent-reference-partial.json").then(v=>{if(v?.build==="1.60.1.71139")for(const c of v.classes||[])for(const t of c.talents||[])partialIndex[c.token+":"+t.tree+":"+t.name]=t;}).catch(()=>{}),loadJSON("talent-zhTW.json").then(v=>{if(v?.build==="1.60.1.71139"&&v.entries&&typeof v.entries==="object")localeIndex=v.entries;}).catch(()=>{})]);render();
- let source="";const upload=$("clientImport");
- upload.onchange=async()=>{const file=upload.files?.[0];if(!file)return;try{if(file.size>5*1024*1024)throw Error("檔案超過5MB");const raw=await file.text(),d=JSON.parse(raw);if(!validateSnapshot(d))throw Error("版本、格式或九職業資料不完整");db=d;try{localStorage.setItem("gt-talent-client-71139",raw);}catch(e){}snapshotStatus("本機匯入");render();}catch(e){$("status").textContent="匯入失敗："+e.message;}finally{upload.value="";}};
+ await Promise.all([loadJSON("skill-client.json").then(v=>{if(v?.build==="1.60.1.71139"&&v.classes)skillClient=v;}).catch(()=>{}),loadJSON("spec-skill-guides.json").then(v=>{if(v?.format===1&&v.specs&&v.common)skillGuides=v;}).catch(()=>{}),Promise.all([loadJSON("talent-icons-fallback.json").catch(()=>null),loadJSON("talent-icons.json").catch(()=>null)]).then(([base,generated])=>{iconIndex=mergeTalentIconIndex(base,generated);}),loadJSON("talent-reference-partial.json").then(v=>{if(v?.build==="1.60.1.71139")for(const c of v.classes||[])for(const t of c.talents||[])partialIndex[c.token+":"+t.tree+":"+t.name]=t;}).catch(()=>{}),loadJSON("talent-zhTW.json").then(v=>{if(v?.build==="1.60.1.71139"&&v.entries&&typeof v.entries==="object")localeIndex=v.entries;}).catch(()=>{})]);render();
+ let source="",importRevision=0;const upload=$("clientImport");
+ upload.onchange=async()=>{const file=upload.files?.[0];if(!file)return;const revision=++importRevision;try{if(file.size>5*1024*1024)throw Error("檔案超過5MB");const raw=await file.text();if(revision!==importRevision)return;const d=JSON.parse(raw);if(!validateSnapshot(d))throw Error("版本、格式或九職業資料不完整");db=d;source="本機匯入";try{localStorage.setItem("gt-talent-client-71139",raw);}catch(e){}snapshotStatus("本機匯入");render();}catch(e){if(revision===importRevision)$("status").textContent="匯入失敗："+e.message;}finally{if(revision===importRevision)upload.value="";}};
  try{const cached=JSON.parse(localStorage.getItem("gt-talent-client-71139")||"null");if(validateSnapshot(cached)){db=cached;source="本機快取";}}catch(e){}
- for(const url of ["talent-client.json","talent-community.json",DATA_URL]){if(db)break;try{const d=await loadJSON(url);if(!validateSnapshot(d)&&!validateCommunitySnapshot(d))throw Error("資料格式或前置條件不完整");db=d;source=url==="talent-community.json"?"網站內建社群快照":url==="talent-client.json"?"網站快照":"公開來源";}catch(e){}}
+ for(const url of ["talent-client.json","talent-community.json",DATA_URL]){if(db)break;try{const d=await loadJSON(url);if(db)break;if(!validateSnapshot(d)&&!validateCommunitySnapshot(d))throw Error("資料格式或前置條件不完整");db=d;source=url==="talent-community.json"?"網站內建社群快照":url==="talent-client.json"?"網站快照":"公開來源";}catch(e){}}
  snapshotStatus(source);render();
 }
 init();
