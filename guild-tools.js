@@ -1277,16 +1277,26 @@ function combatNativeTimeline(parent,timeline){
  q.addEventListener("input",draw);phase.addEventListener("change",draw);
  add(d,node("summary","第一輪技能時間軸（最多400個事件）"),field("戰鬥區段",phase),field("技能／紀錄搜尋",q),count,pre,node("p","引擎的單次隨機戰鬥紀錄；不同戰鬥的觸發與資源會改變實際施放時機。","gt-muted"));parent.append(d);draw();
 }
-function combatResult(raw){
+function combatResultPlayers(raw){
+ if(!raw||typeof raw!=="object"||raw.error||!Number.isInteger(raw.iterationsDone)||raw.iterationsDone<1)throw Error("請提供成功完成的 WoWSims RaidSimResult");
+ const parties=raw.raidMetrics?.parties;if(!Array.isArray(parties)||parties.some(p=>p?.players!=null&&!Array.isArray(p.players)))throw Error("隊伍資料格式不合法");
+ const valid=v=>Number.isFinite(v)&&v>=0;
+ return parties.flatMap((party,pi)=>(party?.players||[]).flatMap((p,ui)=>p&&[p.dps,p.threat,p.hps,p.dtps].some(m=>valid(m?.avg))?[{key:pi+":"+ui,name:typeof p.name==="string"&&p.name.trim()?p.name:"未命名角色",dummy:/^Target Dummy \d+(?: \(#\d+\))?$/.test(p.name||""),player:p}]:[]));
+}
+function combatResult(raw,playerKey=""){
  const validMetric=v=>Number.isFinite(v)&&v>=0,validDeath=v=>Number.isFinite(v)&&v>=0&&v<=1;
  if(!raw||typeof raw!=="object"||raw.error)throw Error("模擬未成功或結果格式不合法");
  if(raw&&Number.isInteger(raw.iterations)&&raw.iterations>0&&Number.isFinite(raw.dps?.mean)&&raw.dps.mean>=0&&!raw.error){return {name:raw.character?.source||"SIML 模擬",iterations:raw.iterations,duration:Number.isFinite(raw.duration)&&raw.duration>0?raw.duration:null,dps:raw.dps.mean,tps:null,hps:null,dtps:null,death:null,logs:combatTimelineText(raw.timeline)};}
  if(!raw||typeof raw.error==="string"&&raw.error||raw.error?.message||raw.error?.type==="ErrorOutcomeAborted"||!Number.isInteger(raw.iterationsDone)||raw.iterationsDone<1)throw Error("請提供成功完成的 WoWSims RaidSimResult 或 SIML sim JSON");
- const parties=raw.raidMetrics?.parties;if(!Array.isArray(parties)||parties.some(p=>p?.players!=null&&!Array.isArray(p.players)))throw Error("隊伍資料格式不合法");
- const players=parties.flatMap(p=>p?.players||[]).filter(p=>p&&[p.dps,p.threat,p.hps,p.dtps].some(m=>validMetric(m?.avg)));
- if(players.length!==1)throw Error("僅接受單一玩家的個人模擬結果，避免誤把團隊總值當個人值");
- const p=players[0],metric=k=>validMetric(p[k]?.avg)?p[k].avg:null;
- return {name:p.name||"角色",iterations:raw.iterationsDone,duration:Number.isFinite(raw.avgIterationDuration)&&raw.avgIterationDuration>0?raw.avgIterationDuration:null,dps:metric("dps"),tps:metric("threat"),hps:metric("hps"),dtps:metric("dtps"),death:validDeath(p.chanceOfDeath)?p.chanceOfDeath:null,logs:typeof raw.logs==="string"?raw.logs.slice(0,200000):""};
+ const players=combatResultPlayers(raw);
+ const chosen=playerKey?players.find(x=>x.key===playerKey):players.length===1?players[0]:null;
+ if(!chosen)throw Error("含多名角色或治療假人；請先讀取並明確選擇角色，避免誤用團隊總值");
+ const p=chosen.player,metric=k=>validMetric(p[k]?.avg)?p[k].avg:null;
+ return {name:p.name||"角色",playerKey:chosen.key,iterations:raw.iterationsDone,duration:Number.isFinite(raw.avgIterationDuration)&&raw.avgIterationDuration>0?raw.avgIterationDuration:null,dps:metric("dps"),tps:metric("threat"),hps:metric("hps"),dtps:metric("dtps"),death:validDeath(p.chanceOfDeath)?p.chanceOfDeath:null,stdev:Object.fromEntries([["dps","dps"],["tps","threat"],["hps","hps"],["dtps","dtps"]].map(([k,f])=>[k,validMetric(p[f]?.stdev)?p[f].stdev:null])),oom:validMetric(p.secondsOomAvg)?p.secondsOomAvg:null,logs:typeof raw.logs==="string"?raw.logs.slice(0,200000):""};
+}
+function combatResultDelta(a,b,role){
+ const metrics=role==="tank"?["tps","dtps","death"]:role==="heal"?["hps","oom"]:["dps"];
+ return {rows:metrics.filter(k=>Number.isFinite(a[k])&&Number.isFinite(b[k])).map(k=>({metric:k,a:a[k],b:b[k],delta:b[k]-a[k],percent:a[k]>0?(b[k]-a[k])/a[k]*100:null})),warnings:[...(a.duration===null||b.duration===null?["缺少平均戰鬥時間"]:Math.abs(a.duration-b.duration)>Math.max(1,a.duration*.03)?["平均戰鬥時間不同，可能不是同遭遇"]:[]),...(a.iterations!==b.iterations?["迭代次數不同"]:[])]};
 }
 function combatCoverageView(parent,data){
  const rows=combatCoverage(data),done=rows.filter(x=>x.count>0).length;
@@ -1582,9 +1592,32 @@ function combatLab(){
   }
  }).catch(()=>{if(presets.isConnected)presets.replaceChildren(node("h4","開源引擎實跑預設案例"),node("p","實跑快照未取得；不顯示估算數值。可使用上方引擎連結。","gt-muted"));});
  const importBox=box(panel,"比較完整模擬結果","可貼上 WoWSims CLI 的 RaidSimResult 或 SIML sim JSON；結果來源與配置由使用者填寫，本站不替其驗證。");
- const resultInputs=[],labels=[],results=node("div"),msg=node("p","","gt-muted");
- for(const name of ["A","B"]){const label=inp("裝備／構築／遭遇與迭代條件"),area=node("textarea");area.rows=3;area.placeholder="貼上 RaidSimResult／SIML sim JSON "+name;area.setAttribute("aria-label","模擬結果 "+name);labels.push(label);resultInputs.push(area);add(importBox,field("方案 "+name+" 說明",label),area,combatFileInput(area,msg,"上傳模擬結果 "+name+" JSON"));}
- const compare=button("比較已完成的模擬",()=>{results.replaceChildren();try{const rows=resultInputs.map((v,i)=>v.value.trim()?{...combatResult(combatReadJSON(v.value)),label:labels[i].value.trim()||"方案 "+["A","B"][i]}:null).filter(Boolean);if(!rows.length)throw Error("至少貼上一份結果");for(const r of rows){const b=box(results,r.label,r.iterations+" 次迭代"+(r.duration?" ｜ 平均 "+r.duration.toFixed(1)+" 秒":""));add(b,node("p",["DPS","TPS","HPS","DTPS"].map(k=>k+" "+(r[k.toLowerCase()]===null?"未提供":r[k.toLowerCase()].toFixed(2))).join(" ｜ ")));if(r.death!==null)add(b,node("p","死亡機率 "+(r.death*100).toFixed(1)+"%"));if(r.logs){const d=node("details"),pre=node("pre");pre.textContent=r.logs;pre.className="gt-combat-log";add(d,node("summary","原始戰鬥時間紀錄"),pre);b.append(d);}}if(rows.length===2){const a=rows[0],b=rows[1];add(results,node("p","B − A："+["dps","tps","hps","dtps"].filter(k=>a[k]!==null&&b[k]!==null).map(k=>k.toUpperCase()+" "+(b[k]-a[k]).toFixed(2)).join(" ｜ "),"gt-muted"));}msg.textContent="比較完成；不同遭遇、增益、迭代或生存條件的結果不可直接判為最佳。";}catch(e){msg.textContent="匯入失敗："+e.message;}});
+ const resultInputs=[],labels=[],players=[],results=node("div"),msg=node("p","","gt-muted");
+ for(const name of ["A","B"]){
+  const label=inp("裝備／構築／遭遇與迭代條件"),area=node("textarea"),pick=select([["","單一角色自動辨識"]]);area.rows=3;area.placeholder="貼上 RaidSimResult／SIML sim JSON "+name;area.setAttribute("aria-label","模擬結果 "+name);labels.push(label);resultInputs.push(area);players.push(pick);
+  let source="";
+  const readPlayers=button("讀取方案 "+name+" 的角色",()=>{try{const raw=combatReadJSON(area.value);if(Number.isInteger(raw.iterations)){pick.replaceChildren(new Option("SIML 單一角色",""));msg.textContent="SIML 個人結果。";source=area.value;return;}const list=combatResultPlayers(raw);pick.replaceChildren(new Option("請選擇角色",""),...list.map(x=>new Option(x.name+"（隊伍 "+(Number(x.key.split(":")[0])+1)+"／位置 "+(Number(x.key.split(":")[1])+1)+(x.dummy?"；治療假人":"")+"）",x.key)));if(list.length===1)pick.value=list[0].key;source=area.value;msg.textContent="方案 "+name+" 共 "+list.length+" 個角色；請選擇要比較的角色。";}catch(e){pick.replaceChildren(new Option("無可用角色",""));msg.textContent="讀取失敗："+e.message;}});
+  area.addEventListener("input",()=>{pick.replaceChildren(new Option("單一角色自動辨識",""));source="";});
+  const upload=combatFileInput(area,msg,"上傳模擬結果 "+name+" JSON");upload.addEventListener("change",()=>{pick.replaceChildren(new Option("單一角色自動辨識",""));source="";});
+  players[players.length-1]={pick,current:()=>source===area.value?pick.value:""};
+  add(importBox,field("方案 "+name+" 說明",label),area,upload,readPlayers,field("方案 "+name+" 分析角色",pick));
+ }
+ const compare=button("比較已完成的模擬",()=>{results.replaceChildren();try{
+  const rows=resultInputs.map((v,i)=>v.value.trim()?{...combatResult(combatReadJSON(v.value),players[i].current()),label:labels[i].value.trim()||"方案 "+["A","B"][i]}:null).filter(Boolean);if(!rows.length)throw Error("至少貼上一份結果");
+  for(const r of rows){
+   const b=box(results,r.label,r.iterations+" 次迭代"+(r.duration?" ｜ 平均 "+r.duration.toFixed(1)+" 秒":""));
+   add(b,node("p",["DPS","TPS","HPS","DTPS"].map(k=>k+" "+(r[k.toLowerCase()]===null?"未提供":r[k.toLowerCase()].toFixed(2))).join(" ｜ ")),node("p","分析角色："+r.name,"gt-muted"));
+   if(r.death!==null)add(b,node("p","死亡機率 "+(r.death*100).toFixed(1)+"%"));
+   if(Number.isFinite(r.oom))b.append(node("p","平均資源耗盡秒數 "+r.oom.toFixed(2)));
+   const deviations=Object.entries(r.stdev||{}).filter(([,v])=>Number.isFinite(v));if(deviations.length)b.append(node("p",deviations.map(([k,v])=>k.toUpperCase()+" 標準差 "+v.toFixed(2)).join(" ｜ "),"gt-muted"));
+   if(r.logs){const d=node("details"),pre=node("pre");pre.textContent=r.logs;pre.className="gt-combat-log";add(d,node("summary","原始戰鬥時間紀錄"),node("p","完整隊伍紀錄，未依角色過濾。","gt-muted"),pre);b.append(d);}
+  }
+  if(rows.length===2){const a=rows[0],b=rows[1],delta=combatResultDelta(a,b,combatRole(id));add(results,node("p","B − A："+["dps","tps","hps","dtps"].filter(k=>a[k]!==null&&b[k]!==null).map(k=>k.toUpperCase()+" "+(b[k]-a[k]).toFixed(2)).join(" ｜ "),"gt-muted"));const c=box(results,"依目前職責比較","差額為 B − A，不自動判定最佳。");
+   for(const x of delta.rows)c.append(node("p",x.metric==="death"?"死亡機率差 "+(100*x.delta).toFixed(2)+" 個百分點":x.metric==="oom"?"資源耗盡時間差 "+x.delta.toFixed(2)+" 秒":x.metric.toUpperCase()+" 差 "+x.delta.toFixed(2)+(x.percent===null?"（基準為零）":" ｜ "+x.percent.toFixed(2)+"%")));
+   if(!delta.rows.length)c.append(node("p","缺少本職責可比較數值。","gt-muted"));for(const warning of delta.warnings)c.append(node("p","注意："+warning,"gt-muted"));
+  }
+  msg.textContent="比較完成；不同遭遇、增益、迭代或生存條件的結果不可直接判為最佳。";
+ }catch(e){msg.textContent="匯入失敗："+e.message;}});
  add(importBox,compare,msg,results);
  const local=box(panel,"自訂技能時間軸試算","使用自行填寫的每次平均傷害、仇恨、治療、冷卻及資源值；以技能清單由上到下作為優先序。可選填技能 earliest／latest（最早／最晚開始秒數）與 reserve（扣除技能消耗後至少預留的資源），用於比較開場爆發或延後技能。可選 targets（敵人數）、targetCap（技能命中上限）、group／groupCd（共用冷卻）、buff／buffs（技能／外部定時倍率）、healingDemand／healMin（合併治療需求及施法缺口門檻）。每個技能仍佔用 GCD，無命中、爆擊、DoT、連擊點、普攻、觸發、承傷、仇恨轉移等真實遊戲模型。");
  const raw=node("textarea");raw.rows=10;raw.placeholder="請輸入模型 JSON，或載入教學範例";raw.setAttribute("aria-label","自訂模擬模型");
