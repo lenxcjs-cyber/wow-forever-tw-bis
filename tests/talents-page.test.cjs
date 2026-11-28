@@ -72,9 +72,9 @@ for(const p of catalog.profiles){
  assert.equal(new Set(g.skills.map(row=>row[1])).size,g.skills.length,p.id+" duplicate core skills");
 }
 for(const g of Object.values(skills.specs))coreCount+=g.skills.length;
-assert.equal(coreCount,183);
-assert.equal(Object.values(skills.common).flat().length,42);
-console.log("PASS: 28 spec skill guides, 183 core entries, 42 class utility entries, every build mapped");
+assert.equal(coreCount,185);
+assert.equal(Object.values(skills.common).flat().length,45);
+console.log("PASS: 28 spec skill guides, 185 core entries, 45 class utility entries, every build mapped");
 
 assert.ok(!skills.specs["spec-26"].skills.some(x=>x[1]==="Primal Bite"));
 assert.ok(skills.specs["spec-27"].skills.some(x=>x[1]==="Primal Bite"));
@@ -86,3 +86,20 @@ assert.equal(skills.unlocks.druid["Shifting Power"],"talent");
 assert.ok(skills.specs["spec-26"].skills.some(row=>row[1]==="Shifting Power"));
 for(const [cls,rows] of Object.entries(skills.unlocks)){assert.ok(classTokens.includes(cls));for(const type of Object.values(rows))assert.ok(["trainer","talent","passive"].includes(type));}
 console.log("PASS: class-specific skill acquisition, passive distinction and Shifting Power");
+
+const {skillBuildNote,investedTalentRows}=require("../talents-page.js");
+assert.equal(Object.keys(skills.buildNotes).length,22);
+for(const [key,note] of Object.entries(skills.buildNotes)){
+ const p=catalog.profiles.find(p=>p.id+":"+p.key===key);
+ assert.ok(p,key+" missing build");
+ assert.equal(skillBuildNote(skills,p),note);
+ const g=skills.specs[p.id],names=new Set([...g.skills,...skills.common[g.class]].map(x=>x[1]));
+ for(const name of note.focus)assert.ok(names.has(name),key+" missing skill "+name);
+}
+assert.equal(skillBuildNote(skills,{id:"spec-26",key:"unknown"}),null);
+assert.equal(skillBuildNote(skills,{id:"spec-26",key:"feral_onehand"}).focus.length,0);
+assert.deepEqual(investedTalentRows({talents:null},fixture),[]);
+const invested=investedTalentRows({talents:[{"Talent 1":2,"Talent 101":1,"Unknown":3,"Invalid":0,"Talent 2":6},{},{}]},fixture);
+assert.equal(invested.length,4);assert.equal(invested[0].valid,true);assert.equal(invested[1].talent,null);assert.equal(invested[2].valid,null);assert.equal(invested[3].valid,false);
+assert.equal(investedTalentRows({talents:[{"talent 1":1},{},{}]},fixture)[0].talent.id,1);
+console.log("PASS: exact build skill notes, valid focus references, invested talent same-tree matching and missing rank handling");
