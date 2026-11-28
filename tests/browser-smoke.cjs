@@ -65,7 +65,12 @@ const server=http.createServer((req,res)=>{
     await page.locator('#guild-tools button[data-tab="audit"]').click();
     assert.ok(await page.locator(".gt-bis-slot").count()>0,"missing candidate cards "+id);
     const weaponMode=page.locator("#gt-gear-weapon-mode");
-    const verifyWeaponView=async()=>{const names=await page.locator(".gt-bis-slot h4").allTextContents();assert.ok(!(names.some(n=>/雙手武器/.test(n))&&names.some(n=>/主手武器|副手物品/.test(n))),"mutually exclusive weapon slots rendered together "+id);};
+    const verifyWeaponView=async()=>{const names=await page.locator(".gt-bis-slot h4").allTextContents();assert.ok(!(names.some(n=>/雙手武器/.test(n))&&names.some(n=>/主手武器|副手物品/.test(n))),"mutually exclusive weapon slots rendered together "+id);
+     assert.equal(names.length,names.includes("雙手武器")?16:17,id+" physical position count");
+     for(const label of ["戒指 1","戒指 2","飾品 1","飾品 2","遠程／聖物"])assert.equal(names.filter(n=>n===label).length,1,id+" missing or duplicate "+label);
+     const featured=await page.locator(".gt-bis-slot[data-featured-id]").evaluateAll(nodes=>nodes.map(n=>n.dataset.featuredId));
+     assert.equal(new Set(featured).size,featured.length,id+" repeated featured equipment");
+    };
     await verifyWeaponView();
     if(await weaponMode.isVisible()){
      await weaponMode.selectOption("one");await verifyWeaponView();
