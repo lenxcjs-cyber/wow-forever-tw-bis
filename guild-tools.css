@@ -176,3 +176,22 @@ html.gt-blue-mode .gt-legacy-history{display:none!important}
 #guild-tools .gt-combat-presets .gt-card{margin:8px 0}
 #guild-tools .gt-combat-metric{font-size:22px;font-weight:700;color:#e9c78c;font-variant-numeric:tabular-nums}
 #guild-tools textarea[aria-label="自訂模擬模型"],#guild-tools textarea[aria-label^="模擬結果"]{box-sizing:border-box;width:100%;max-width:100%;padding:8px;font:12px/1.5 ui-monospace,monospace;resize:vertical}
+
+
+/* Responsive wide workspace: no horizontal page scroll at narrow widths. */
+main#top{width:100%;max-width:1920px;padding:clamp(12px,1.5vw,28px)}
+html.gt-standard-width main#top{max-width:1240px}
+.gt-site-mode{align-items:center}
+.gt-site-mode .gt-width-toggle{margin-left:auto}
+#guild-tools .gt-panel,#guild-tools .gt-card,#guild-tools .gt-build-column,#guild-tools .gt-field{min-width:0}
+#guild-tools textarea{box-sizing:border-box;width:100%;max-width:100%;resize:vertical}
+#guild-tools .gt-panel pre{max-width:100%;overflow:auto}
+@media(min-width:1280px){
+ html:not(.gt-standard-width) #guild-tools .gt-build-workspace{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+ html:not(.gt-standard-width) #guild-tools .gt-build-column{height:clamp(620px,80vh,1200px)}
+ html:not(.gt-standard-width) #guild-tools .gt-gear-filters{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(min-width:1600px){
+ html:not(.gt-standard-width) #guild-tools .gt-build-workspace{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+}
+@media(max-width:600px){main#top{padding:10px}.gt-site-mode .gt-width-toggle{margin-left:0}}
