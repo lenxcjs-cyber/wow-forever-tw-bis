@@ -1033,6 +1033,15 @@ const injected=JSON.parse(JSON.stringify(imported.request));injected.raid.partie
 assert.throws(()=>nativeImport.nativeBrowserRequest(injected,"spec-1","guild-50k",50));
 const nativeRaw={iterationsDone:50,avgIterationDuration:60,raidMetrics:{parties:[{players:[{name:"角色",dps:{avg:120}}]}]}};
 assert.equal(nativeImport.nativeBrowserResult(nativeRaw,"spec-1",50).dps,120);
+const tankRaw={iterationsDone:50,avgIterationDuration:60,raidMetrics:{parties:[{players:[{threat:{avg:500},dtps:{avg:300},chanceOfDeath:0}]}]}};
+assert.equal(nativeImport.nativeBrowserResult(tankRaw,"spec-3",50).tps,500);
+const tankIncomplete=JSON.parse(JSON.stringify(tankRaw));delete tankIncomplete.raidMetrics.parties[0].players[0].chanceOfDeath;
+assert.throws(()=>nativeImport.nativeBrowserResult(tankIncomplete,"spec-3",50),/坦克結果/);
+tankIncomplete.raidMetrics.parties[0].players[0].chanceOfDeath=1.1;
+assert.throws(()=>nativeImport.nativeBrowserResult(tankIncomplete,"spec-3",50),/坦克結果/);
+delete tankIncomplete.raidMetrics.parties[0].players[0].dtps;
+tankIncomplete.raidMetrics.parties[0].players[0].chanceOfDeath=0;
+assert.throws(()=>nativeImport.nativeBrowserResult(tankIncomplete,"spec-3",50),/坦克結果/);
 const actionNative={iterationsDone:50,raidMetrics:{parties:[{players:[{name:"角色",dps:{avg:120},actions:[{id:{spellId:123,rank:2},targets:[{damage:5000,threat:1000,manualCasts:100},{damage:1000,threat:500,manualCasts:50}]},{id:{itemId:456},isPassive:true,targets:[{damage:500}]},{id:{spellId:123,itemId:789},targets:[{damage:999999}]},{id:{spellId:789},targets:[{damage:-10},{damage:"400"}]}],pets:[{name:"狼",actions:[{id:{otherId:"OtherActionAttack"},targets:[{damage:2500}]}]}]},{name:"Target Dummy 1",dps:{avg:0},actions:[{id:{spellId:999},targets:[{damage:999999}]}]}]}]}};
 const browserActions=nativeImport.combatBrowserActionRows(actionNative);
 assert.equal(browserActions.length,3);
@@ -1055,6 +1064,12 @@ const standalone=nativeImport.nativeCharacterRequest({player:importedPlayer,enco
 assert.deepEqual(standalone.request.raid.parties[0].players[0].equipment,nativeGear);
 const wrongClass=JSON.parse(JSON.stringify(imported.request));wrongClass.raid.parties[0].players[0].class="ClassMage";
 assert.throws(()=>nativeImport.nativeBrowserRequest(wrongClass,"spec-1","guild-50k",50));
+assert.throws(()=>nativeImport.nativeCharacterRequest(wrongClass,null,"spec-1",metadata),/職業/);
+assert.throws(()=>nativeImport.nativeCharacterRequest(injected,null,"spec-1",metadata),/自訂引擎/);
+const wrongRotation=JSON.parse(JSON.stringify(imported.request));wrongRotation.raid.parties[0].players[0].rotation="invalid";
+assert.throws(()=>nativeImport.nativeCharacterRequest(wrongRotation,null,"spec-1",metadata),/技能優先序/);
+assert.throws(()=>nativeImport.nativeBrowserRequest(imported.request,"spec-1","__proto__",50),/不明公會/);
+assert.throws(()=>nativeImport.nativeBrowserRequest(imported.request,"spec-1","constructor",50),/不明公會/);
 const sameGearVariant={name:"附魔測試",mode:"two",equipment:{items:nativeGear.items.map((x,i)=>i===0?{...x,enchant:99}:x)}};
 const localBatch=combat.combatGuildBatch(imported.request,"spec-1",[sameGearVariant]);
 const nativeBatchJobs=nativeImport.nativeBrowserBatchJobs(localBatch,"spec-1",metadata,200);
