@@ -736,6 +736,14 @@ const guildTank=combat.combatGuildScenario(tankFixture,"spec-3","guild-5x50k");
 assert.equal(guildTank.raid.parties[0].players[0].inFrontOfTarget,true);
 assert.deepEqual(guildTank.raid.tanks,[{type:"Player",index:0}]);
 assert.ok(guildTank.encounter.targets.every(x=>x.tankIndex===0&&x.minBaseDamage===300));
+const lateTank=JSON.parse(JSON.stringify(tankFixture)),tankPlayer=lateTank.raid.parties[0].players[0];
+lateTank.raid.parties=[{}, {players:[{}, {}, tankPlayer]}];
+const lateScenario=combat.combatGuildScenario(lateTank,"spec-3","guild-50k");
+assert.deepEqual(lateScenario.raid.tanks,[{type:"Player",index:7}]);
+assert.equal(lateScenario.encounter.targets[0].tankIndex,0);
+assert.equal(lateTank.raid.parties[1].players[2].inFrontOfTarget,tankPlayer.inFrontOfTarget);
+const invalidParties=JSON.parse(JSON.stringify(tankFixture));invalidParties.raid.parties.push({},{},{},{},{},{});
+assert.throws(()=>combat.combatGuildScenario(invalidParties,"spec-3","guild-50k"),/隊伍格式/);
 assert.equal(combat.combatScenarioRequest(gearRequest,"spec-1",{guild:"guild-boss",duration:120,variation:0}).encounter.duration,120);
 const tierLogic=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSet,catalogSetTierComparison,nativeSetComparison};")();
 const tierItem=(id,name,total)=>({item:{id,item_set:name},score:{total}});
@@ -882,7 +890,7 @@ console.log("PASS: equal-slot coverage for set wins, duplicate bonus rejection, 
 
 // Forever addon exports can be compact and carry signed random_suffix IDs.
 // Use the pinned native item types rather than guessing positional slots.
-const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,combatEquipmentSpec,combatModifierValid,combatCandidateReplacement};")();
+const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,nativeCanonicalJSON,combatEquipmentSpec,combatModifierValid,combatCandidateReplacement};")();
 const metadata={items:{1:[1,0,0,4],2:[11,0,0,0],3:[11,0,0,0],4:[12,0,0,0],5:[12,0,0,0],6:[13,4,9,0],7:[14,0,0,0],8:[13,3,7,0],9:[13,2,9,0]},enchants:{99:true},suffixes:{"-15":true}};
 const compactGear={items:[{id:1,random_suffix:-15},{id:2},{id:3},{id:4},{id:5},{id:6,enchant:99},{id:7}]};
 const nativeGear=nativeImport.nativeImportGear(compactGear,metadata);
@@ -959,4 +967,11 @@ assert.throws(()=>nativeImport.nativeBrowserBatchJobs(mismatchedName,"spec-1",me
 const mismatchedConfig=JSON.parse(JSON.stringify(localBatch));
 for(const x of mismatchedConfig.cases.filter(x=>x.scenario==="guild-boss"))x.request.raid.parties[0].players[0].talentsString="1-1-1";
 assert.throws(()=>nativeImport.nativeBrowserBatchJobs(mismatchedConfig,"spec-1",metadata,200));
+assert.equal(nativeImport.nativeCanonicalJSON({b:[1,{z:2,a:3}],a:true}),nativeImport.nativeCanonicalJSON({a:true,b:[1,{a:3,z:2}]}));
+assert.ok(nativeImport.nativeCanonicalJSON([1,2])!==nativeImport.nativeCanonicalJSON([2,1]));
+const reorderKeys=x=>Array.isArray(x)?x.map(reorderKeys):x&&typeof x==="object"?Object.fromEntries(Object.entries(x).reverse().map(([k,v])=>[k,reorderKeys(v)])):x;
+const reorderedBatch=JSON.parse(JSON.stringify(localBatch));reorderedBatch.cases[1].request=reorderKeys(reorderedBatch.cases[1].request);
+assert.equal(nativeImport.nativeBrowserBatchJobs(reorderedBatch,"spec-1",metadata,200).length,localBatch.cases.length);
+const tooManyDummies=JSON.parse(JSON.stringify(localBatch));tooManyDummies.cases[0].request.raid.targetDummies=25;
+assert.throws(()=>nativeImport.nativeBrowserBatchJobs(tooManyDummies,"spec-1",metadata,200),/假人/);
 console.log("PASS: standalone settings and controlled native browser batch comparison");
