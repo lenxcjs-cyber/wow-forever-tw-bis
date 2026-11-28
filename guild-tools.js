@@ -100,6 +100,11 @@ const rawWeaponWeightKeys=["武器DPS","主手DPS","副手DPS","雙手DPS","遠�
 function effectiveGearWeights(id,weights){if(!feralSpec(id))return weights;return Object.fromEntries(Object.entries(weights||{}).filter(([key])=>!["副手DPS","遠程DPS"].includes(key)));}
 function omittedFeralWeights(id,weights){return feralSpec(id)?["副手DPS","遠程DPS"].filter(k=>Number(weights?.[k])>0):[];}
 function feralWeaponMode(id){return feralSpec(id)?(buildFor(id)==="feral_onehand"?"onehand":"twohand"):"";}
+function feralDpsReady(id,weights){
+ if(!feralSpec(id))return true;
+ const w=effectiveGearWeights(id,weights||{}),specific=["主手DPS","雙手DPS"].some(k=>Number(w[k])>0),key=feralWeaponMode(id)==="onehand"?"主手DPS":"雙手DPS";
+ return Number(w[specific?key:"武器DPS"])>0;
+}
 
 function isTwoHand(type){return /雙手|two.hand|法杖|長柄|staff|staves|polearm/i.test(type||"");}
 function classWeaponGate(id,x){
@@ -441,9 +446,9 @@ function optimizer(){
  });
  add(weightBox,epBox,grid,field("模擬來源與假設",source),field("JSON 權重（以本頁繁中屬性名稱為鍵）",raw),importBtn,exportBtn,saveBtn,resetBtn,message);
  function draw(){result.replaceChildren();const effective=effectiveGearWeights(id,weights);if(!Object.values(effective).some(v=>v>0)){result.append(node("p","此構築尚無非零權重；不產生排名，請匯入專屬模擬資料。"));return;}const rows=(s.slots.get(slot.value)||[]).filter(x=>allowed(id,x));const base=Math.max(0,Number(current.value)||0),cap=target.value===""?null:Math.max(0,Number(target.value)||0);
- const sorted=rows.map(x=>{const m=modelScore(x,effective,{base,cap,talent:Math.max(0,Number(talentHit.value)||0)});return {...x,calc:m.total,parts:m.parts,missingDps:m.incomplete};}).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||Number(a.missingDps)-Number(b.missingDps)||b.calc-a.calc);
+ const sorted=rows.map(x=>{const m=modelScore(x,effective,{base,cap,talent:Math.max(0,Number(talentHit.value)||0)},id);return {...x,calc:m.total,parts:m.parts,missingDps:m.incomplete};}).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||Number(a.missingDps)-Number(b.missingDps)||b.calc-a.calc);
  if(!sorted.length){result.append(node("p","本站沒有符合此構築的候選裝備，請查證外部資料。"));return;}
- for(const [i,x] of sorted.entries()){const c=box(result,(x.review?"待複核 · ":"比較 "+(i+1)+" · ")+zhItem(x),"試算分："+x.calc.toFixed(2));add(c,node("p",x.source),node("p",x.review||"未觸發適用性警示；非已驗證","gt-muted"));if(x.missingDps)add(c,node("p","缺武器DPS，分數不完整","gt-muted"));const d=node("details");d.append(node("summary","查看各屬性分數貢獻"));for(const [k,v] of Object.entries(x.parts))if(v!==0)d.append(node("p",k+"："+v.toFixed(2)));add(c,d,link("物品來源",x.url));}}
+ for(const [i,x] of sorted.entries()){const c=box(result,(x.review?"待複核 · ":"比較 "+(i+1)+" · ")+zhItem(x),"試算分："+x.calc.toFixed(2));add(c,node("p",x.source),node("p",x.review||"未觸發適用性警示；非已驗證","gt-muted"));if(x.missingDps)add(c,node("p","缺武器DPS資料或適用權重，分數不完整，不代表優先推薦","gt-muted"));const d=node("details");d.append(node("summary","查看各屬性分數貢獻"));for(const [k,v] of Object.entries(x.parts))if(v!==0)d.append(node("p",k+"："+v.toFixed(2)));add(c,d,link("物品來源",x.url));}}
  slot.addEventListener("change",()=>{const h=saved?.hitBySlot?.[slot.value];current.value=String(h?.base??0);target.value=h?.cap??"";talentHit.value=String(h?.talent??0);draw();});for(const el of [current,target,talentHit])el.addEventListener("input",draw);
  add(out,specLabel(),node("p",research?"權重研究："+research[2]:"尚無研究資料","gt-muted"),node("p","構築："+(rogueProfiles[id]?.find(x=>x[0]===profile)?.[1]||"既有專精／待建立完整構築")),indicator,...(feralSpec(id)?[node("p","暴雪已確認永恆版貓／熊形態使用裝備武器DPS。請輸入適用構築的武器DPS權重；舊版未計武器DPS的模型不宜沿用。副手持有物與聖物不算武器DPS。","gt-muted")]:[]),field("比較部位",slot),field("其他部位命中 (%)；不含下方天賦命中",current),field("額外天賦命中 (%)；已包含於上方則填0",talentHit),...((referenceTalent(id)?.[1]?.Precision||0)>0?[button("套用參考配點的精準命中 +"+(referenceTalent(id)[1].Precision||0)+"%",()=>{talentHit.value=String(referenceTalent(id)[1].Precision||0);draw();})]:[]),field("命中目標 (%)",target),weightBox,node("p","各手位DPS權重可獨立輸入；只要有一項手位權重非零，就完全改用手位權重（其他手位0代表不計分）；全為0才沿用通用DPS。盾牌、法器、聖物不計武器DPS。未計套裝、觸發、整套互斥或完整技能循環。","gt-muted"),result,link("WoWSims Forever","https://wowsims.com/forever/"),node("p",""),link("VoidSim 屬性權重","https://voidsim.io/forever"));panel.append(out);draw();
 }
@@ -460,14 +465,14 @@ function weaponDpsKey(x){
  if(/主手|單手武器|近戰武器|main.hand/i.test(slot))return "主手DPS";
  return "";
 }
-function modelScore(x,weights,hit={}){
+function modelScore(x,weights,hit={},id=""){
  const parts={},base=(Number.isFinite(hit.base)?Math.max(0,hit.base):0)+(Number.isFinite(hit.talent)?Math.max(0,hit.talent):0),cap=Number.isFinite(hit.cap)?Math.max(0,hit.cap):null;
  for(const [k,v] of Object.entries(x.stats||{})){if(!Number.isFinite(v))continue;const qty=k==="命中機率"&&cap!==null?Math.min(v,Math.max(0,cap-base)):v;parts[k]=qty*(weights[k]||0);}
  const key=weaponDpsKey(x),specific=["主手DPS","副手DPS","雙手DPS","遠程DPS"].some(k=>(weights[k]||0)>0),weight=key?(specific?(weights[key]||0):(weights["武器DPS"]||0)):0;
  const dps=Object.entries(x.wm||{}).find(([k])=>/每秒傷害|DPS/i.test(k));
  const rawDps=dps?String(dps[1]).trim():"",parsedDps=rawDps.match(/^(\d+(?:\.\d+)?)\s*(?:DPS)?$/i),wd=parsedDps?Number(parsedDps[1]):NaN;
  if(key&&weight&&Number.isFinite(wd)&&wd>0)parts[specific?key:"武器DPS"]=wd*weight;
- return {total:Object.values(parts).reduce((a,b)=>a+b,0),parts,incomplete:!!weight&&(!Number.isFinite(wd)||wd<=0)};
+ return {total:Object.values(parts).reduce((a,b)=>a+b,0),parts,incomplete:!!weight&&(!Number.isFinite(wd)||wd<=0)||!!key&&!!id&&feralSpec(id)&&!feralDpsReady(id,weights)};
 }
 
 // Pair scoring uses a shared hit budget, not per-slot hit caps.
@@ -1000,9 +1005,10 @@ function catalogWeaponScore(x,position,weights){
 function catalogRankableWeights(weights){
  return [...Object.values(catalogWeightFields),...Object.values(catalogDpsKeys),"武器DPS"].some(k=>Number.isFinite(weights?.[k])&&weights[k]>0);
 }
-function catalogPositionRankScore(x,position,weights){
+function catalogPositionRankScore(x,position,weights,id=""){
  const score=catalogWeaponScore(x,position,weights);
- return {...score,rankable:catalogSourceRecorded(x)&&!score.incomplete&&Number.isFinite(score.total)&&score.total>0};
+ const incomplete=score.incomplete||!!id&&feralSpec(id)&&x.item_class==="Weapon"&&["主手","雙手武器"].includes(position)&&!feralDpsReady(id,weights);
+ return {...score,incomplete,rankable:catalogSourceRecorded(x)&&!incomplete&&Number.isFinite(score.total)&&score.total>0};
 }
 function catalogPositionCompare(a,b){
  return Number(b.rankable)-Number(a.rankable)||(a.rankable&&b.rankable?b.total-a.total:0);
@@ -1033,8 +1039,8 @@ function catalogWeaponPlan(spec,records,prof,weights,options={}){
   }
  }
  choices.sort((a,b)=>b.total-a.total||b.picks.length-a.picks.length);
- const melee=choices[0]||null,extra=["遠程","聖物"].map(k=>pools.get(k)[0]).filter(x=>x&&x.score.total>0).sort((a,b)=>b.score.total-a.score.total).slice(0,1); // Shared ranged/relic equipment slot.
- return {melee,extra,total:(melee?.total||0)+extra.reduce((n,p)=>n+p.score.total,0),requirePair,requireTwo};
+ const melee=feralDpsReady(spec.id,weights)?choices[0]||null:null,extra=["遠程","聖物"].map(k=>pools.get(k)[0]).filter(x=>x&&x.score.total>0).sort((a,b)=>b.score.total-a.score.total).slice(0,1); // Shared ranged/relic equipment slot.
+ return {melee,extra,total:(melee?.total||0)+extra.reduce((n,p)=>n+p.score.total,0),requirePair,requireTwo,missingFeralDps:!feralDpsReady(spec.id,weights)};
 }
 function candidateCatalogCheck(candidate,record){
  if(!record)return {state:"未收錄",differences:[]};
@@ -1100,7 +1106,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
      if(group.picks.length<group.count)for(let i=group.picks.length;i<group.count;i++)c.append(node("p",(group.count===2?group.slot+" "+(i+1)+"｜":"")+"候選不足：保留空位，不以零分物品補滿。","gt-muted"));
      rows.append(c);
     }
-    const w=node("section",undefined,"gt-card gt-catalog-weapon-plan");add(w,node("h4","武器與遠程／聖物"),node("p",weapon.melee?weapon.melee.kind+"｜"+weapon.melee.total.toFixed(2):"沒有可計分的合法近戰武器組合；保留空位","gt-muted"),node("p","武器DPS採用已儲存的對應手位權重；缺少或僅有估算DPS的武器在需要DPS權重時排除。盾牌、持有型副手、聖物不計武器DPS；貓／熊形態採裝備武器DPS；形態攻速固定，觸發和套裝仍需原生模擬。","gt-muted"));
+    const w=node("section",undefined,"gt-card gt-catalog-weapon-plan");add(w,node("h4","武器與遠程／聖物"),node("p",weapon.melee?weapon.melee.kind+"｜"+weapon.melee.total.toFixed(2) :weapon.missingFeralDps?"缺少本形態武器DPS權重；不產生可能誤導的武器首選":"沒有可計分的合法近戰武器組合；保留空位","gt-muted"),node("p","武器DPS採用已儲存的對應手位權重；缺少或僅有估算DPS的武器在需要DPS權重時排除。盾牌、持有型副手、聖物不計武器DPS；貓／熊形態採裝備武器DPS；形態攻速固定，觸發和套裝仍需原生模擬。","gt-muted"));
     for(const {item:x,position,score} of [...(weapon.melee?.picks||[]),...weapon.extra])add(w,node("p",position+"｜"+score.total.toFixed(2)),link(zhItem(x)+"（"+gearType(x)+"）","https://www.wowhead.com/forever/tw/item="+x.id),node("p",score.parts.map(v=>v.label+" "+v.value+" × "+v.weight).join("；")||"無已計分屬性","gt-muted"),node("p",x.source_summary||"來源待查"));
     rows.append(w);
     const setPanel=node("section",undefined,"gt-card gt-catalog-set-plan"),baseline=plan.groups.flatMap(g=>g.picks.map(p=>({...p,slot:g.slot}))),setCounts=catalogSetCounts(baseline);
@@ -1203,7 +1209,7 @@ function catalogQuestReview(spec,records,prof,weights,limit=10){
  for(const position of positions){
   const all=eligible.filter(x=>gearCatalogEligible(spec,x,prof,position)),quest=all.filter(x=>gearCatalogTags(x).includes("任務"));
   if(!quest.length)continue;
-  const scored=all.filter(catalogSourceRecorded).map(item=>({item,score:catalogPositionRankScore(item,position,weights)})).filter(x=>x.score.rankable).sort((a,b)=>b.score.total-a.score.total||Number(a.item.id)-Number(b.item.id));
+  const scored=all.filter(catalogSourceRecorded).map(item=>({item,score:catalogPositionRankScore(item,position,weights,spec.id)})).filter(x=>x.score.rankable).sort((a,b)=>b.score.total-a.score.total||Number(a.item.id)-Number(b.item.id));
   const best=scored[0]?.score.total??null,byId=new Map(scored.map((x,i)=>[String(x.item.id),{rank:i+1,score:x.score.total,gap:best-x.score.total}]));
   const ranked=quest.filter(x=>byId.has(String(x.id))).map(item=>({item,...byId.get(String(item.id))})).sort((a,b)=>a.rank-b.rank);
   const unranked=quest.filter(x=>!byId.has(String(x.id))).sort((a,b)=>Number(catalogHasSpecial(b))-Number(catalogHasSpecial(a))||Number(b.item_level||0)-Number(a.item_level||0)||Number(a.id)-Number(b.id));
@@ -1263,7 +1269,7 @@ function gearCatalogView(spec){
  const omitted=catalogWeightCoverage(rankWeights).filter(k=>!Object.values(catalogDpsKeys).includes(k)&&k!=="武器DPS");const rankNote=node("p",rankable?"已讀取本構築權重："+(model.source||"使用者提供")+"。全目錄試算使用已明確對應的面板欄位（基本屬性、攻強、獨立法傷／治療、回魔、格擋值）及對應手位的非估算武器DPS。法術能量不自動併入法傷或治療；不換算命中、爆擊等不同單位。":"可至配裝試算儲存本構築可對應的面板權重，以解鎖全目錄跨甲比較。","gt-muted");
  const omittedNote=node("p",omitted.length?"本目錄未計入的非零權重："+omitted.join("、")+"。因此分數不是完整配裝結果。":"未計套裝、觸發、唯一裝備限制及完整技能循環。","gt-muted");
  status.textContent="來源版本："+data.meta.client_build+"｜"+eligible.length+" 件符合初步裝備資格（含待查）｜"+eligible.filter(x=>catalogSourceRecorded(x)&&!knownIds.has(String(x.id))).length+" 件有來源記載但尚未納入本站候選"+(data.catalogAudit&&(data.catalogAudit.invalid||data.catalogAudit.duplicates)?"｜資料檢查：無效 "+data.catalogAudit.invalid+" 筆、重複 "+data.catalogAudit.duplicates+" 筆、衝突 "+data.catalogAudit.conflicts+" 件（不計分）":"");
- function draw(){list.replaceChildren();const weighted=sort.value==="weighted";if(weighted&&!sl.value){list.append(node("p","請先選擇同一裝備部位，避免不同部位分數互相比較。","gt-muted"));return;}const terms=q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);const scoreCache=weighted?new Map(eligible.map(x=>[x,catalogPositionRankScore(x,sl.value,rankWeights)])):null;const rows=eligible.filter(x=>catalogCandidateFilter(x,knownIds,coverageFilter.value)&&(!armorFilter.value||(armorFilter.value==="cross"?gearCrossArmor(cls,x):!gearCrossArmor(cls,x)))&&(scope.value==="all"||catalogSourceRecorded(x))&&(!quality.value||Number(x.quality)>=Number(quality.value))&&(!levelMin.value||Number(x.required_level||0)>=Number(levelMin.value))&&(!sl.value||gearCatalogEligible(spec,x,data.prof,sl.value))&&(!kind.value||gearCatalogTags(x).includes(kind.value))&&terms.every(t=>[x.name,globalThis.GTLocale?.item(x.id,x.name),x.id,x.source_summary,zhDisplay(x.source_summary||""),x.required_reputation,gearType(x),gearCatalogTags(x).join(" "),gearSlotNames[x.slot],...Object.keys(gearStatNames).filter(k=>x[k]).map(k=>gearStatNames[k])].join(" ").toLowerCase().includes(t))).sort((a,b)=>(weighted?catalogPositionCompare(scoreCache.get(a),scoreCache.get(b)):Number(b[sort.value]||0)-Number(a[sort.value]||0))||Number(b.item_level||0)-Number(a.item_level||0)||a.id-b.id);
+ function draw(){list.replaceChildren();const weighted=sort.value==="weighted";if(weighted&&!sl.value){list.append(node("p","請先選擇同一裝備部位，避免不同部位分數互相比較。","gt-muted"));return;}const terms=q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);const scoreCache=weighted?new Map(eligible.map(x=>[x,catalogPositionRankScore(x,sl.value,rankWeights,spec.id)])):null;const rows=eligible.filter(x=>catalogCandidateFilter(x,knownIds,coverageFilter.value)&&(!armorFilter.value||(armorFilter.value==="cross"?gearCrossArmor(cls,x):!gearCrossArmor(cls,x)))&&(scope.value==="all"||catalogSourceRecorded(x))&&(!quality.value||Number(x.quality)>=Number(quality.value))&&(!levelMin.value||Number(x.required_level||0)>=Number(levelMin.value))&&(!sl.value||gearCatalogEligible(spec,x,data.prof,sl.value))&&(!kind.value||gearCatalogTags(x).includes(kind.value))&&terms.every(t=>[x.name,globalThis.GTLocale?.item(x.id,x.name),x.id,x.source_summary,zhDisplay(x.source_summary||""),x.required_reputation,gearType(x),gearCatalogTags(x).join(" "),gearSlotNames[x.slot],...Object.keys(gearStatNames).filter(k=>x[k]).map(k=>gearStatNames[k])].join(" ").toLowerCase().includes(t))).sort((a,b)=>(weighted?catalogPositionCompare(scoreCache.get(a),scoreCache.get(b)):Number(b[sort.value]||0)-Number(a[sort.value]||0))||Number(b.item_level||0)-Number(a.item_level||0)||a.id-b.id);
  list.append(node("p",rows.length+" 件候選；"+(weighted?"依部分已儲存權重排序（非完整BiS）。":"依單項數值排序，非專精BiS。"),"gt-muted"));
  for(const x of rows.slice(0,limit)){const c=node("article",undefined,"gt-card");add(c,add(node("div",undefined,"gt-item-heading"),itemIcon(x.id),link((globalThis.GTLocale?.item(x.id,x.name)||x.name)+"（ID "+x.id+"）","https://www.wowhead.com/forever/tw/item="+x.id)),node("p",(sl.value==="副手"&&x.slot==="One-Hand"?"副手可用（通用單手）":gearSlotNames[x.slot])+"｜"+gearType(x)+(gearCrossArmor(cls,x)?"（跨甲）":"")+"｜"+gearCatalogTags(x).join("・")+"｜"+(Number(x.estimated)?"經典推定":"客戶端資料；取得狀態待逐件確認"),"gt-muted"),node("p",x.source_summary||(catalogSourceRecorded(x)?"結構化來源："+gearCatalogTags(x).join("、")+"（詳細來源待核）":"取得來源待查")));
  const stats=Object.entries(gearStatNames).filter(([k])=>Number(x[k])).map(([k,v])=>v+" "+x[k]);if(x.dps)stats.unshift("武器DPS "+x.dps+(Number(x.dps_approx)?"（估算）":""));if(stats.length)c.append(node("p",stats.join(" · ")));
@@ -1422,8 +1428,8 @@ function audit(){
  const saved=savedModel(spec.id),effective=effectiveGearWeights(spec.id,saved?.weights||{}),model=saved&&Object.values(effective).some(v=>v>0)?{...saved,weights:effective}:null;
  const workspace=node("div",undefined,"gt-build-workspace"),left=node("section",undefined,"gt-build-column"),right=node("section",undefined,"gt-build-column"),gearScroll=node("div",undefined,"gt-gear-scroll"),gearFilters=node("div",undefined,"gt-gear-filters"),jump=select([["","跳至裝備部位"]]),compact=select([["full","完整屬性"],["compact","精簡裝備列表"]]);
  const candidateSlots=expandCandidateSlots(spec);
- const compare=(a,b)=>Number(!!a.review)-Number(!!b.review)||(model?(Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total):0)||Number(!!b.priority)-Number(!!a.priority)||(a.rank||999)-(b.rank||999);
- const slots=[...candidateSlots].sort((a,b)=>auditSlotOrder(a[0])-auditSlotOrder(b[0])).map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).map(x=>model?{...x,model:modelScore(x,model.weights,model.hitBySlot?.[name])}:x).sort(compare)}));
+ const compare=(a,b)=>Number(!!a.review)-Number(!!b.review)||(model?(Number(a.model.incomplete)-Number(b.model.incomplete)||(!a.model.incomplete&&!b.model.incomplete?b.model.total-a.model.total:0)):0)||Number(!!b.priority)-Number(!!a.priority)||(a.rank||999)-(b.rank||999);
+ const slots=[...candidateSlots].sort((a,b)=>auditSlotOrder(a[0])-auditSlotOrder(b[0])).map(([name,items])=>({name,items:items.filter(x=>allowed(spec.id,x)).map(x=>model?{...x,model:modelScore(x,model.weights,model.hitBySlot?.[name],spec.id)}:x).sort(compare)}));
  const excluded=[...candidateSlots.values()].flat().filter(x=>!allowed(spec.id,x));
  if(feralWeaponMode(spec.id)==="twohand"){for(let i=slots.length-1;i>=0;i--){if(/副手|盾牌|單手|主手/.test(slots[i].name)&&!slots[i].items.length)slots.splice(i,1);}}
  const partition=auditWeaponGroups(slots,compare),weaponMode=select(partition.modes.map(m=>[m,m==="two"?"雙手武器":"單手＋副手（或雙持）"]));
@@ -1451,7 +1457,7 @@ function audit(){
  function itemView(x){
   const c=node("div",undefined,"gt-bis-alt"),name=link((x.rank?"舊候選 "+x.rank+" · ":"")+(globalThis.GTLocale?.item(x.id,x.name)||x.name),x.url);name.className="gt-bis-name";
   const source=node("div",undefined,"gt-bis-source");add(source,node("small","取得來源"),node("strong",x.source));
-  const heading=node("div",undefined,"gt-item-heading");add(heading,itemIcon(x.id),name);c.append(heading);const warning=status(x);if(warning)c.append(warning);c.append(source);if(x.model)add(c,node("p","試算分："+x.model.total.toFixed(2)+(x.model.incomplete?"（缺武器DPS）":""),"gt-muted"));if(x.review)add(c,node("p",x.review,"gt-stat-warning"));
+  const heading=node("div",undefined,"gt-item-heading");add(heading,itemIcon(x.id),name);c.append(heading);const warning=status(x);if(warning)c.append(warning);c.append(source);if(x.model)add(c,node("p","試算分："+x.model.total.toFixed(2)+(x.model.incomplete?"（武器DPS資料或權重不足）":""),"gt-muted"));if(x.review)add(c,node("p",x.review,"gt-stat-warning"));
   const stats=node("div",undefined,"gt-stat-wrap");
   const weapon=Object.entries(x.wm||{}).filter(([k,v])=>k&&v!==""),normal=Object.entries(x.stats||{}).filter(([k])=>k);
   const order=k=>/每秒傷害|DPS/i.test(k)?0:/速度|speed/i.test(k)?1:/傷害範圍|damage/i.test(k)?2:3;
@@ -2019,7 +2025,7 @@ function combatGearView(parent,id,build,nativeView){
  const c=box(parent,"配裝匯出與原生模擬串接","由本站候選選擇裝備，匯出固定 17 格 EquipmentSpec，或替換已取得的個人 RaidSimRequest 的裝備；不自動宣稱 BiS。");
  const saved=savedModel(id),weights=effectiveGearWeights(id,saved?.weights||{}),hasModel=!!saved&&Object.values(weights).some(v=>v>0);
  const compare=(a,b)=>Number(!!a.review)-Number(!!b.review)||(hasModel?Number(a.model.incomplete)-Number(b.model.incomplete)||b.model.total-a.model.total:0)||Number(!!b.priority)-Number(!!a.priority)||(a.rank||999)-(b.rank||999);
- const slots=[...expandCandidateSlots(spec)].map(([name,items])=>({name,items:items.filter(x=>allowed(id,x)).map(x=>hasModel?{...x,model:modelScore(x,weights,saved.hitBySlot?.[name])}:x).sort(compare)}));
+ const slots=[...expandCandidateSlots(spec)].map(([name,items])=>({name,items:items.filter(x=>allowed(id,x)).map(x=>hasModel?{...x,model:modelScore(x,weights,saved.hitBySlot?.[name],id)}:x).sort(compare)}));
  const partition=auditWeaponGroups(slots,compare),mode=select((partition.modes.length?partition.modes:["one"]).map(m=>[m,m==="two"?"雙手武器":"單手／副手"]));
  const key="gt-combat-gear-v1:"+id+":"+build,output=node("textarea"),request=node("textarea"),msg=node("p","","gt-muted"),editor=node("div"),selected=new Map(),modifiers=new Map();
  let stored={};try{stored=JSON.parse(localStorage.getItem(key)||"{}")||{};}catch(e){}
