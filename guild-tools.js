@@ -696,13 +696,14 @@ function normalizeGearCatalog(d){
  for(const row of d.items){
   if(!row||typeof row!=="object"||Array.isArray(row)||!/^[1-9]\d{0,8}$/.test(String(row.id))){invalid++;continue;}
   const id=String(row.id),old=map.get(id);if(!old){map.set(id,row);continue;}duplicates++;
-  if(Number(old.estimated)!==Number(row.estimated)){if(Number(old.estimated)&&!Number(row.estimated))map.set(id,row);continue;}
-  const fields=["item_class","slot","subclass","class_mask","required_level","dps","dps_approx","item_set","effects","other_stats",...Object.keys(gearStatNames)];
-  const conflict=fields.some(k=>String(old[k]??"")!==String(row[k]??""));
-  if(conflict&&!old.catalogConflict)conflicts++;
+  if(!!Number(old.estimated)!==!!Number(row.estimated)){if(Number(old.estimated)&&!Number(row.estimated))map.set(id,row);continue;}
+  const fields=["item_class","slot","subclass","class_mask","required_level","quality","bonding","is_unique","required_reputation","dps","dps_approx","speed","min_damage","max_damage","item_set","effects","other_stats",...Object.keys(gearStatNames)];
+  const value=(x,k)=>x[k]!=null&&typeof x[k]==="object"?JSON.stringify(x[k]):String(x[k]??"");
+  const conflict=fields.some(k=>value(old,k)!==value(row,k));
+  
   map.set(id,{...old,catalogConflict:!!old.catalogConflict||conflict,source_summary:[...new Set([old.source_summary,row.source_summary].filter(v=>typeof v==="string"&&v.trim()))].join("；"),source_types:[...new Set([...catalogSourceTypes(old),...catalogSourceTypes(row)])]});
  }
- if(!map.size)throw Error("裝備目錄沒有有效物品ID");return {...d,items:[...map.values()],catalogAudit:{invalid,duplicates,conflicts}};
+ if(!map.size)throw Error("裝備目錄沒有有效物品ID");const items=[...map.values()];conflicts=items.filter(x=>x.catalogConflict).length;return {...d,items,catalogAudit:{invalid,duplicates,conflicts}};
 }
 function validGearCatalog(d){return !!d&&Array.isArray(d.items)&&d.items.length>0&&!!d.prof&&typeof d.prof==="object"&&!Array.isArray(d.prof)&&gearCatalogClasses.every(cls=>!!(d.prof[cls]||d.prof[cls.toLowerCase()]))&&typeof d.meta?.client_build==="string"&&!!d.meta.client_build.trim();}
 function catalogSlotCheck(candidate,record){
@@ -1031,6 +1032,7 @@ function catalogWeaponPlan(spec,records,prof,weights,options={}){
 }
 function candidateCatalogCheck(candidate,record){
  if(!record)return {state:"未收錄",differences:[]};
+ if(record.catalogConflict)return {state:"目錄重複數值衝突待核",differences:[]};
  if(Number(record.estimated))return {state:"經典推定",differences:[]};
  const differences=[];let compared=0;
  const baseFields=catalogWeightFields;
@@ -1218,7 +1220,7 @@ function catalogQuestView(spec){
   const model=savedModel(spec.id),known=catalogCandidateIds(spec),review=catalogQuestReview(spec,data.items,data.prof,model?.weights||{},Infinity),groups=node("div");
   add(out,node("p","資料版本："+data.meta.client_build+"｜符合初步資格的不同任務物品 "+review.total+" 件，其中 "+review.recorded+" 件有客戶端數值及來源記載。","gt-muted"),node("p",review.hasWeights?"依部分面板權重比較；排名是全來源同部位順位，非正式 BiS。":"尚無可用權重，先列待核對的任務裝備；儲存權重後可比較。","gt-muted"),button("前往配裝試算",()=>show("v14")),groups);
   const renderItem=(item,score=null,position)=>{
-   const c=node("article",undefined,"gt-card");add(c,add(node("div",undefined,"gt-item-heading"),itemIcon(item.id),link(zhItem(item)+"（ID "+item.id+"）","https://www.wowhead.com/forever/tw/item="+item.id)),node("p",item.source_summary||"任務來源待核"),node("p",(known.has(String(item.id))?"已列入原候選":"尚未列入原候選")+"｜"+(catalogSourceRecorded(item)?"客戶端數值＋來源記載":"經典推定或來源待核")+"｜"+gearType(item),"gt-muted"));
+   const c=node("article",undefined,"gt-card");add(c,add(node("div",undefined,"gt-item-heading"),itemIcon(item.id),link(zhItem(item)+"（ID "+item.id+"）","https://www.wowhead.com/forever/tw/item="+item.id)),node("p",item.source_summary||"結構化來源：任務（任務名稱待核）"),node("p",(known.has(String(item.id))?"已列入原候選":"尚未列入原候選")+"｜"+(catalogSourceRecorded(item)?"客戶端數值＋來源記載":"經典推定或來源待核")+"｜"+gearType(item),"gt-muted"));
    if(score)add(c,node("p","同部位全來源第 "+score.rank+" 名｜面板 "+score.score.toFixed(2)+"｜距首選 "+score.gap.toFixed(2)+" 分"));
    if(questChoiceGroup(item.id))add(c,node("p","黑石塔陣營任務三選一：黑手飾物／暴君印記／比斯巨獸之眼不可在同一角色配裝同時選取。","gt-muted"),link("聯盟任務與獎勵","https://azeroth.wiki/forever/quests/general-drakkisath-s-demise"),link("部落／聯盟任務獎勵對照","https://everfor.gg/items/13965/"));
    if(catalogHasSpecial(item))add(c,node("p","含套裝或特殊效果，未計入面板順位："+[item.item_set,item.effects,item.other_stats].filter(Boolean).join("；"),"gt-muted"));
@@ -1257,7 +1259,7 @@ function gearCatalogView(spec){
  status.textContent="來源版本："+data.meta.client_build+"｜"+eligible.length+" 件符合初步裝備資格（含待查）｜"+eligible.filter(x=>catalogSourceRecorded(x)&&!knownIds.has(String(x.id))).length+" 件有來源記載但尚未納入本站候選"+(data.catalogAudit&&(data.catalogAudit.invalid||data.catalogAudit.duplicates)?"｜資料檢查：無效 "+data.catalogAudit.invalid+" 筆、重複 "+data.catalogAudit.duplicates+" 筆、衝突 "+data.catalogAudit.conflicts+" 件（不計分）":"");
  function draw(){list.replaceChildren();const weighted=sort.value==="weighted";if(weighted&&!sl.value){list.append(node("p","請先選擇同一裝備部位，避免不同部位分數互相比較。","gt-muted"));return;}const terms=q.value.toLowerCase().trim().split(/\s+/).filter(Boolean);const scoreCache=weighted?new Map(eligible.map(x=>[x,catalogPositionRankScore(x,sl.value,rankWeights)])):null;const rows=eligible.filter(x=>catalogCandidateFilter(x,knownIds,coverageFilter.value)&&(!armorFilter.value||(armorFilter.value==="cross"?gearCrossArmor(cls,x):!gearCrossArmor(cls,x)))&&(scope.value==="all"||catalogSourceRecorded(x))&&(!quality.value||Number(x.quality)>=Number(quality.value))&&(!levelMin.value||Number(x.required_level||0)>=Number(levelMin.value))&&(!sl.value||gearCatalogEligible(spec,x,data.prof,sl.value))&&(!kind.value||gearCatalogTags(x).includes(kind.value))&&terms.every(t=>[x.name,globalThis.GTLocale?.item(x.id,x.name),x.id,x.source_summary,zhDisplay(x.source_summary||""),x.required_reputation,gearType(x),gearCatalogTags(x).join(" "),gearSlotNames[x.slot],...Object.keys(gearStatNames).filter(k=>x[k]).map(k=>gearStatNames[k])].join(" ").toLowerCase().includes(t))).sort((a,b)=>(weighted?catalogPositionCompare(scoreCache.get(a),scoreCache.get(b)):Number(b[sort.value]||0)-Number(a[sort.value]||0))||Number(b.item_level||0)-Number(a.item_level||0)||a.id-b.id);
  list.append(node("p",rows.length+" 件候選；"+(weighted?"依部分已儲存權重排序（非完整BiS）。":"依單項數值排序，非專精BiS。"),"gt-muted"));
- for(const x of rows.slice(0,limit)){const c=node("article",undefined,"gt-card");add(c,add(node("div",undefined,"gt-item-heading"),itemIcon(x.id),link((globalThis.GTLocale?.item(x.id,x.name)||x.name)+"（ID "+x.id+"）","https://www.wowhead.com/forever/tw/item="+x.id)),node("p",(sl.value==="副手"&&x.slot==="One-Hand"?"副手可用（通用單手）":gearSlotNames[x.slot])+"｜"+gearType(x)+(gearCrossArmor(cls,x)?"（跨甲）":"")+"｜"+gearCatalogTags(x).join("・")+"｜"+(Number(x.estimated)?"經典推定":"客戶端資料；取得狀態待逐件確認"),"gt-muted"),node("p",x.source_summary||"取得來源待查"));
+ for(const x of rows.slice(0,limit)){const c=node("article",undefined,"gt-card");add(c,add(node("div",undefined,"gt-item-heading"),itemIcon(x.id),link((globalThis.GTLocale?.item(x.id,x.name)||x.name)+"（ID "+x.id+"）","https://www.wowhead.com/forever/tw/item="+x.id)),node("p",(sl.value==="副手"&&x.slot==="One-Hand"?"副手可用（通用單手）":gearSlotNames[x.slot])+"｜"+gearType(x)+(gearCrossArmor(cls,x)?"（跨甲）":"")+"｜"+gearCatalogTags(x).join("・")+"｜"+(Number(x.estimated)?"經典推定":"客戶端資料；取得狀態待逐件確認"),"gt-muted"),node("p",x.source_summary||(catalogSourceRecorded(x)?"結構化來源："+gearCatalogTags(x).join("、")+"（詳細來源待核）":"取得來源待查")));
  const stats=Object.entries(gearStatNames).filter(([k])=>Number(x[k])).map(([k,v])=>v+" "+x[k]);if(x.dps)stats.unshift("武器DPS "+x.dps+(Number(x.dps_approx)?"（估算）":""));if(stats.length)c.append(node("p",stats.join(" · ")));
  if(weighted){const score=scoreCache.get(x);c.append(node("p",score.rankable?"部分面板試算："+score.total.toFixed(2)+"｜"+score.parts.map(v=>v.label+" "+v.value+" × "+v.weight).join("；"):!catalogSourceRecorded(x)?"來源或數值待核，不列入有效順位":score.incomplete?"缺可核對的武器DPS，不列入有效順位":"未取得正分，不列入有效順位（仍保留特殊效果供研究）","gt-muted"));}
  const qualityLabel=["粗糙","普通","優良","精良","史詩","傳說","神器","傳家寶"][Number(x.quality)]||"品質待查";
