@@ -164,6 +164,36 @@ jobs:
           else
             echo "::warning::Required native or item-set data unavailable; no simulated set rankings."
           fi
+      - name: Install Go for in-site native browser engine
+        id: wasm_go
+        continue-on-error: true
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Build and smoke-test same-origin WebAssembly engine
+        if: steps.wasm_go.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/tomb-wasm-source"
+          mkdir -p "$root"
+          git -C "$root" init -q
+          git -C "$root" remote add origin https://github.com/wowsims/forever.git
+          git -C "$root" sparse-checkout init --cone
+          git -C "$root" sparse-checkout set sim proto assets/database ui/worker
+          git -C "$root" fetch --depth=1 --filter=blob:none origin 3b9c125a9b1387cd53ce2bb12969e0c6b54b813e
+          git -C "$root" checkout --detach FETCH_HEAD
+          command -v protoc || sudo apt-get update && command -v protoc || sudo apt-get install -y protobuf-compiler
+          bash scripts/build-browser-engine.sh . "$root"
+      - name: Report actual browser-engine availability
+        run: |
+          if test -s native-engine/manifest.json; then
+            echo '### Browser native engine: real WASM smoke passed' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '### Browser native engine: unavailable; do not show a successful native execution state' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Stamp homepage asset versions
         run: python3 scripts/stamp-assets.py
       - name: Install browser test dependency
