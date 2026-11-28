@@ -1430,7 +1430,7 @@ function audit(){
  const alternatives=matches.filter(x=>!chosen.has(String(x.id)));if(alternatives.length){const d=node("details");d.append(node("summary","展開其他候選（"+alternatives.length+"）"));for(const x of alternatives)add(d,itemView(x),evidenceView(x));c.append(d);}grid.append(c);}
  add(out,node("p","顯示 "+count+" / "+visibleSlots.length+" 個戰鬥裝備位置｜候選首列 "+visibleSlots.filter(x=>x.featured).length+" 件不同物品；襯衣與外袍不列入BiS。","gt-muted"));if(term||acq.value||mode.value==="missing"){const other=auditOtherWeaponMatches(partition,weaponMode.value,match);if(other.count){const hint=node("div",undefined,"gt-other-weapon-matches");add(hint,node("span","另一種武器配置另有 "+other.count+" 件符合條件。"),button(other.mode==="two"?"查看雙手武器":"查看單手＋副手",()=>chooseWeaponMode(other.mode)));out.append(hint);}}out.append(grid);if(!count)out.append(node("p","沒有符合條件的候選。"));jump.replaceChildren(new Option("跳至裝備部位",""),...Array.from(grid.children).map(c=>new Option(c.dataset.slot,c.dataset.slot)));gearScroll.scrollTop=0;}
  const excludedDetails=node("details");excludedDetails.append(node("summary","檢視構築排除清單（"+excluded.length+"）"));for(const x of excluded)add(excludedDetails,node("p",x.slot+" · "+x.name+" — "+skillGate(spec.id,x),"gt-muted"),link("原物品資料",x.url));q.addEventListener("input",draw);mode.addEventListener("change",draw);acq.addEventListener("change",draw);weaponMode.addEventListener("change",()=>chooseWeaponMode(weaponMode.value));
- const frame=node("iframe",undefined,"gt-build-talent-frame");frame.title="並排天賦流派";frame.src=talentPageURL(true)+"&layout=workspace&v=21.8";frame.loading="lazy";
+ const frame=node("iframe",undefined,"gt-build-talent-frame");frame.title="並排天賦流派";frame.src=talentPageURL(true)+"&layout=workspace&v=22.1";frame.loading="lazy";
  const leftHead=node("div",undefined,"gt-build-column-head"),rightHead=node("div",undefined,"gt-build-column-head");
  add(leftHead,node("h4","天賦流派"),link("獨立開啟天賦",talentPageURL(false)));
  const filterToggle=button("收合篩選",()=>{gearFilters.hidden=!gearFilters.hidden;filterToggle.textContent=gearFilters.hidden?"展開篩選":"收合篩選";filterToggle.setAttribute("aria-expanded",String(!gearFilters.hidden));});filterToggle.setAttribute("aria-expanded","true");gearFilters.id="gt-gear-filter-panel";filterToggle.setAttribute("aria-controls",gearFilters.id);add(rightHead,node("h4","BiS 裝備候選"),add(node("div",undefined,"gt-gear-head-actions"),filterToggle,button("回到頂端",()=>{gearScroll.scrollTop=0;jump.value="";})));
@@ -2453,7 +2453,7 @@ function talentHub(){
  if(!getSpec()){panel.append(node("p","請先在上方選擇職業及專精。"));return;}
  const frame=node("iframe");frame.title="天賦流派與野外練等";frame.style.cssText="display:block;width:100%;height:950px;border:0;border-radius:8px;background:#0e131c";
  fitEmbedded(frame);
- frame.src=talentPageURL(true)+"&v=21.8";
+ frame.src=talentPageURL(true)+"&v=22.1";
  add(panel,frame);
 }
 const renderers={combat:combatLab,audit,v8:talentHub,v9:drops,v10:checklist,v11:raid,v12:hotfix,v13:material,v14:optimizer};
@@ -2503,7 +2503,10 @@ selectorGroup?.addEventListener("change",e=>{if(e.target!==mainSpec&&e.target.ta
 const modeBar=node("div",undefined,"gt-site-mode"),classMode=button("職業資料",()=>switchMode("class")),blueMode=button("官方藍帖",()=>switchMode("blue"));classMode.id="gt-mode-class";blueMode.id="gt-mode-blue";
 modeBar.style.cssText="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px";
 for(const b of [classMode,blueMode])b.style.cssText="padding:6px 12px;border:1px solid #52647b;border-radius:8px;background:#172230;color:#e9c88c;font-weight:700";
-add(modeBar,classMode,blueMode);
+let wideLayout=true;try{wideLayout=localStorage.getItem("gt-desktop-width-v1")!=="standard";}catch(e){}
+const widthToggle=button("",()=>{wideLayout=!wideLayout;applyWidth();try{localStorage.setItem("gt-desktop-width-v1",wideLayout?"wide":"standard");}catch(e){}});widthToggle.classList.add("gt-width-toggle");widthToggle.setAttribute("aria-label","寬版版面");
+function applyWidth(){document.documentElement.classList.toggle("gt-standard-width",!wideLayout);widthToggle.textContent=wideLayout?"寬版：已開啟":"標準版：已開啟";widthToggle.setAttribute("aria-pressed",String(wideLayout));}
+applyWidth();add(modeBar,classMode,blueMode,widthToggle);
 if(pickerArea)pickerArea.before(modeBar);else root.prepend(modeBar);
 const fallbackControls=[];
 if(!pickerArea&&mainSpec){let p=mainSpec.parentElement;while(p&&p!==root&&!p.contains(root)&&p.querySelectorAll("select").length<2)p=p.parentElement;if(p&&p!==root&&!p.contains(root))fallbackControls.push(p);else for(const e of [$("#class-select"),mainSpec])if(e)fallbackControls.push(e.closest("label")||e);}
