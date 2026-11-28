@@ -702,3 +702,14 @@ assert.equal(tierLogic.nativeSetComparison(nativeTier,"dps").firstWin,2);
 assert.equal(tierLogic.nativeSetComparison(nativeTier,"tank").firstWin,4);
 assert.equal(tierLogic.nativeSetComparison(nativeTier,"tank").rows.length,2);
 console.log("PASS: guild target HP/level/zero mitigation, orientation, exact set tiers and native survival-aware threshold comparison");
+
+
+const missingTier=tierLogic.nativeSetComparison({...nativeTier,thresholds:[2,4,6,8]},"tank");
+assert.deepEqual(missingTier.missing,[6,8]);
+const duplicateTier=tierLogic.nativeSetComparison({...nativeTier,thresholds:[2,4],cases:[...nativeTier.cases,nativeTier.cases[1]]},"dps");
+assert.equal(duplicateTier.firstWin,4);
+assert.deepEqual(duplicateTier.missing,[2]);
+assert.equal(tierLogic.nativeSetComparison({cases:[nativeTier.cases[0],nativeTier.cases[0]]},"dps"),null);
+const invalidSurvival={cases:[nativeTier.cases[0],{...nativeTier.cases[1],metrics:{dps:110,tps:110,dtps:-1,death:0}}]};
+assert.equal(tierLogic.nativeSetComparison(invalidSurvival,"tank").firstWin,null);
+console.log("PASS: missing and ambiguous native set thresholds, invalid tank survival safeguards");
