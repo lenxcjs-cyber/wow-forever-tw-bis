@@ -1,0 +1,49 @@
+{
+  "commit": "3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",
+  "templates": [
+    {
+      "spec": "spec-17",
+      "label": "增強／上游預設",
+      "requestFile": "combat-requests/spec-17-0000000000000001.json",
+      "configuration": "上游完整 JSON 構築；公會標準單體遭遇。尚未宣稱已實跑。",
+      "source": "ui/specs/shaman/enhancement/builds/default.build.json"
+    },
+    {
+      "spec": "spec-22",
+      "label": "痛苦／Wrack",
+      "requestFile": "combat-requests/spec-22-0000000000000002.json",
+      "configuration": "上游完整 JSON 構築；公會標準單體遭遇。尚未宣稱已實跑。",
+      "source": "ui/specs/warlock/dps/builds/aff_wrack.build.json"
+    },
+    {
+      "spec": "spec-23",
+      "label": "惡魔／Fire Brand",
+      "requestFile": "combat-requests/spec-23-0000000000000003.json",
+      "configuration": "上游完整 JSON 構築；公會標準單體遭遇。尚未宣稱已實跑。",
+      "source": "ui/specs/warlock/dps/builds/demo_fire_brand.build.json"
+    },
+    {
+      "spec": "spec-24",
+      "label": "毀滅／上游預設",
+      "requestFile": "combat-requests/spec-24-0000000000000004.json",
+      "configuration": "上游完整 JSON 構築；公會標準單體遭遇。尚未宣稱已實跑。",
+      "source": "ui/specs/warlock/dps/builds/destro.build.json"
+    },
+    {
+      "spec": "spec-23",
+      "label": "惡魔／Shadow Brand",
+      "requestFile": "combat-requests/spec-23-0000000000000005.json",
+      "configuration": "上游完整 JSON 構築；公會標準單體遭遇。尚未宣稱已實跑。",
+      "source": "ui/specs/warlock/dps/builds/demo_shadow_brand.build.json"
+    },
+    {
+      "spec": "spec-22",
+      "label": "痛苦／SM Ruin",
+      "requestFile": "combat-requests/spec-22-0000000000000006.json",
+      "configuration": "上游完整 JSON 構築；公會標準單體遭遇。尚未宣稱已實跑。",
+      "source": "ui/specs/warlock/dps/builds/sm_ruin.build.json"
+    }
+  ],
+  "failed": [],
+  "scope": "Pinned upstream JSON request templates, not results."
+}
