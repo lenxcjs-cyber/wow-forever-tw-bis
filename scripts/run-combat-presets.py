@@ -34,7 +34,7 @@ def tank_result(cli,root,settings_file):
     # This preset has Enchanting; no ring-enchant stripping is needed.
     d=invoke(cli,root,["siml","parse","-json",settings_file])
     p=d.get("player")
-    if not isinstance(p,dict) or not p.get("protectionPaladin") or not p.get("rotation") or not d.get("encounter"):
+    if not isinstance(p,dict) or not ("protectionPaladin" in p or "feralBearDruid" in p) or not p.get("rotation") or not d.get("encounter"):
         raise ValueError("Tank preset settings incomplete")
     raid={"parties":[{"players":[p],"buffs":d.get("partyBuffs",{})},{},{},{},{}],
           "buffs":d.get("raidBuffs",{}),"debuffs":d.get("debuffs",{}),"tanks":d.get("tanks",[]),"targetDummies":d.get("targetDummies",0)}
@@ -47,15 +47,81 @@ def tank_result(cli,root,settings_file):
         raise ValueError("Incomplete tank result")
     p=players[0]
     return {k:p[field]["avg"] for k,field in (("dps","dps"),("tps","threat"),("dtps","dtps"),("hps","hps")) if finite(p.get(field,{}).get("avg"))}|{"iterations":ITERATIONS,"death":p.get("chanceOfDeath"),"logs":str(result.get("logs") or "")[:80000]}
+def feral_setups(root):
+    # The upstream cat/bear defaults are TypeScript, not complete SIML setups.
+    # Rebuild explicit controlled, no-consumable/no-item-swap cases using the upstream
+    # talent strings, gear files and adaptive APL. Do not claim they equal web defaults.
+    out=[]
+    for spec,folder,code,gear,weapon,label in [
+        ("spec-26","feralcat","050021-53200032123012125001-055","pre_raid.gear.siml","the_unstoppable_force","貓德／無堅不摧之力"),
+        ("spec-26","feralcat","050021-53200032123012125001-055","pre_raid.gear.siml","bonecrusher","貓德／碎骨者"),
+        ("spec-27","feralbear","050022-5023030212310112501-055","default.gear.siml",None,"熊德／上游60級裝備"),
+    ]:
+        base=Path("ui/specs/druid")/folder
+        original=base/"gear_sets"/gear
+        selected=original
+        if weapon=="bonecrusher":
+            raw=(root/original).read_text(encoding="utf-8")
+            if raw.count("the_unstoppable_force")!=1:raise ValueError("Cat reference weapon changed")
+            selected=base/"gear_sets"/"gt_bonecrusher.gear.siml"
+            (root/selected).write_text(raw.replace("the_unstoppable_force","bonecrusher"),encoding="utf-8")
+        bear=spec=="spec-27"
+        filename=base/("gt_"+(weapon or "bear")+".siml")
+        apl=base/"apls/adaptive.apl.siml"
+        setup=f"""siml 1
+spec {'feral_bear_druid' if bear else 'feral_cat_druid'}
+talents "{code}"
+use "gear_sets/{selected.name}"
+use "apls/adaptive.apl.siml"
+
+settings:
+  race tauren
+  profession1 engineering
+  profession2 enchanting
+  reaction_time 250ms
+  distance_from_target 25
+  assume_bleed_active
+"""
+        if bear:setup+="  in_front_of_target\n  tanks player1\n  healing_model(hps=2200, cadence_seconds=0.4, cadence_variation=1.2, absorb_frac=0.02, burst_window=6, inspiration_uptime=0.25)\n"
+        setup+="""\nbuffs:
+  greater_blessing_of_kings
+  greater_blessing_of_might 1
+
+party_buffs: mana_spring_totem
+
+raid_buffs:
+  arcane_intellect, prayer_of_spirit, mark_of_the_wild, power_word_fortitude
+  strength_of_earth_totem 1
+  grace_of_air_totem 1
+  windfury_totem
+  battle_shout 1
+
+debuffs:
+  judgement_of_wisdom, sunder_armor, gift_of_arthas, vindication
+
+encounter:
+  duration 180
+  duration_variation 5
+  execute_proportion_20 0.2
+  execute_proportion_35 0.35
+  targets(id=31146, name="Raid Target", level=63, mob_type=dragonkin, stats(attack_power=320, block_value=54, armor=3731, health=1428900), min_base_damage="""+("6000" if bear else "2601")+""", damage_spread=0.5, swing_speed=2, parry_haste, can_crush)
+"""
+        (root/filename).write_text(setup,encoding="utf-8")
+        config="本站控制變因測試；牛頭人、團隊增益、180±5秒、63級單體首領、隊友維持流血；無消耗品、無換武器。"+("熊坦承傷假設與上游預設裝備（不保證當前可取得），治療模型2200 HPS。" if bear else "同一天賦、附魔與其他裝備，只變更雙手武器。")
+        out.append((spec,label,str(filename),str(apl),str(original),config))
+    return out
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
     cases=[]
-    for spec,label,settings,apl in CASES:
+    cases_to_run=[(*case,case[2],"") for case in CASES]
+    try:cases_to_run=feral_setups(root)+cases_to_run
+    except (OSError,ValueError) as e:print("Feral setup unavailable:",str(e)[:400])
+    for spec,label,settings,apl,source,configuration in cases_to_run:
         try:
             request={"siml":(root/apl).read_text(encoding="utf-8"),"path":apl,"settingsFile":settings,"iterations":ITERATIONS,"seed":SEED,"timeline":True,"timelineLimit":400}
             d=apl_result(invoke(cli,root,["siml","sim"],json.dumps(request)))
-            d.update({"spec":spec,"label":label,"settings":settings,"apl":apl})
-            if spec=="spec-5":
+            d.update({"spec":spec,"label":label,"settings":source,"apl":apl,"configuration":configuration})
+            if spec in ("spec-5","spec-27"):
                 try:d["tank"]=tank_result(cli,root,settings)
                 except (OSError,ValueError,subprocess.SubprocessError) as e:print("Tank metrics unavailable:",str(e)[:300])
             cases.append(d);print("Native engine preset:",spec,"iterations",d["iterations"],"timeline",len(d["timeline"]))
