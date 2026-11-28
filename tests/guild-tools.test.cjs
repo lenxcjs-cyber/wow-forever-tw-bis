@@ -896,6 +896,7 @@ assert.equal(batch.cases[1].request.raid.parties[0].players[0].equipment.items[0
 assert.equal(JSON.stringify(batchSource),batchBefore);
 assert.throws(()=>combat.combatGuildBatch(batchSource,"spec-1",[]));
 assert.throws(()=>combat.combatGuildBatch(batchSource,"spec-1",[{name:"原始配裝",mode:"one",equipment:batchGear}]));
+assert.throws(()=>combat.combatGuildBatch(batchSource,"spec-1",[{name:"原始配裝 ",mode:"one",equipment:batchGear}]),/方案名稱/);
 const batchImport=new Function(section("function nativeSetUncertainty(","function nativeSetComparison(")+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function combatLab(")+";return {combatGuildBatchResults};")();
 const batchOut=(cases,spec="spec-1")=>({format:"tomb-guild-results/1",commit:combat.combatPresetCommit,spec,cases});
 const batchMetric=(variant,name,dps,scenario="guild-50k")=>({scenario,variant,name,iterations:1000,duration:scenario==="guild-boss"?180:60,metrics:{dps,dpsStdev:50}});
@@ -1064,6 +1065,13 @@ assert.equal(scopedSummary.groups[0].best.percent,10);
 assert.throws(()=>batchImport.combatGuildBatchResults({...scopedResult,cases:[scopedResult.cases[0],{...scopedResult.cases[1],variant:5}]},"spec-1"),/無效方案/);
 assert.throws(()=>nativeImport.nativeBrowserBatchJobs({...scopedAB,cases:[scopedAB.cases[0],null]},"spec-1",metadata,200),/無效/);
 assert.throws(()=>nativeImport.nativeBrowserBatchJobs({...scopedAB,cases:[scopedAB.cases[0],{...scopedAB.cases[1],name:"A".repeat(81)}]},"spec-1",metadata,200),/無效/);
+assert.throws(()=>nativeImport.nativeBrowserBatchJobs({...scopedAB,cases:[scopedAB.cases[0],{...scopedAB.cases[1],name:" 原始配裝"}]},"spec-1",metadata,200),/無效/);
+const duplicateBaseline=JSON.parse(JSON.stringify(scopedAB));
+duplicateBaseline.cases[1].request.raid.parties[0].players[0].equipment=duplicateBaseline.cases[0].request.raid.parties[0].players[0].equipment;
+assert.throws(()=>nativeImport.nativeBrowserBatchJobs(duplicateBaseline,"spec-1",metadata,200),/完全相同/);
+const duplicateCandidate={...scopedAB,cases:[...scopedAB.cases,{...scopedAB.cases[1],variant:2,name:"另一個名稱"}]};
+assert.throws(()=>nativeImport.nativeBrowserBatchJobs(duplicateCandidate,"spec-1",metadata,200),/完全相同/);
+assert.throws(()=>batchImport.combatGuildBatchResults({...scopedResult,cases:[scopedResult.cases[0],{...scopedResult.cases[1],name:"方案A " }]},"spec-1"),/無效方案/);
 
 assert.equal(batchImport.combatGuildBatchResults({...scopedResult,cases:scopedResult.cases.slice(0,1)},"spec-1").finished,false);
 assert.throws(()=>batchImport.combatGuildBatchResults({...scopedResult,scenarios:["guild-boss"]},"spec-1"));
