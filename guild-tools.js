@@ -750,6 +750,10 @@ function catalogMultiSetAlternative(pools,requirements){
  const result=states.get(minima.join(","));
  return result?{...result,sets:names.map((name,i)=>({name,count:result.counts[i],minimum:minima[i]}))}:null;
 }
+function catalogSameCoverage(a,b){
+ const count=picks=>catalogArmorGroups.map(([slot])=>picks.filter(x=>x.slot===slot).length).join(",");
+ return Array.isArray(a)&&Array.isArray(b)&&count(a)===count(b);
+}
 function catalogExactSet(pools,name,count){
  if(typeof name!=="string"||!name||!Number.isInteger(count)||count<0||count>14)return null;
  let states=new Map([[0,{total:0,picks:[]}]]);
@@ -758,7 +762,8 @@ function catalogExactSet(pools,name,count){
   for(const [old,prev] of states)for(let n=0;n<=Math.min(count-old,capacity,yes.length);n++){
    const picks=[...yes.slice(0,n),...no.slice(0,capacity-n)].map(p=>({...p,slot}));
    const total=prev.total+picks.reduce((sum,p)=>sum+p.score.total,0),k=old+n;
-   if(!next.has(k)||total>next.get(k).total)next.set(k,{total,picks:[...prev.picks,...picks]});
+   const combined=[...prev.picks,...picks],prior=next.get(k);
+   if(!prior||combined.length>prior.picks.length||combined.length===prior.picks.length&&total>prior.total)next.set(k,{total,picks:combined});
   }
   states=next;
  }
@@ -771,9 +776,10 @@ function catalogSetTierComparison(pools,name,max,bonuses=[]){
  for(let n=1;n<=max;n++){
   const plan=catalogExactSet(pools,name,n);if(!plan)continue;
   const active=bonuses.filter(b=>Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=n);
-  const complete=active.length>0&&active.every(b=>Number.isFinite(b.value));
+  const complete=active.length>0&&new Set(active.map(b=>b.pieces)).size===active.length&&active.every(b=>Number.isFinite(b.value));
   const value=complete?active.reduce((sum,b)=>sum+b.value,0):null;
-  rows.push({...plan,loss:base.total-plan.total,active,bonus:value,net:value===null?null:plan.total+value-base.total});
+  const comparable=catalogSameCoverage(base.picks,plan.picks);
+  rows.push({...plan,comparable,loss:comparable?base.total-plan.total:null,active,bonus:value,net:value===null||!comparable?null:plan.total+value-base.total});
  }
  return {base,rows,firstWin:rows.find(x=>x.net!==null&&x.net>1e-8)?.count??null};
 }
@@ -979,7 +985,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
       const bonuses=tierInputs.map(x=>({pieces:x.pieces,value:x.input.value.trim()===""?null:Number(x.input.value)}));
       const study=catalogSetTierComparison(pools,name,max,bonuses);if(!study)return;
       add(tiers,node("h4","指定套裝逐件損益（相對完全不穿此套裝）"),node("p","基準：0 件指定套裝，面板分 "+study.base.total.toFixed(2)+"。其他套裝與觸發未計入；表中收益為手動輸入的額外面板等價分數，不是 DPS。","gt-muted"));
-      for(const x of study.rows){const activated=x.active.map(b=>b.pieces+"件").join("＋")||"無已知門檻";const line=node("div",undefined,"gt-card");add(line,node("p",x.count+" 件 ｜ 啟動 "+activated+" ｜ 面板 "+x.total.toFixed(2)+" ｜ 相對0件 "+(-x.loss).toFixed(2)),node("p",x.net===null?"需額外淨收益超過 "+Math.max(0,x.loss).toFixed(2)+" 分；效果未核算。":"計入已填效果後差額 "+x.net.toFixed(2)+" 分"+(x.net>0?"（勝過0件）":"")));line.append(button("匯出 "+x.count+" 件方案",()=>exportPlan(x.picks,name+" "+x.count+" 件",x.total)));tiers.append(line);}
+      for(const x of study.rows){const activated=x.active.map(b=>b.pieces+"件").join("＋")||"無已知門檻";const line=node("div",undefined,"gt-card");add(line,node("p",x.count+" 件 ｜ 啟動 "+activated+" ｜ 面板 "+x.total.toFixed(2)+" ｜ "+(x.comparable?"相對0件 "+(-x.loss).toFixed(2):"裝備欄覆蓋不一致")),node("p",!x.comparable?"散件與套裝的已填裝備欄不同，不判定勝負。":x.net===null?"需額外淨收益超過 "+Math.max(0,x.loss).toFixed(2)+" 分；效果未核算。":"計入已填效果後差額 "+x.net.toFixed(2)+" 分"+(x.net>0?"（勝過0件）":"")));line.append(button("匯出 "+x.count+" 件方案",()=>exportPlan(x.picks,name+" "+x.count+" 件",x.total)));tiers.append(line);}
       tiers.append(node("p",study.firstWin===null?"尚無已填收益證明哪個件數勝過0件。":"依已填收益，最少 "+study.firstWin+" 件勝過0件（仍需原生驗證）。","gt-muted"));
       tiers.append(button("匯出0件對照組",()=>exportPlan(study.base.picks,name+" 0 件對照",study.base.total)));
      }
@@ -997,9 +1003,9 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
      function compare(){
       const requirements=[{name:setSelect.value,minimum:Number(target.value)},...(secondSet.value?[{name:secondSet.value,minimum:Number(secondTarget.value)}]:[])],result=catalogMultiSetAlternative(pools,requirements);detail.replaceChildren();
       if(!result){detail.append(node("p","未找到符合件數要求的方案。"));return;}
-      const comparison=catalogSetTradeoff(plan.total,result.total,bonus.value.trim()!==""?Number(bonus.value):null),delta=comparison.gap,baseIds=new Set(baseline.map(p=>String(p.item.id))),newIds=new Set(result.picks.map(p=>String(p.item.id)));
-      const setLabel=result.sets.map(x=>zhDisplay(x.name)+" "+x.count+" 件（至少 "+x.minimum+"）").join("＋");add(detail,node("p","替代防具："+setLabel+"｜面板分 "+result.total.toFixed(2)+"｜相較散件方案差額 "+delta.toFixed(2)+"；需比較相較原方案新增或失去的套裝／特殊效果淨收益。","gt-muted"));
-      if(comparison.net!==null)detail.append(node("p","假設淨收益後差值："+comparison.net.toFixed(2)+" 分｜"+(comparison.net>0?"替代方案較高":comparison.net<0?"原方案較高":"兩者相同")+"（使用者假設，非實測）","gt-muted"));
+      const sameCoverage=catalogSameCoverage(baseline,result.picks),comparison=catalogSetTradeoff(plan.total,result.total,bonus.value.trim()!==""?Number(bonus.value):null),delta=comparison.gap,baseIds=new Set(baseline.map(p=>String(p.item.id))),newIds=new Set(result.picks.map(p=>String(p.item.id)));
+      const setLabel=result.sets.map(x=>zhDisplay(x.name)+" "+x.count+" 件（至少 "+x.minimum+"）").join("＋");add(detail,node("p","替代防具："+setLabel+"｜面板分 "+result.total.toFixed(2)+"｜"+(sameCoverage?"相較原面板方案差額 "+delta.toFixed(2):"欄位覆蓋不同，不比較勝負")+"；需比較相較原方案新增或失去的套裝／特殊效果淨收益。","gt-muted"));
+      if(sameCoverage&&comparison.net!==null)detail.append(node("p","假設淨收益後差值："+comparison.net.toFixed(2)+" 分｜"+(comparison.net>0?"替代方案較高":comparison.net<0?"原方案較高":"兩者相同")+"（使用者假設，非實測）","gt-muted"));
       detail.append(button("匯出指定套裝替代方案",()=>exportPlan(result.picks,setLabel,result.total)));
       for(const p of result.picks.filter(p=>!baseIds.has(String(p.item.id))))add(detail,node("p","加入 "+p.slot+"｜"+zhItem(p.item)+"｜"+p.score.total.toFixed(2)),link("物品資料","https://www.wowhead.com/forever/tw/item="+p.item.id));
       for(const p of baseline.filter(p=>!newIds.has(String(p.item.id))))detail.append(node("p","移除 "+p.slot+"｜"+zhItem(p.item)+"｜"+p.score.total.toFixed(2),"gt-muted"));
