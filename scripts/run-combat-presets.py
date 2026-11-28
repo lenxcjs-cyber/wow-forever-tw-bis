@@ -290,6 +290,15 @@ def direct_metrics(result):
     metrics={k:p[field]["avg"] for k,field in (("dps","dps"),("tps","threat"),("dtps","dtps"),("hps","hps")) if finite(p.get(field,{}).get("avg")) and p[field]["avg"]>=0}
     if "dps" not in metrics or metrics["dps"]<=0:
         raise ValueError("No positive DPS; rotation may be incomplete")
+    for k,field in (("dps","dps"),("tps","threat"),("dtps","dtps"),("hps","hps")):
+        deviation=p.get(field,{}).get("stdev")
+        if finite(deviation) and deviation>=0:
+            metrics[k+"Stdev"]=deviation
+    if finite(p.get("secondsOomAvg")) and p["secondsOomAvg"]>=0:
+        metrics["secondsOomAvg"]=p["secondsOomAvg"]
+    tto=p.get("tto",{}).get("avg")
+    if finite(tto) and tto>=0:
+        metrics["tto"]=tto
     if finite(p.get("chanceOfDeath")) and 0<=p["chanceOfDeath"]<=1:
         metrics["death"]=p["chanceOfDeath"]
     return metrics,duration,str(result.get("logs") or "")[:80000]
