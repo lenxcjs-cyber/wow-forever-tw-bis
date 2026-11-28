@@ -59,5 +59,40 @@ class PresetTests(unittest.TestCase):
             (root/"main.siml").write_text('use "../private.siml"\n',encoding="utf-8")
             self.assertEqual([x["path"] for x in mod.collect_sources(root,"main.siml")],["main.siml"])
 
+    def test_all_specs_are_accounted_for(self):
+        first,extra=mod.direct_jobs()
+        self.assertEqual(len({x[0] for x in first}),len(first))
+        self.assertTrue({x[0] for x in extra}<={x[0] for x in first})
+        native={x[0] for x in first}|{x[0] for x in mod.CASES}|{"spec-26","spec-27"}
+        self.assertEqual(len(native),23)
+        self.assertFalse(native&set(mod.HEALERS))
+        self.assertEqual(native|set(mod.HEALERS),{"spec-"+str(i) for i in range(1,29)})
+
+    def test_direct_request_preserves_source(self):
+        original={"player":{"rotation":{"type":"TypeAPL"},"talentsString":"fixture"},
+                  "encounter":{"duration":180,"durationVariation":5,"targets":[{"id":31146}]},
+                  "partyBuffs":{"fixture":True},"tanks":[{"type":"Player","index":0}]}
+        request=mod.direct_request(original,60)
+        self.assertEqual(request["encounter"]["duration"],60)
+        self.assertEqual(original["encounter"]["duration"],180)
+        self.assertEqual(request["encounter"]["durationVariation"],5)
+        self.assertEqual(request["raid"]["parties"][0]["players"][0]["talentsString"],"fixture")
+        self.assertEqual(request["raid"]["tanks"],original["tanks"])
+        self.assertEqual(request["simOptions"]["iterations"],mod.ITERATIONS)
+        with self.assertRaises(ValueError):
+            mod.direct_request({"player":{},"encounter":{}})
+
+    def test_direct_metrics(self):
+        valid={"iterationsDone":mod.ITERATIONS,"avgIterationDuration":180,
+               "raidMetrics":{"parties":[{"players":[{"dps":{"avg":321},"threat":{"avg":456},"dtps":{"avg":-5},"hps":{"avg":0},"chanceOfDeath":0.1}]}]},"logs":"fixture"}
+        metrics,duration,logs=mod.direct_metrics(valid)
+        self.assertEqual(metrics,{"dps":321,"tps":456,"hps":0,"death":0.1})
+        self.assertEqual(duration,180)
+        self.assertEqual(logs,"fixture")
+        with self.assertRaises(ValueError):
+            mod.direct_metrics({**valid,"iterationsDone":0})
+        with self.assertRaises(ValueError):
+            mod.direct_metrics({**valid,"raidMetrics":{"parties":[{"players":[{"dps":{"avg":0}}]}]}})
+
 if __name__=="__main__":
     unittest.main()
