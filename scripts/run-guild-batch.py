@@ -25,23 +25,29 @@ def controlled_signature(req,across_scenarios=False):
     if across_scenarios:base.pop("encounter",None)
     return json.dumps(base,sort_keys=True,allow_nan=False,separators=(",",":"))
 def validate(data):
-    if data.get("format")!="tomb-guild-batch/1" or data.get("commit")!=COMMIT:raise ValueError("Wrong batch version")
+    if not isinstance(data,dict) or data.get("format")!="tomb-guild-batch/1" or data.get("commit")!=COMMIT:raise ValueError("Wrong batch version")
     sid=data.get("spec")
     if not isinstance(sid,str) or not re.fullmatch(r"spec-(?:[1-9]|1[0-9]|2[0-8])",sid):raise ValueError("Invalid specialization")
     cases=data.get("cases")
-    if not isinstance(cases,list) or len(cases) not in (6,9,12,15,18):raise ValueError("Expected 6–18 cases")
-    expected=len(cases)//3
+    scope=data.get("scenarios")
+    if scope is None:keys=list(SCENARIOS)
+    else:
+        if not isinstance(scope,list) or len(scope) not in (1,3) or any(not isinstance(k,str) or k not in SCENARIOS for k in scope) or len(set(scope))!=len(scope):raise ValueError("Invalid scenario scope")
+        keys=[key for key in SCENARIOS if key in scope]
+    if not isinstance(cases,list) or len(cases) not in [n*len(keys) for n in range(2,7)]:raise ValueError("Expected 2–6 variants per scenario")
+    expected=len(cases)//len(keys)
     by={}
     for c in cases:
         key=c["scenario"];idx=c["variant"];name=c["name"];req=c["request"]
-        if key not in SCENARIOS or type(idx) is not int or not 0<=idx<expected or not isinstance(name,str) or not name.strip() or len(name)>80 or (key,idx) in by:raise ValueError("Invalid or duplicate case")
+        if key not in keys or type(idx) is not int or not 0<=idx<expected or not isinstance(name,str) or not name.strip() or name!=name.strip() or len(name)>80 or (key,idx) in by:raise ValueError("Invalid or duplicate case")
         p=get_player(req)
         if FIELDS[int(sid.split("-")[1])-1] not in p or not p.get("rotation"):raise ValueError("Wrong player specialization or missing rotation")
         gear=p.get("equipment",{}).get("items",[])
+        if not isinstance(gear,list) or any(not isinstance(x,dict) for x in gear):raise ValueError("Invalid equipment")
         ids=[x.get("id") for x in gear if x.get("id")]
         if len(gear)!=17 or len(ids)!=len(set(ids)) or any(type(i) is not int or not 1<=i<=999999999 for i in ids):raise ValueError("Invalid equipment")
-        if any(type(x.get(k,0)) is not int or not 0<=x.get(k,0)<=999999999 for x in gear for k in ("enchant","randomSuffix")):raise ValueError("Invalid enchant or suffix")
-        if p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or '"itemSwap":' in json.dumps(p["rotation"]):raise ValueError("Item swap unsupported")
+        if any(type(x.get(k,0)) is not int or not (0 if k=="enchant" else -2147483647)<=x.get(k,0)<=2147483647 for x in gear for k in ("enchant","randomSuffix")):raise ValueError("Invalid enchant or suffix")
+        if p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or p.get("itemSwap",{}).get("swapSets") or '"itemSwap":' in json.dumps(p["rotation"]):raise ValueError("Item swap unsupported")
         opt=req.get("simOptions",{});n=opt.get("iterations")
         if type(n) is not int or not 1<=n<=10000 or opt.get("interactive"):raise ValueError("Iterations must be 1–10000, noninteractive")
         level,hp,count,duration=SCENARIOS[key]
@@ -51,8 +57,20 @@ def validate(data):
         if any(re.search(r"sunder|exposeArmor|faerieFire|curseOfRecklessness|curseOfElements|curseOfShadow|armor|resistance",name,re.I) for name in req["raid"].get("debuffs",{})):raise ValueError("External armor/resistance debuff present")
         if any(t.get("level")!=level or t.get("stats")!=[hp if i==29 else 0 for i in range(39)] or t.get("tankIndex")!=(0 if tank else -1) or t.get("id") or t.get("targetInputs") or t.get("disabledAtStart") or t.get("swingSpeed")!=2 or t.get("minBaseDamage")!=(1000 if level==63 else 300) or t.get("damageSpread",0)!=0 or t.get("mobType")!="MobTypeUnknown" or t.get("canCrush") is not (level==63) or t.get("parryHaste") for t in targets):raise ValueError("Guild target stats mismatch")
         by[key,idx]=c
-    common=controlled_signature(by["guild-50k",0]["request"],True)
-    for key in SCENARIOS:
+    if any((key,i) not in by for key in keys for i in range(expected)):raise ValueError("Missing scenario or variant")
+    first=keys[0]
+    common=controlled_signature(by[first,0]["request"],True)
+    names=set();gear_signatures=set()
+    for i in range(expected):
+        row=by[first,i]
+        name=row["name"]
+        if name in names:raise ValueError("Duplicate variant name")
+        names.add(name)
+        gear=get_player(row["request"])["equipment"]["items"]
+        sig=tuple(tuple(x.get(k,0) for k in ("id","enchant","randomSuffix")) for x in gear)
+        if sig in gear_signatures:raise ValueError("Duplicate equipment variant")
+        gear_signatures.add(sig)
+    for key in keys:
         base=by[key,0]
         if controlled_signature(base["request"],True)!=common:raise ValueError("Non-encounter settings changed across scenarios")
         if base["name"]!="原始配裝":raise ValueError("Missing original gear")
@@ -60,9 +78,9 @@ def validate(data):
         for i in range(expected):
             c=by[key,i]
             if controlled_signature(c["request"])!=sig:raise ValueError("A/B changes more than equipment")
-            if c["name"]!=by["guild-50k",i]["name"]:raise ValueError("Variant name mismatch")
-            if get_player(c["request"])["equipment"]!=get_player(by["guild-50k",i]["request"])["equipment"]:raise ValueError("Variant gear mismatch across scenarios")
-    return sid,[by[key,i] for key in SCENARIOS for i in range(expected)]
+            if c["name"]!=by[first,i]["name"]:raise ValueError("Variant name mismatch")
+            if get_player(c["request"])["equipment"]!=get_player(by[first,i]["request"])["equipment"]:raise ValueError("Variant gear mismatch across scenarios")
+    return sid,[by[key,i] for key in keys for i in range(expected)]
 
 def metrics(raw,request,sid):
     n=request["simOptions"]["iterations"]
@@ -87,7 +105,7 @@ def run(cli,source,dest):
     if source==dest:raise ValueError("Input and output must differ")
     if source.stat().st_size>8_000_000:raise ValueError("Input too large")
     raw=source.read_bytes();data=json.loads(raw);sid,cases=validate(data)
-    result={"format":"tomb-guild-results/1","commit":COMMIT,"spec":sid,"inputSha256":hashlib.sha256(raw).hexdigest(),"cases":[],"finished":False}
+    result={"format":"tomb-guild-results/1","commit":COMMIT,"spec":sid,"inputSha256":hashlib.sha256(raw).hexdigest(),"scenarios":list(dict.fromkeys(c["scenario"] for c in cases)),"expectedCases":len(cases),"cases":[],"finished":False}
     def save():
         temp=dest.with_suffix(dest.suffix+".tmp")
         temp.write_text(json.dumps(result,ensure_ascii=False,allow_nan=False,indent=2),encoding="utf-8");temp.replace(dest)
