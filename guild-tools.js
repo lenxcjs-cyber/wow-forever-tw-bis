@@ -1359,6 +1359,14 @@ function combatPresetCases(data,id){
  if(!combatSnapshotValid(data))return [];
  return data.cases.filter(x=>x&&x.spec===id&&typeof x.label==="string"&&Number.isFinite(x.dps)&&x.dps>=0&&Number.isFinite(x.duration)&&x.duration>0&&Number.isInteger(x.iterations)&&x.iterations>0&&((Array.isArray(x.timeline)&&x.timeline.length>0)||(x.nativeMetrics&&Number.isFinite(x.nativeMetrics.dps)&&x.nativeMetrics.dps===x.dps))&&[x.settings,x.apl].every(p=>typeof p==="string"&&/^ui\/specs\/[a-zA-Z_0-9/.-]+\.(?:siml|json|ts)$/.test(p)&&!p.includes("..")));
 }
+function combatGuildCoverage(data,id){
+ const planned=data?.plannedScenarios?.[id],cases=Array.isArray(data?.cases)?data.cases:[],failed=Array.isArray(data?.failed)?data.failed:[];
+ return Object.entries(guildScenarios).map(([key,cfg])=>{
+  const ok=cases.filter(c=>c?.spec===id&&c.scenario===key&&Number.isInteger(c.iterations)&&c.iterations>0&&Number.isFinite(c.duration)&&Math.abs(c.duration-cfg.duration)<1e-6&&Number.isFinite(c.dps)&&c.dps>=0&&c.targetCount===cfg.count&&c.targetHealth===cfg.health&&c.targetLevel===cfg.level&&c.inFrontOfTarget===(combatRole(id)==="tank")).length;
+  const failures=failed.filter(c=>c?.spec===id&&c.scenario===key).length,n=planned?.[key];
+  return {key,cfg,ok,failures,planned:Number.isInteger(n)&&n>=ok+failures?n:null};
+ });
+}
 function combatNativeGroups(cases){
  const groups=new Map();
  for(const x of cases){if(typeof x.comparisonGroup!=="string"||!x.comparisonGroup.trim())continue;const key=x.comparisonGroup.trim().slice(0,120),rows=groups.get(key)||[];rows.push(x);groups.set(key,rows);}
@@ -1761,9 +1769,12 @@ function combatLab(){
   if(Number.isInteger(data.planned)&&Array.isArray(data.cases)&&data.planned>=data.cases.length){const failures=Array.isArray(data.failed)?data.failed.length:0;presets.append(node("p","本次快照：全站 "+data.cases.length+" / "+data.planned+" 個計畫案例已成功產出；失敗 "+failures+" 個；尚未執行或未記錄 "+Math.max(0,data.planned-data.cases.length-failures)+" 個。","gt-muted"));}
   if(typeof data.finished==="boolean"){const stamp=typeof data.startedAt==="string"?new Date(data.startedAt):null;presets.append(node("p","批次狀態："+(data.finished?"已結束（可能仍有未執行案例）":"部分快照／未確認正常結束")+(stamp&&Number.isFinite(stamp.getTime())?" ｜ 開始 "+stamp.toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})+"（台灣時間）":"")+(Number.isFinite(data.elapsedSeconds)&&data.elapsedSeconds>=0?" ｜ 已記錄 "+data.elapsedSeconds.toFixed(1)+" 秒":""),"gt-muted"));}
   if(Array.isArray(data.failed)){const failed=data.failed.filter(x=>x?.spec===id&&typeof x.label==="string");if(failed.length){const d=node("details");d.append(node("summary","此專精未產出案例（"+failed.length+"）"));for(const x of failed)d.append(node("p",x.label+" ｜ "+combatFailureLabel(x.reason),"gt-muted"));presets.append(d);}}
+  const coverage=node("details");coverage.append(node("summary","三種標準遭遇的案例覆蓋"));for(const x of combatGuildCoverage(data,id))coverage.append(node("p",x.cfg.label+" ｜ 成功 "+x.ok+(x.planned!==null?" / "+x.planned+" ｜ 未執行或未記錄 "+(x.planned-x.ok-x.failures):" ｜ 計畫數未知")+" ｜ 失敗 "+x.failures));presets.append(coverage);
   if(!cases.length){const pending=Array.isArray(data.healerPending)?data.healerPending.find(x=>x?.spec===id):null;presets.append(node("p",pending?.reason||"目前此專精沒有已成功匯入的原生引擎案例；請使用上方引擎連結。","gt-muted"));if(pending&&typeof pending.source==="string"&&/^ui\/specs\/[a-z/]+\/presets\.ts$/.test(pending.source))presets.append(link("上游治療專精原始設定","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+pending.source));return;}
   add(presets,node("p","WoWSims v1.0.12 ｜ 固定種子 "+data.seed+" ｜ 上游預設或本站明示的控制變因案例，不代表本站目前構築或最佳 BiS。CLI 未自動加入網頁生成的藥水／魔法物品 APL 行。","gt-muted"));
-  for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));if(guildScenarios[x.scenario]){const cfg=guildScenarios[x.scenario];add(c,node("p",cfg.label+" ｜ 零基礎護甲／抗性 ｜ "+(x.inFrontOfTarget?"正面":"背面")+" ｜ 固定時間","gt-muted"));if(x.dps>0)add(c,node("p","總血量 ÷ 平均DPS："+(cfg.health*cfg.count/x.dps).toFixed(1)+" 秒（粗估；非實際擊殺，不反映逐隻死亡或斬殺階段變化）","gt-muted"));combatNativeTargetView(c,x.nativeTargets,cfg);}
+  const caseFilter=select([["all","所有案例"],...Object.entries(guildScenarios).map(([k,v])=>[k,v.label]),["legacy","舊版／其他遭遇"]]),caseCards=[];add(presets,field("原生案例遭遇篩選",caseFilter));
+  caseFilter.addEventListener("change",()=>{for(const [x,c] of caseCards)c.hidden=caseFilter.value!=="all"&&(caseFilter.value==="legacy"?!!guildScenarios[x.scenario]:x.scenario!==caseFilter.value);});
+  for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");caseCards.push([x,c]);add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));if(guildScenarios[x.scenario]){const cfg=guildScenarios[x.scenario];add(c,node("p",cfg.label+" ｜ 零基礎護甲／抗性 ｜ "+(x.inFrontOfTarget?"正面":"背面")+" ｜ 固定時間","gt-muted"));if(x.dps>0)add(c,node("p","總血量 ÷ 平均DPS："+(cfg.health*cfg.count/x.dps).toFixed(1)+" 秒（粗估；非實際擊殺，不反映逐隻死亡或斬殺階段變化）","gt-muted"));combatNativeTargetView(c,x.nativeTargets,cfg);}
    if(x.tank&&Number.isFinite(x.tank.tps))add(c,node("p","另一次完整引擎坦克測試：TPS "+x.tank.tps.toFixed(2)+(Number.isFinite(x.tank.dtps)?" ｜ DTPS "+x.tank.dtps.toFixed(2):"")+(Number.isFinite(x.tank.death)?" ｜ 死亡機率 "+(x.tank.death*100).toFixed(1)+"%":"")));
    add(c,link("裝備、天賦與設定來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.settings),link("技能優先序（APL）來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.apl));
    if(typeof x.configuration==="string"&&x.configuration){add(c,node("p",x.configuration,"gt-muted"),link("本站控制變因配置與產生程式","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-combat-presets.py"));}
