@@ -20,8 +20,9 @@ def get_player(request):
     players=[p for party in parties for p in party.get("players",[]) if p]
     if len(players)!=1:raise ValueError("Requires one character")
     return players[0]
-def controlled_signature(req):
+def controlled_signature(req,across_scenarios=False):
     base=copy.deepcopy(req);get_player(base).pop("equipment",None)
+    if across_scenarios:base.pop("encounter",None)
     return json.dumps(base,sort_keys=True,allow_nan=False,separators=(",",":"))
 def validate(data):
     if data.get("format")!="tomb-guild-batch/1" or data.get("commit")!=COMMIT:raise ValueError("Wrong batch version")
@@ -39,16 +40,21 @@ def validate(data):
         gear=p.get("equipment",{}).get("items",[])
         ids=[x.get("id") for x in gear if x.get("id")]
         if len(gear)!=17 or len(ids)!=len(set(ids)) or any(type(i) is not int or not 1<=i<=999999999 for i in ids):raise ValueError("Invalid equipment")
+        if any(type(x.get(k,0)) is not int or not 0<=x.get(k,0)<=999999999 for x in gear for k in ("enchant","randomSuffix")):raise ValueError("Invalid enchant or suffix")
         if p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or '"itemSwap":' in json.dumps(p["rotation"]):raise ValueError("Item swap unsupported")
         opt=req.get("simOptions",{});n=opt.get("iterations")
         if type(n) is not int or not 1<=n<=10000 or opt.get("interactive"):raise ValueError("Iterations must be 1–10000, noninteractive")
         level,hp,count,duration=SCENARIOS[key]
         e=req["encounter"];targets=e["targets"];tank=sid in TANKS
-        if e.get("duration")!=duration or e.get("durationVariation",0)!=0 or len(targets)!=count or p.get("inFrontOfTarget") is not tank:raise ValueError("Guild encounter mismatch")
-        if any(t.get("level")!=level or t.get("stats")!=[hp if i==29 else 0 for i in range(39)] or t.get("tankIndex")!=(0 if tank else -1) or t.get("id") or t.get("targetInputs") for t in targets):raise ValueError("Guild target stats mismatch")
+        if e.get("duration")!=duration or e.get("durationVariation",0)!=0 or e.get("executeProportion20")!=0.2 or e.get("executeProportion35")!=0.35 or len(targets)!=count or p.get("inFrontOfTarget") is not tank:raise ValueError("Guild encounter mismatch")
+        if req["raid"].get("tanks",[])!=([{"type":"Player","index":0}] if tank else []):raise ValueError("Tank assignment mismatch")
+        if any(re.search(r"sunder|exposeArmor|faerieFire|curseOfRecklessness|curseOfElements|curseOfShadow|armor|resistance",name,re.I) for name in req["raid"].get("debuffs",{})):raise ValueError("External armor/resistance debuff present")
+        if any(t.get("level")!=level or t.get("stats")!=[hp if i==29 else 0 for i in range(39)] or t.get("tankIndex")!=(0 if tank else -1) or t.get("id") or t.get("targetInputs") or t.get("disabledAtStart") or t.get("swingSpeed")!=2 or t.get("minBaseDamage")!=(1000 if level==63 else 300) or t.get("damageSpread",0)!=0 or t.get("mobType")!="MobTypeUnknown" or t.get("canCrush") is not (level==63) or t.get("parryHaste") for t in targets):raise ValueError("Guild target stats mismatch")
         by[key,idx]=c
+    common=controlled_signature(by["guild-50k",0]["request"],True)
     for key in SCENARIOS:
         base=by[key,0]
+        if controlled_signature(base["request"],True)!=common:raise ValueError("Non-encounter settings changed across scenarios")
         if base["name"]!="原始配裝":raise ValueError("Missing original gear")
         sig=controlled_signature(base["request"])
         for i in range(expected):
