@@ -103,3 +103,27 @@ const invested=investedTalentRows({talents:[{"Talent 1":2,"Talent 101":1,"Unknow
 assert.equal(invested.length,4);assert.equal(invested[0].valid,true);assert.equal(invested[1].talent,null);assert.equal(invested[2].valid,null);assert.equal(invested[3].valid,false);
 assert.equal(investedTalentRows({talents:[{"talent 1":1},{},{}]},fixture)[0].talent.id,1);
 console.log("PASS: exact build skill notes, valid focus references, invested talent same-tree matching and missing rank handling");
+
+const {skillScenarios,skillGuideMatch}=require("../talents-page.js");
+assert.equal(Object.keys(skills.scenarios).length,28);
+let scenarioCount=0;
+for(const p of catalog.profiles){
+ const sc=skillScenarios(skills,p),g=skills.specs[p.id],names=new Set([...g.skills,...skills.common[g.class]].map(x=>x[1]));
+ assert.equal(sc.length,3,p.id);
+ assert.equal(new Set(sc.map(x=>x.label)).size,sc.length);
+ for(const row of sc){
+  assert.ok(row.note.trim());assert.equal(new Set(row.skills).size,row.skills.length);
+  for(const name of row.skills)assert.ok(names.has(name),p.id+" invalid scenario skill "+name);
+ }
+}
+for(const rows of Object.values(skills.scenarios))scenarioCount+=rows.length;
+assert.equal(scenarioCount,84);
+assert.deepEqual(skillScenarios(skills,{id:"spec-26",cls:"warrior"}),[]);
+const cat=skills.specs["spec-26"],shred=cat.skills.find(x=>x[1]==="Shred"),shift=cat.skills.find(x=>x[1]==="Shifting Power"),focus=new Set(["Shred"]);
+const filters={scenario:skills.scenarios["spec-26"][0],terms:["shred"],focusOnly:true};
+assert.equal(skillGuideMatch(shred,filters,{kind:"unknown"},focus),true);
+assert.equal(skillGuideMatch(shift,filters,{kind:"talent"},focus),false);
+assert.equal(skillGuideMatch(shred,{...filters,acq:"talent"},{kind:"unknown"},focus),false);
+assert.equal(skillGuideMatch(shred,{...filters,category:"回能"},{kind:"unknown"},focus),false);
+assert.equal(skillGuideMatch(shift,{scenario:skills.scenarios["spec-26"][2]},{kind:"talent"},focus),true);
+console.log("PASS: all 84 combat scenarios, correct class mapping and combined skill filters");
