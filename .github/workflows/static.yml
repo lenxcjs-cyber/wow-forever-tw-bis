@@ -36,6 +36,8 @@ jobs:
         run: node tests/guild-tools.test.cjs
       - name: Check native combat preset generator offline
         run: python3 tests/test-combat-presets.py
+      - name: Check local guild batch validation
+        run: python3 tests/test_guild_batch.py
       - name: Fetch version-pinned talent client snapshot
         run: |
           if curl --fail --location --retry 2 --connect-timeout 10 --max-time 40 'https://zephras.com/data/forever/enUS/talents/1.60.1.71139.json' -o talent-client.tmp && node -e "const d=JSON.parse(require('fs').readFileSync('talent-client.tmp','utf8'));if(d.build!=='1.60.1.71139'||d.format!=='zephras-talents/1')process.exit(1)"; then
