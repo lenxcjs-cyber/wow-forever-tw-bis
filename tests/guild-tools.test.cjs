@@ -110,7 +110,7 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogPlanSourceAllowed,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,catalogRankableWeights,catalogPositionRankScore,catalogPositionCompare,effectiveGearWeights,omittedFeralWeights,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,normalizeGearCatalog,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogPlanSourceAllowed,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,catalogRankableWeights,catalogPositionRankScore,catalogPositionCompare,effectiveGearWeights,omittedFeralWeights,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
@@ -220,6 +220,19 @@ assert.equal(expansion.catalogCandidateFilter({id:3},ids,"known"),false);
 assert.equal(expansion.catalogSourceRecorded({estimated:1,source_summary:"World drop"}),false);
 assert.equal(expansion.catalogSourceRecorded({source_summary:" "}),false);
 assert.equal(expansion.catalogSourceRecorded({source_summary:"World drop"}),true);
+assert.equal(expansion.catalogSourceRecorded({source_types:["quest"],estimated:0}),true);
+assert.deepEqual(expansion.gearCatalogTags({source_types:"quest, vendor;container"}),["任務","商人","寶箱／容器"]);
+assert.deepEqual(expansion.gearCatalogTags({source_types:["crafted","drop"],bonding:"Binds when picked up"}),["製作","掉落"]);
+assert.equal(expansion.catalogSourceRecorded({source_types:"bogus"}),false);
+const normalized=expansion.normalizeGearCatalog({items:[null,{id:0},{id:1,estimated:1,agility:99},{id:1,estimated:0,agility:10,source_types:"quest"},{id:"2",agility:3,source_summary:"Quest reward"},{id:2,agility:3,source_types:"vendor"},{id:3,agility:2,source_summary:"Drop"},{id:3,agility:4,source_summary:"Drop"}]});
+assert.deepEqual(normalized.catalogAudit,{invalid:2,duplicates:3,conflicts:1});
+assert.equal(normalized.items.length,3);
+assert.equal(normalized.items[0].agility,10);
+assert.equal(expansion.catalogSourceRecorded(normalized.items[0]),true);
+assert.deepEqual(expansion.gearCatalogTags(normalized.items[1]),["任務","商人"]);
+assert.equal(expansion.catalogSourceRecorded(normalized.items[2]),false);
+assert.equal(expansion.candidateCatalogCheck({},normalized.items[2]).state,"目錄重複數值衝突待核");
+assert.throws(()=>expansion.normalizeGearCatalog({items:[null,{id:"invalid"}]}));
 assert.equal(expansion.validGearCatalog({items:[],prof:{},meta:{client_build:"x"}}),false);
 assert.equal(expansion.validGearCatalog({items:[{}],prof:{},meta:{client_build:"x"}}),false);
 const completeProf=Object.fromEntries(["Warrior","Paladin","Hunter","Rogue","Priest","Shaman","Mage","Warlock","Druid"].map(k=>[k,{}]));
