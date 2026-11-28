@@ -1,5 +1,5 @@
 """Bounded native set-vs-scatter trials using successful guild requests.
-Candidate selection is a transparent same-slot/item-level heuristic, not BiS.
+Candidate selection is a same-slot partial EP or item-level heuristic, not BiS.
 All cases use the exact same encounter/APL/buffs and native engine effects.
 """
 import copy,importlib.util,json,sys,time
@@ -13,6 +13,11 @@ CLASSES=["Warrior","Warrior","Warrior","Paladin","Paladin","Paladin","Hunter","H
 CLASS_IDS={"Warrior":1,"Paladin":2,"Hunter":3,"Rogue":4,"Priest":5,"Shaman":7,"Mage":8,"Warlock":9,"Druid":11}
 ARMOR={"Warrior":3,"Paladin":3,"Hunter":2,"Shaman":2,"Rogue":1,"Druid":1,"Priest":0,"Mage":0,"Warlock":0}
 ARMOR_ORDER={"Cloth":0,"Leather":1,"Mail":2,"Plate":3}
+PROFESSIONS={0:"ProfessionUnknown",1:"Alchemy",2:"Blacksmithing",3:"Enchanting",4:"Engineering",5:"Herbalism",6:"Inscription",8:"Leatherworking",9:"Mining",10:"Skinning",11:"Tailoring"}
+def profession_allowed(registry,player):
+    needed=registry.get("requiredProfession")
+    if not needed or needed=="ProfessionUnknown":return True
+    return needed!="unknown" and needed in [PROFESSIONS.get(player.get(k),player.get(k)) for k in ("profession1","profession2")]
 def num(value,default=0):
     try:return int(value)
     except (ValueError,TypeError):return default
@@ -74,6 +79,7 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
         matches=[s for s in registry if name in (s.get("name"),s.get("alternativeName"))]
         if len(matches)!=1:continue
         registered=matches[0]
+        if not profession_allowed(registered,p):continue
         thresholds=sorted({num(b.get("pieces")) for b in registered.get("bonuses",[]) if 1<num(b.get("pieces"))<=14})
         if not thresholds:continue
         available=sets.get(name,{})
@@ -90,8 +96,10 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
             if not candidates:continue
             # Prefer role-specific verified partial EP; otherwise nearest item level.
             key=lambda x:(-ep_score(x,weights),abs(num(x.get("item_level"))-num(old.get("item_level"))),-num(x.get("quality")),num(x["id"]))
+            if old_set and not any(num(x["id"])==old_id for x in candidates):continue
             chosen=old if old_set else min(candidates,key=key)
             if not old_set and item_set(old):continue # do not remove another set
+            if not old_set and not eligible(old,cls):continue # no restricted scatter replacement
             if old_set or weights:
                 alternatives=[x for x in scatter.get((slot,old.get("subclass")),[]) if num(x["id"]) not in reserved|used]
                 if not old_set:alternatives.append(old)
@@ -115,7 +123,7 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
             for rank,(i,yes,no,_) in enumerate(positions):
                 g[i]={"id":num((yes if rank<count else no)["id"])}
             cases.append((count,req))
-        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"adjacentCounts":adjacent,"cases":cases,"positions":[i for i,_,_,_ in positions],"epProfile":{k:ep[k] for k in ("label","source","declaration","catalogWeights","omitted") if k in ep} if weights else None,"items":[{"slot":SLOTS[i],"position":i,"setId":num(yes["id"]),"scatterId":num(no["id"]),"setScore":ep_score(yes,weights) if weights else None,"scatterScore":ep_score(no,weights) if weights else None} for i,yes,no,_ in positions]}
+        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"adjacentCounts":adjacent,"cases":cases,"positions":[i for i,_,_,_ in positions],"requiredProfession":registered.get("requiredProfession"),"epProfile":{k:ep[k] for k in ("label","source","declaration","catalogWeights","omitted") if k in ep} if weights else None,"items":[{"slot":SLOTS[i],"position":i,"setId":num(yes["id"]),"scatterId":num(no["id"]),"setScore":ep_score(yes,weights) if weights else None,"scatterScore":ep_score(no,weights) if weights else None} for i,yes,no,_ in positions]}
     return None
 
 def run(cli,root,site):
@@ -141,7 +149,7 @@ def run(cli,root,site):
                 plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded,prepared,ep_by_spec.get(sid))
                 if not plan:break
                 excluded.add(plan["name"])
-                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"adjacentCounts":plan["adjacentCounts"],"positions":plan["positions"],"items":plan["items"],"epProfile":plan["epProfile"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
+                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"adjacentCounts":plan["adjacentCounts"],"positions":plan["positions"],"items":plan["items"],"epProfile":plan["epProfile"],"requiredProfession":plan["requiredProfession"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
                 results.append(row);jobs.append((row,plan["cases"]))
             if excluded:seen.add((sid,scenario))
         except (ValueError,KeyError,TypeError,OSError):continue
