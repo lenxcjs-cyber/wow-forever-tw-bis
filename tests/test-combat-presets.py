@@ -251,5 +251,41 @@ class PresetTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 mod.upstream_consumables(root,"rogue/dps","muti")
 
+    def test_guild_schedule_baselines_and_variants(self):
+        first=[("spec-1","base","json","a",None),("spec-2","base","json","b",None)]
+        extra=[("spec-1","alt","json","c",None),("spec-2","alt","json","d",None)]
+        siml=[("spec-7","base","settings","apl","source","config")]
+        siml_extra=[("spec-7","alt","settings2","apl2","source2","config")]
+        schedule=mod.guild_schedule(first,extra,siml,siml_extra)
+        self.assertEqual(len(schedule),18)
+        self.assertEqual({(j[0],key) for j,key in schedule[:9]},{(sid,key) for sid in ("spec-1","spec-2","spec-7") for key in mod.GUILD_SCENARIOS})
+        self.assertTrue(all(j[1]=="base" for j,key in schedule[:9]))
+        self.assertTrue(all(j[1]=="alt" for j,key in schedule[9:]))
+
+    def test_local_guild_batch_validation(self):
+        loader=importlib.util.spec_from_file_location("guild_batch",SCRIPT.with_name("run-guild-batch.py"))
+        batch=importlib.util.module_from_spec(loader);loader.loader.exec_module(batch)
+        source={"player":{"dpsWarrior":{},"rotation":{"type":"TypeAPL"},"equipment":{"items":[{"id":1}]+[{} for _ in range(16)]}},"encounter":{"duration":60,"targets":[{}]}}
+        baseline=mod.direct_request(source)
+        cases=[]
+        for key in mod.GUILD_SCENARIOS:
+            r=mod.guild_scenario(baseline,"spec-1",key)
+            cases.append({"scenario":key,"variant":0,"name":"原始配裝","request":r})
+            alt=mod.copy.deepcopy(r);batch.get_player(alt)["equipment"]["items"][0]={"id":2,"enchant":99}
+            cases.append({"scenario":key,"variant":1,"name":"候選","request":alt})
+        data={"format":"tomb-guild-batch/1","commit":mod.COMMIT,"spec":"spec-1","cases":cases}
+        self.assertEqual(batch.validate(data)[0],"spec-1")
+        self.assertEqual(len(batch.validate(data)[1]),6)
+        different=mod.copy.deepcopy(data)
+        batch.get_player(different["cases"][1]["request"])["talentsString"]="changed"
+        with self.assertRaises(ValueError):batch.validate(different)
+        different=mod.copy.deepcopy(data)
+        for c in different["cases"][2:4]:batch.get_player(c["request"])["talentsString"]="changed"
+        with self.assertRaises(ValueError):batch.validate(different)
+        different=mod.copy.deepcopy(data);different["cases"][1]["request"]["encounter"]["targets"][0]["stats"][27]=100
+        with self.assertRaises(ValueError):batch.validate(different)
+        result={"iterationsDone":mod.ITERATIONS,"avgIterationDuration":60,"raidMetrics":{"parties":[{"players":[{"dps":{"avg":123,"stdev":20}}]}]}}
+        self.assertEqual(batch.metrics(result,cases[0]["request"],"spec-1")["metrics"],{"dps":123,"dpsStdev":20})
+
 if __name__=="__main__":
     unittest.main()
