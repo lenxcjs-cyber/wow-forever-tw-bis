@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel,combatGuildScenario};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel,combatGuildScenario,combatGuildKill,combatNativeTargetRows};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -713,3 +713,37 @@ assert.equal(tierLogic.nativeSetComparison({cases:[nativeTier.cases[0],nativeTie
 const invalidSurvival={cases:[nativeTier.cases[0],{...nativeTier.cases[1],metrics:{dps:110,tps:110,dtps:-1,death:0}}]};
 assert.equal(tierLogic.nativeSetComparison(invalidSurvival,"tank").firstWin,null);
 console.log("PASS: missing and ambiguous native set thresholds, invalid tank survival safeguards");
+
+
+// Health-limited local trials retarget surviving mobs without counting overkill.
+const killFixture={duration:60,gcd:1,cap:100,initial:100,regen:0,skills:[{name:"strike",cost:0,gain:0,cd:0,cast:0,damage:30000,threat:1,targetCap:2}]};
+const killFive=combat.combatGuildKill(killFixture,"guild-5x50k",60);
+assert.equal(killFive.original.kill.cleared,true);
+assert.equal(killFive.original.kill.killTime,5);
+assert.deepEqual(killFive.original.kill.deathTimes,[1,1,3,3,5]);
+assert.deepEqual(killFive.original.kill.remaining,[0,0,0,0,0]);
+assert.equal(killFive.original.totals.damage,250000);
+assert.equal(killFive.original.kill.overkill,50000);
+assert.deepEqual(killFive.original.events[2].hitIds,[2,3]);
+assert.equal(killFive.best.count,1);
+const notCleared=combat.combatGuildKill(killFixture,"guild-boss",3).original;
+assert.equal(notCleared.kill.cleared,false);
+assert.equal(notCleared.kill.killTime,null);
+assert.equal(notCleared.kill.remaining[0],210000);
+const insta=combat.combatGuildKill({...killFixture,skills:[{...killFixture.skills[0],damage:50000}]},"guild-50k").original;
+assert.equal(insta.kill.killTime,0);
+assert.equal(insta.events.length,1);
+assert.throws(()=>combat.combatGuildKill(killFixture,"bad"));
+const perTarget=combat.combatNativeTargetRows([{index:0,health:50000,dps:100}],{count:1,health:50000});
+assert.equal(perTarget[0].timeEstimate,500);
+assert.equal(combat.combatNativeTargetRows([{index:0,health:50000,dps:0}],{count:1,health:50000})[0].timeEstimate,null);
+assert.deepEqual(combat.combatNativeTargetRows([{index:0,health:50000,dps:100},{index:0,health:50000,dps:100}],{count:2,health:50000}),[]);
+assert.deepEqual(combat.combatNativeTargetRows([{index:0,health:300000,dps:100}],{count:1,health:50000}),[]);
+const confidence=new Function(section("const catalogArmorGroups=","function catalogPlanText(")+";return {nativeSetComparison,nativeSetUncertainty};")();
+const cRow=(pieces,dps)=>({pieces,duration:60,iterations:1000,metrics:{dps,dpsStdev:100}});
+const cStudy=confidence.nativeSetComparison({cases:[cRow(0,1000),cRow(2,1001),cRow(4,1020)]},"dps");
+assert.equal(cStudy.firstWin,2);assert.equal(cStudy.firstConfirmed,4);
+assert.equal(cStudy.rows[0].confirmedWin,false);
+assert.equal(cStudy.rows[1].confirmedWin,true);
+assert.equal(confidence.nativeSetUncertainty(cRow(0,1000),{...cRow(2,1001),iterations:1},"dps"),null);
+console.log("PASS: health-limited kills, sequential retarget, exact overkill, per-target native estimates and conservative set uncertainty");
