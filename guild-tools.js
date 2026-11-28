@@ -1927,11 +1927,16 @@ function nativeBrowserView(parent,id){
  const c=box(parent,"站內原生實戰模擬","本機瀏覽器 WebAssembly 運算；角色 JSON 不傳送外部模擬服務。引擎載入及運算會消耗記憶體與 CPU。");
  const status=node("p","檢查站內引擎與固定版本裝備資料…","gt-muted"),templatePick=select([["","尚未載入範本"]]),area=node("textarea"),readyText=node("p","","gt-muted"),preview=node("div"),results=node("div"),scenario=select([["all","全部三種公會遭遇"],...Object.entries(guildScenarios).map(([k,v])=>[k,v.label])]),iterations=select([["50","50次快速測試"],["200","200次初步比較"],["1000","1000次正式比較"]]);
  area.rows=6;area.placeholder='貼上 WoWSims Exporter /wse export 的完整 JSON，或個人 RaidSimRequest';area.setAttribute("aria-label","角色匯入 JSON");
- let manifest=null,metadata=null,templates=[],character=null,worker=null,active=0,ready=false,timer=null;
+ let manifest=null,metadata=null,templates=[],character=null,worker=null,active=0,ready=false,timer=null,partialReport=null;
  const upload=combatFileInput(area,status,"上傳角色 JSON");
  const runBtn=button("在本站開始模擬",()=>run()),stopBtn=button("停止模擬",()=>stop("已停止，保留完成的結果。")),importBtn=button("匯入並核對角色",()=>importCharacter(false)),defaultBtn=button("直接載入範本角色",()=>importCharacter(true)),sendBtn=button("帶入目前原生配裝編輯器",()=>{if(character)c.dispatchEvent(new CustomEvent("gt-native-request",{bubbles:true,detail:{request:character.request,mode:metadata.items[combatRequestPlayer(character.request,id).equipment.items[14]?.id]?.[1]===4?"two":"one"}}));}),downloadBtn=button("下載已核對角色請求",()=>{if(character)combatDownloadJSON(character.request,"tomb-"+id+"-character.json");});
  function sync(){runBtn.disabled=!ready||!character||!!worker;stopBtn.disabled=!worker;importBtn.disabled=!ready||!!worker;defaultBtn.disabled=!ready||!templatePick.value||!!worker;downloadBtn.disabled=!character;sendBtn.disabled=!character;templatePick.disabled=!!worker;area.disabled=!!worker;scenario.disabled=!!worker;iterations.disabled=!!worker;upload.disabled=!!worker;}
- function stop(message){active++;clearTimeout(timer);timer=null;if(worker)worker.terminate();worker=null;status.textContent=message;sync();}
+ function stop(message){
+  active++;clearTimeout(timer);timer=null;if(worker)worker.terminate();worker=null;
+  const report=partialReport;partialReport=null;
+  if(report&&c.isConnected)try{report();}catch(e){message+="｜部分快照無法驗證："+e.message;}
+  status.textContent=message;sync();
+ }
  function clear(){if(worker)stop("角色資料已變更，停止舊模擬。");active++;character=null;preview.replaceChildren();results.replaceChildren();sync();}
  area.addEventListener("input",clear);templatePick.addEventListener("change",clear);
  async function read(url){const res=await fetch(url,{cache:"no-cache",credentials:"same-origin"});if(!res.ok)throw Error("HTTP "+res.status);return res.json();}
@@ -1969,11 +1974,11 @@ function nativeBrowserView(parent,id){
   const token=++active,n=Number(iterations.value),keys=scenario.value==="all"?Object.keys(guildScenarios):[scenario.value];
   results.replaceChildren();
   let jobs;try{jobs=batch?nativeBrowserBatchJobs(batch,id,metadata,n):keys.map(k=>({scenario:k,name:"匯入角色",request:nativeBrowserRequest(character.request,id,k,n)}));}catch(e){status.textContent=e.message;return;}
-  const batchRows=[];
+  const batchRows=[];let successful=0;
   function reportBatch(){
    if(!batch)return;
    const payload={format:"tomb-guild-results/1",commit:combatPresetCommit,spec:id,cases:batchRows,finished:batchRows.length===jobs.length};
-   const part=box(results,"三遭遇原生配裝比較","各遭遇獨立排名；同一迭代數、天賦、消耗品及 APL。");
+   const part=box(results,"三遭遇原生配裝比較","各遭遇獨立排名；同一迭代數、天賦、消耗品及 APL。"+(payload.finished?"":"｜部分快照 "+batchRows.length+"／"+jobs.length+"，未完成候選不得視為落敗。"));
    const summary=combatGuildBatchResults(payload,id);
    for(const group of summary.groups){
     part.append(node("h5",group.cfg.label));
@@ -1987,9 +1992,9 @@ function nativeBrowserView(parent,id){
   status.textContent="載入同站引擎中…";
   let index=0;
   try{worker=new Worker("native-engine/worker.js?v="+combatPresetCommit.slice(0,8));}catch(e){status.textContent="無法啟動 Worker："+e.message;worker=null;sync();return;}
-  const w=worker;sync();
+  const w=worker;partialReport=batch?()=>{if(batchRows.length)reportBatch();}:null;sync();
   const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(active===token)stop("模擬超過時間限制；請減少迭代數或改為單一遭遇。");},180000);};
-  const next=()=>{if(token!==active||!c.isConnected){clearTimeout(timer);w.terminate();return;}if(index>=jobs.length){clearTimeout(timer);try{reportBatch();stop("全部所選遭遇完成。");}catch(e){stop("原生運算已結束，但批次排名無法驗證："+e.message);}return;}const job=jobs[index];status.textContent="原生運算 "+(index+1)+"／"+jobs.length+"："+guildScenarios[job.scenario].label+"／"+job.name+"（"+n+"次）";resetTimer();w.postMessage({type:"run",request:JSON.stringify(job.request)});};
+  const next=()=>{if(token!==active||!c.isConnected){clearTimeout(timer);w.terminate();return;}if(index>=jobs.length){clearTimeout(timer);partialReport=null;try{reportBatch();stop("運算結束：成功 "+successful+"／"+jobs.length+"；無效或失敗 "+(jobs.length-successful)+"。");}catch(e){stop("原生運算已結束，但批次排名無法驗證："+e.message);}return;}const job=jobs[index];status.textContent="原生運算 "+(index+1)+"／"+jobs.length+"："+guildScenarios[job.scenario].label+"／"+job.name+"（"+n+"次）";resetTimer();w.postMessage({type:"run",request:JSON.stringify(job.request)});};
   w.onmessage=e=>{
    if(token!==active||worker!==w)return;
    if(!c.isConnected){clearTimeout(timer);stop("頁面已切換，停止模擬。");return;}
@@ -2001,6 +2006,7 @@ function nativeBrowserView(parent,id){
    try{
     const raw=e.data.result,m=nativeBrowserResult(raw,id,n);
     if(batch&&Math.abs(m.duration-cfg.duration)>1e-6)throw Error("實際平均時間與標準遭遇不符，不能納入批次比較");
+    successful++;
     if(batch){const metrics={};for(const k of ["dps","tps","hps","dtps","death"])if(Number.isFinite(m[k]))metrics[k]=m[k];for(const [k,v] of Object.entries(m.stdev||{}))if(Number.isFinite(v))metrics[k+"Stdev"]=v;batchRows.push({scenario:job.scenario,variant:job.variant,name:job.name,metrics,iterations:n,duration:m.duration});}
     for(const [key,label] of [["dps","DPS"],["tps","TPS"],["hps","HPS"],["dtps","DTPS"]])if(Number.isFinite(m[key]))part.append(node("p",label+" "+m[key].toFixed(2)+(Number.isFinite(m.stdev?.[key])?" ｜ 標準差 "+m.stdev[key].toFixed(2):"")));
     if(m.death!==null)part.append(node("p","死亡機率 "+(m.death*100).toFixed(2)+"%"));
