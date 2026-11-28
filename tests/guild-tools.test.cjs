@@ -805,7 +805,7 @@ console.log("PASS: equal-slot coverage for set wins, duplicate bonus rejection, 
 
 // Forever addon exports can be compact and carry signed random_suffix IDs.
 // Use the pinned native item types rather than guessing positional slots.
-const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,combatEquipmentSpec};")();
+const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,combatEquipmentSpec};")();
 const metadata={items:{1:[1,0,0,4],2:[11,0,0,0],3:[11,0,0,0],4:[12,0,0,0],5:[12,0,0,0],6:[13,4,9,0],7:[14,0,0,0],8:[13,3,7,0],9:[13,2,9,0]},enchants:{99:true},suffixes:{"-15":true}};
 const compactGear={items:[{id:1,random_suffix:-15},{id:2},{id:3},{id:4},{id:5},{id:6,enchant:99},{id:7}]};
 const nativeGear=nativeImport.nativeImportGear(compactGear,metadata);
@@ -840,3 +840,19 @@ assert.equal(nativeImport.nativeBrowserResult(nativeRaw,"spec-1",50).dps,120);
 assert.throws(()=>nativeImport.nativeBrowserResult(nativeRaw,"spec-1",200));
 assert.throws(()=>nativeImport.nativeBrowserResult(nativeRaw,"spec-13",50));
 console.log("PASS: in-site character import with compact slots, signed suffixes, class/level/spec gates and native result validation");
+
+
+const standalone=nativeImport.nativeCharacterRequest({player:importedPlayer,encounter:{duration:60,targets:[{}]},raidBuffs:{},partyBuffs:{}},null,"spec-1",metadata);
+assert.deepEqual(standalone.request.raid.parties[0].players[0].equipment,nativeGear);
+const wrongClass=JSON.parse(JSON.stringify(imported.request));wrongClass.raid.parties[0].players[0].class="ClassMage";
+assert.throws(()=>nativeImport.nativeBrowserRequest(wrongClass,"spec-1","guild-50k",50));
+const sameGearVariant={name:"附魔測試",mode:"two",equipment:{items:nativeGear.items.map((x,i)=>i===0?{...x,enchant:99}:x)}};
+const localBatch=combat.combatGuildBatch(imported.request,"spec-1",[sameGearVariant]);
+const nativeBatchJobs=nativeImport.nativeBrowserBatchJobs(localBatch,"spec-1",metadata,200);
+assert.equal(nativeBatchJobs.length,6);
+assert.equal(nativeBatchJobs[1].request.raid.parties[0].players[0].equipment.items[0].enchant,99);
+assert.equal(nativeBatchJobs[5].request.encounter.targets.length,5);
+assert.equal(nativeBatchJobs[5].request.simOptions.iterations,200);
+const contaminated=JSON.parse(JSON.stringify(localBatch));contaminated.cases[1].request.raid.parties[0].players[0].talentsString="0-0-0";
+assert.throws(()=>nativeImport.nativeBrowserBatchJobs(contaminated,"spec-1",metadata,200));
+console.log("PASS: standalone settings and controlled native browser batch comparison");
