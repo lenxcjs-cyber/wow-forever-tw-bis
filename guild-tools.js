@@ -1090,18 +1090,28 @@ function fitEmbedded(frame){
 }
 // Local deterministic scheduling model. No inferred game coefficients or gear-to-DPS conversion.
 const combatPaths=["warrior/dps","warrior/dps","warrior/protection","paladin/holy","paladin/protection","paladin/retribution","hunter/dps","hunter/dps","hunter/dps","rogue/dps","rogue/dps","rogue/dps","priest/healer","priest/healer","priest/dps","shaman/elemental","shaman/enhancement","shaman/restoration","mage/dps","mage/dps","mage/dps","warlock/dps","warlock/dps","warlock/dps","druid/balance","druid/feralcat","druid/feralbear","druid/restoration"];
-function combatEngineURL(id){const p=combatPaths[Number(String(id).split("-")[1])-1];return p?"https://www.wowsims.com/forever/"+p+"/":null;}
+function combatEngineURL(id){const p=/^spec-(?:[1-9]|1[0-9]|2[0-8])$/.test(String(id))?combatPaths[Number(String(id).split("-")[1])-1]:null;return p?"https://www.wowsims.com/forever/"+p+"/":null;}
 function simulatePriority(raw,reverse=false){
  const finite=(v,min,max)=>typeof v==="number"&&Number.isFinite(v)&&v>=min&&v<=max;
  if(!raw||!finite(raw.duration,1,600)||!finite(raw.gcd,.1,10)||!finite(raw.cap,1,1000000)||!finite(raw.initial,0,raw.cap)||!finite(raw.regen,0,100000)||!Array.isArray(raw.skills)||raw.skills.length<1||raw.skills.length>30)throw Error("戰鬥時間、資源、共用冷卻或技能數量不合法");
- const skills=raw.skills.map(x=>{if(!x||typeof x.name!=="string"||!x.name.trim()||x.name.length>80||!finite(x.cost,0,raw.cap)||!finite(x.gain,0,raw.cap)||!finite(x.cd,0,600)||!finite(x.cast,0,60)||!finite(x.damage,0,1e9)||!finite(x.threat,0,1e9)||!finite(x.healing??0,0,1e9))throw Error("技能欄位必須填入非負有限數值，且消耗不超過資源上限");if(!finite(x.earliest??0,0,raw.duration)||!finite(x.latest??raw.duration,0,raw.duration)||(x.earliest??0)>(x.latest??raw.duration)||!finite(x.reserve??0,0,raw.cap))throw Error("技能可用時間窗或保留資源不合法");return {...x,healing:x.healing??0,earliest:x.earliest??0,latest:x.latest??raw.duration,reserve:x.reserve??0};});
+ const skills=raw.skills.map(x=>{if(!x||typeof x.name!=="string"||!x.name.trim()||x.name.length>80||!finite(x.cost,0,raw.cap)||!finite(x.gain,0,raw.cap)||!finite(x.cd,0,600)||!finite(x.cast,0,60)||!finite(x.damage,0,1e9)||!finite(x.threat,0,1e9)||!finite(x.healing??0,0,1e9))throw Error("技能欄位必須填入非負有限數值，且消耗不超過資源上限");if(!finite(x.earliest??0,0,600)||!finite(x.latest??600,0,600)||(x.earliest??0)>(x.latest??600)||!finite(x.reserve??0,0,raw.cap))throw Error("技能可用時間窗或保留資源不合法");return {...x,healing:x.healing??0,earliest:x.earliest??0,latest:x.latest??600,reserve:x.reserve??0};});
  if(new Set(skills.map(x=>x.name)).size!==skills.length)throw Error("技能名稱不得重複");
  if(reverse)skills.reverse();
  const ready=new Map(),events=[],totals={damage:0,threat:0,healing:0};let t=0,resource=raw.initial,idle=0,wasted=0;
  const advance=to=>{const next=resource+raw.regen*(to-t);wasted+=Math.max(0,next-raw.cap);resource=Math.min(raw.cap,next);t=to;};
  while(t<raw.duration-1e-8){
   const skill=skills.find(x=>t+1e-8>=x.earliest&&t<=x.latest+1e-8&&(ready.get(x.name)||0)<=t+1e-8&&x.cost+x.reserve<=resource+1e-8&&t+x.cast<=raw.duration+1e-8);
-  if(!skill){const next=Math.min(raw.duration,t+.1);idle+=next-t;advance(next);continue;}
+  if(!skill){
+   // Jump to the next real eligibility boundary rather than polling every 100 ms.
+   let next=raw.duration;
+   for(const x of skills){
+    const need=x.cost+x.reserve;if(need>raw.cap+1e-8)continue;
+    const wait=need<=resource+1e-8?0:raw.regen>0?(need-resource)/raw.regen:Infinity;
+    const candidate=Math.max(t+wait,x.earliest,ready.get(x.name)||0);
+    if(candidate>t+1e-8&&candidate<=x.latest+1e-8&&candidate+x.cast<=raw.duration+1e-8)next=Math.min(next,candidate);
+   }
+   idle+=next-t;advance(next);continue;
+  }
   const start=t,before=resource;resource=Math.max(0,resource-skill.cost);advance(Math.min(raw.duration,t+skill.cast));wasted+=Math.max(0,resource+skill.gain-raw.cap);resource=Math.min(raw.cap,resource+skill.gain);
   ready.set(skill.name,t+skill.cd);
   for(const k of Object.keys(totals))totals[k]+=skill[k];
@@ -1116,6 +1126,40 @@ function combatBestPriority(raw,metric){
  if(raw.skills.length>5)throw Error("完整優先序搜尋最多 5 個技能（120 種排列），請縮小範圍");
  let best=null,count=0;function visit(prefix,left){if(!left.length){const r=simulatePriority({...raw,skills:prefix});count++;if(!best||r.totals[metric]>best.result.totals[metric]+1e-8)best={order:prefix.map(x=>x.name),result:r};return;}for(let i=0;i<left.length;i++)visit([...prefix,left[i]],left.filter((_,j)=>i!==j));}
  visit([],raw.skills);return {...best,count,metric};
+}
+function combatSkillStats(result){
+ const by=new Map();
+ for(const e of result.events){const x=by.get(e.name)||{name:e.name,count:0,first:e.time,last:e.time,damage:0,threat:0,healing:0};x.count++;x.last=e.time;for(const k of ["damage","threat","healing"])x[k]+=e.delta[k];by.set(e.name,x);}
+ return [...by.values()].map(x=>({...x,dps:x.damage/result.duration,tps:x.threat/result.duration,hps:x.healing/result.duration}));
+}
+function combatDurationSweep(raw,metric){
+ if(!["damage","threat","healing"].includes(metric))throw Error("未知最佳化目標");
+ simulatePriority(raw);
+ return [30,60,120,180].map(duration=>{
+  const data={...raw,duration},original=simulatePriority(data),reverse=simulatePriority(data,true);
+  const best=raw.skills.length<=5?combatBestPriority(data,metric):null;
+  return {duration,original,reverse,best};
+ });
+}
+function combatTimingSweep(raw,skillName,metric){
+ if(!["damage","threat","healing"].includes(metric))throw Error("未知最佳化目標");
+ const baseline=simulatePriority(raw),skill=raw.skills.find(x=>x.name===skillName);
+ if(!skill)throw Error("找不到指定技能，請輸入完整技能名稱");
+ const earliest=skill.earliest??0,latest=skill.latest??600;
+ const offsets=[0,1,3,5,10,15,20,30].filter(offset=>earliest+offset<=latest&&earliest+offset<raw.duration);
+ const rows=offsets.map(offset=>{
+  const result=offset===0?baseline:simulatePriority({...raw,skills:raw.skills.map(x=>x===skill?{...x,earliest:earliest+offset}:x)});
+  const uses=result.events.filter(e=>e.name===skillName);
+  return {offset,earliest:earliest+offset,result,first:uses[0]?.time??null,count:uses.length};
+ });
+ if(!rows.length)throw Error("指定技能不在此次戰鬥的有效時間窗內");
+ return {rows,best:[...rows].sort((a,b)=>b.result.rate[metric]-a.result.rate[metric]||a.offset-b.offset)[0],baseline,skillName,metric};
+}
+function combatSkillView(parent,result){
+ const d=node("details");d.append(node("summary","各技能施放與貢獻（假設模型）"));
+ for(const x of combatSkillStats(result))d.append(node("p",x.name+" ｜ "+x.count+" 次 ｜ 首次 "+x.first.toFixed(2)+"s ｜ 最後 "+x.last.toFixed(2)+"s ｜ DPS "+x.dps.toFixed(2)+" ｜ TPS "+x.tps.toFixed(2)+" ｜ HPS "+x.hps.toFixed(2)));
+ if(!result.events.length)d.append(node("p","本輪沒有完成技能。","gt-muted"));
+ parent.append(d);
 }
 const combatPresetCommit="3b9c125a9b1387cd53ce2bb12969e0c6b54b813e";
 function combatPresetCases(data,id){
@@ -1132,7 +1176,7 @@ function combatPhaseMetrics(result){
 function combatPhaseView(parent,result){
  const d=node("details");d.append(node("summary","分段輸出／仇恨與資源效率"));
  for(const p of combatPhaseMetrics(result))d.append(node("p",p.start+"–"+p.end+" 秒 ｜ 完成 "+p.count+" 次 ｜ DPS "+p.damage.toFixed(2)+" ｜ TPS "+p.threat.toFixed(2)+" ｜ HPS "+p.healing.toFixed(2)));
- d.append(node("p","資源溢出 "+result.wasted.toFixed(1)+"；以技能完成時間歸入區段。","gt-muted"));parent.append(d);
+ d.append(node("p","資源溢出 "+result.wasted.toFixed(1)+"；以技能完成時間歸入區段。","gt-muted"));parent.append(d);combatSkillView(parent,result);
 }
 function combatNativeTimeline(parent,timeline){
  const events=(Array.isArray(timeline)?timeline:[]).filter(e=>e&&Number.isFinite(e.timeMs)&&typeof e.label==="string").slice(0,400).sort((a,b)=>a.timeMs-b.timeMs);
@@ -1205,7 +1249,26 @@ function combatLab(){
  const modelResult=node("div"),status=node("p","","gt-muted"),objective=select([["damage","最大每秒傷害"],["threat","最大每秒仇恨"],["healing","最大每秒治療"]]);
  const run=button("執行 A／B 優先序試算",()=>{modelResult.replaceChildren();try{const data=JSON.parse(raw.value),a=simulatePriority(data),b=simulatePriority(data,true);try{localStorage.setItem(key,raw.value);}catch(e){}for(const [name,r] of [["A：原優先序",a],["B：反轉優先序",b]]){const c=box(modelResult,name,"假設模型 ｜ 非遊戲實測");add(c,node("p","每秒傷害 "+r.rate.damage.toFixed(2)+" ｜ 每秒仇恨 "+r.rate.threat.toFixed(2)+" ｜ 每秒治療 "+r.rate.healing.toFixed(2)),node("p","施放 "+r.events.length+" 次 ｜ 無技能可用等待 "+r.idle.toFixed(1)+" 秒","gt-muted"));const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=r.events.map(e=>e.time.toFixed(2)+"s → "+e.finish.toFixed(2)+"s ｜ "+e.name+" ｜ 資源 "+e.before.toFixed(1)+" → "+e.after.toFixed(1)+" ｜ 累積傷害 "+e.damage.toFixed(0)+" ｜ 累積仇恨 "+e.threat.toFixed(0)).join("\n");add(d,node("summary","逐次施放時間軸"),pre);c.append(d);combatPhaseView(c,r);}status.textContent="A、B 僅比較這兩個自訂優先序，沒有證明全域最佳。";}catch(e){status.textContent="試算失敗："+e.message;}});
  const optimize=button("搜尋最佳固定優先序（最多5技能）",()=>{modelResult.replaceChildren();try{const data=JSON.parse(raw.value),best=combatBestPriority(data,objective.value),r=best.result,c=box(modelResult,"假設模型最佳固定優先序",best.count+" 種排列已比較；僅限本模型，非遊戲最大值。");add(c,node("p",best.order.join(" → ")),node("p","每秒傷害 "+r.rate.damage.toFixed(2)+" ｜ 每秒仇恨 "+r.rate.threat.toFixed(2)+" ｜ 每秒治療 "+r.rate.healing.toFixed(2)));const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=r.events.map(e=>e.time.toFixed(2)+"s ｜ "+e.name+" ｜ 資源 "+e.before.toFixed(1)+" → "+e.after.toFixed(1)+" ｜ 累積傷害 "+e.damage.toFixed(0)+" ｜ 累積仇恨 "+e.threat.toFixed(0)).join("\n");add(d,node("summary","最佳方案施放時間軸"),pre);c.append(d);combatPhaseView(c,r);status.textContent="已比較全部固定優先序；未搜尋任意等待、條件式技能策略或裝備組合。";}catch(e){status.textContent="試算失敗："+e.message;}});
- add(local,button("載入純教學範例（非遊戲數值）",()=>{raw.value=JSON.stringify(demo,null,2);modelResult.replaceChildren();status.textContent="這是假設數值，請勿視為目前專精的實際數據。";}),raw,run,field("最佳化目標",objective),optimize,status,modelResult);
+ const timingSkill=inp("完整技能名稱；留空則使用第一個技能");
+ const objectiveLabel=()=>({damage:"DPS",threat:"TPS",healing:"HPS"})[objective.value];
+ const durationSweep=button("比較 30／60／120／180 秒",()=>{modelResult.replaceChildren();try{
+  const data=JSON.parse(raw.value),rows=combatDurationSweep(data,objective.value),metric=objective.value;
+  const c=box(modelResult,"不同戰鬥時間的優先序比較","同一自訂參數；保留原本技能時間窗。非正式遊戲傷害模型。");
+  for(const x of rows){const r=x.best?.result,part=box(c,x.duration+" 秒","原優先序 "+objectiveLabel()+" "+x.original.rate[metric].toFixed(2)+" ｜ 反轉 "+x.reverse.rate[metric].toFixed(2));
+   if(r){add(part,node("p","最佳固定優先序："+x.best.order.join(" → ")+" ｜ "+objectiveLabel()+" "+r.rate[metric].toFixed(2)),node("p","搜尋 "+x.best.count+" 組固定優先序","gt-muted"));combatPhaseView(part,r);}
+   else part.append(node("p","超過 5 技能，僅比較原始與反轉兩種方案。","gt-muted"));
+  }status.textContent="已比較四種戰鬥長度；沒有重新搜尋裝備、天賦或遊戲 APL。";
+ }catch(e){status.textContent="試算失敗："+e.message;}});
+ const timingSweep=button("比較指定技能的開場延後時機",()=>{modelResult.replaceChildren();try{
+  const data=JSON.parse(raw.value),name=timingSkill.value.trim()||data.skills?.[0]?.name,t=combatTimingSweep(data,name,objective.value),metric=objective.value;
+  const c=box(modelResult,"技能開場時機比較："+t.skillName,"固定其餘技能優先序，只調整指定技能最早可用時間。");
+  for(const x of t.rows)add(c,node("p","延後 "+x.offset+"s ｜ 最早 "+x.earliest+"s ｜ 實際首次 "+(x.first===null?"未施放":x.first.toFixed(2)+"s")+" ｜ "+x.count+" 次 ｜ "+objectiveLabel()+" "+x.result.rate[metric].toFixed(2)));
+  add(c,node("p","本組最佳：延後 "+t.best.offset+"s ｜ 相較原方案 "+objectiveLabel()+" "+(t.best.result.rate[metric]-t.baseline.rate[metric]).toFixed(2)));
+  combatPhaseView(c,t.best.result);
+  const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=t.best.result.events.map(e=>e.time.toFixed(2)+"s → "+e.finish.toFixed(2)+"s ｜ "+e.name+" ｜ 資源 "+e.before.toFixed(1)+" → "+e.after.toFixed(1)).join("\n");add(d,node("summary","本組最佳施放時間軸"),pre);c.append(d);
+  status.textContent="只測試列出的延後秒數；不代表全域最優，也未模擬真實爆發增益。";
+ }catch(e){status.textContent="試算失敗："+e.message;}});
+ add(local,button("載入純教學範例（非遊戲數值）",()=>{raw.value=JSON.stringify(demo,null,2);modelResult.replaceChildren();status.textContent="這是假設數值，請勿視為目前專精的實際數據。";}),raw,run,field("最佳化目標",objective),optimize,durationSweep,field("延後測試技能",timingSkill),timingSweep,status,modelResult);
 }
 function talentHub(){
  title("天賦流派與野外練等","使用首頁的職業、專精與玩法選單，直接查看天賦及練等。");
