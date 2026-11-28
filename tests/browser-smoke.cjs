@@ -340,7 +340,8 @@ const server=http.createServer((req,res)=>{
   await openTab("combat");
   const lab=page.locator(".gt-panel");
   assert.ok(await lab.getByRole("heading",{name:"實戰模擬",exact:true}).isVisible());
-  assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).getAttribute("href"),"https://www.wowsims.com/forever/druid/feralcat/");
+  assert.ok(await lab.getByRole("heading",{name:"站內原生實戰模擬",exact:true}).isVisible());
+  assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).count(),0);
   await lab.locator(".gt-combat-presets").getByText("DPS 123.45",{exact:true}).waitFor({state:"visible"});
   assert.ok(await lab.getByText("全28專精原生案例覆蓋：2 / 28",{exact:true}).isVisible());
   assert.ok(await lab.getByRole("heading",{name:"此專精的配裝與循環研究",exact:true}).isVisible());
@@ -445,7 +446,8 @@ const server=http.createServer((req,res)=>{
   await lab.getByRole("button",{name:"比較已完成的模擬"}).click();
   assert.ok(await lab.getByText("DPS 500.00 ｜ TPS 700.00 ｜ HPS 未提供 ｜ DTPS 未提供",{exact:true}).isVisible());
   await spec.selectOption("spec-27");
-  assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).getAttribute("href"),"https://www.wowsims.com/forever/druid/feralbear/");
+  assert.ok(await lab.getByRole("heading",{name:"站內原生實戰模擬",exact:true}).isVisible());
+  assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).count(),0);
   assert.equal(await lab.getByLabel("最佳化目標").inputValue(),"threat");
   await lab.getByText("TPS 600.00 ｜ DTPS 300.00 ｜ 死亡機率 10.0%",{exact:true}).waitFor({state:"visible"});
   await lab.getByText("原生引擎戰鬥時間紀錄",{exact:true}).click();
