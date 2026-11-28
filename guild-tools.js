@@ -788,12 +788,12 @@ function catalogSameCoverage(a,b){
  const count=picks=>catalogArmorGroups.map(([slot])=>picks.filter(x=>x.slot===slot).length).join(",");
  return Array.isArray(a)&&Array.isArray(b)&&count(a)===count(b);
 }
-function catalogExactSet(pools,name,count){
- if(typeof name!=="string"||!name||!Number.isInteger(count)||count<0||count>14)return null;
+function catalogExactSetPlans(pools,name,max){
+ if(typeof name!=="string"||!name||!Number.isInteger(max)||max<0||max>14)return new Map();
  let states=new Map([[0,{total:0,picks:[]}]]);
  for(const [slot,capacity] of catalogArmorGroups){
   const rows=pools.get(slot)||[],yes=rows.filter(p=>catalogSetName(p.item)===name),no=rows.filter(p=>catalogSetName(p.item)!==name&&p.score.total>0),next=new Map();
-  for(const [old,prev] of states)for(let n=0;n<=Math.min(count-old,capacity,yes.length);n++){
+  for(const [old,prev] of states)for(let n=0;n<=Math.min(max-old,capacity,yes.length);n++){
    const picks=[...yes.slice(0,n),...no.slice(0,capacity-n)].map(p=>({...p,slot}));
    const total=prev.total+picks.reduce((sum,p)=>sum+p.score.total,0),k=old+n;
    const combined=[...prev.picks,...picks],prior=next.get(k);
@@ -801,15 +801,16 @@ function catalogExactSet(pools,name,count){
   }
   states=next;
  }
- const r=states.get(count);return r?{count,...r}:null;
+ return states;
 }
-function catalogSetTierComparison(pools,name,max,bonuses=[],thresholdsKnown=bonuses.length>0){
+function catalogExactSet(pools,name,count){const r=catalogExactSetPlans(pools,name,count).get(count);return r?{count,...r}:null;}
+function catalogSetTierComparison(pools,name,max,bonuses=[],thresholdsKnown=Array.isArray(bonuses)&&bonuses.length>0){
  if(!Number.isInteger(max)||max<1||max>14||!Array.isArray(bonuses))return null;
- const base=catalogExactSet(pools,name,0);if(!base)return null;
- const rows=[];
+ const plans=catalogExactSetPlans(pools,name,max),basePlan=plans.get(0);if(!basePlan)return null;
+ const base={count:0,...basePlan},rows=[];
  for(let n=1;n<=max;n++){
-  const plan=catalogExactSet(pools,name,n);if(!plan)continue;
-  const active=bonuses.filter(b=>Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=n);
+  const exact=plans.get(n);if(!exact)continue;const plan={count:n,...exact};
+  const active=bonuses.filter(b=>b&&Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=n);
   const validThresholds=bonuses.every(b=>b&&Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=14)&&new Set(bonuses.map(b=>b.pieces)).size===bonuses.length;
   const complete=validThresholds&&(active.length>0||thresholdsKnown)&&active.every(b=>Number.isFinite(b.value));
   const value=complete?active.reduce((sum,b)=>sum+b.value,0):null;
@@ -817,6 +818,26 @@ function catalogSetTierComparison(pools,name,max,bonuses=[],thresholdsKnown=bonu
   rows.push({...plan,comparable,loss:comparable?base.total-plan.total:null,active,bonus:value,net:value===null||!comparable?null:plan.total+value-base.total});
  }
  return {base,rows,firstWin:rows.find(x=>x.net!==null&&x.net>1e-8)?.count??null};
+}
+// An additive shortlist is a screening tool, not a simulation or a claim of set effectiveness.
+function catalogSetShortlist(pools,effects,baseline){
+ if(!Array.isArray(effects)||!Array.isArray(baseline))return [];
+ const total=baseline.reduce((n,p)=>n+p.score.total,0),rows=[];
+ if(!Number.isFinite(total))return [];
+ for(const [name,max] of catalogSetOptions(pools)){
+  const match=effects.filter(x=>x&&(x.name===name||x.alternativeName===name));
+  if(match.length!==1||!Array.isArray(match[0].bonuses))continue;
+  const thresholds=[...new Set(match[0].bonuses.map(b=>b?.pieces).filter(n=>Number.isInteger(n)&&n>=1&&n<=max))].sort((a,b)=>a-b);
+  if(!thresholds.length)continue;
+  const plans=catalogExactSetPlans(pools,name,thresholds[thresholds.length-1]);
+  for(const count of thresholds){
+   const plan=plans.get(count);
+   if(!plan||!catalogSameCoverage(baseline,plan.picks)||!Number.isFinite(plan.total))continue;
+   const gap=total-plan.total;
+   rows.push({name,count,gap,required:Math.max(0,gap),total:plan.total,picks:plan.picks,profession:match[0].requiredProfession||null});
+  }
+ }
+ return rows.sort((a,b)=>a.required-b.required||b.total-a.total||a.count-b.count||a.name.localeCompare(b.name));
 }
 let setEffectsPromise=null;
 function loadSetEffects(){
@@ -1013,6 +1034,18 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
     const share=node("div",undefined,"gt-plan-export"),shareStatus=node("p","","gt-muted");
     add(rows,button("匯出目前整套面板方案",()=>exportPlan(baseline,"最高面板防具",plan.total)),share);
     if(sets.length){
+     const shortlist=node("div",undefined,"gt-set-shortlist");
+     const scan=button("掃描全部已登錄套裝門檻",()=>{
+      try{
+       const candidates=catalogSetShortlist(pools,effectRows,baseline);
+       shortlist.replaceChildren(node("p",candidates.length?"共 "+candidates.length+" 組同欄位候選，依面板損失排序；最多顯示20組。":"此篩選下無版本相符、同欄位可比較的套裝門檻。","gt-muted"));
+       for(const x of candidates.slice(0,20)){
+        const row=node("div",undefined,"gt-card");
+        add(row,node("p",zhDisplay(x.name)+" ｜ 恰好 "+x.count+" 件 ｜ 面板 "+x.total.toFixed(2)),node("p","相較最高面板方案，需新增淨效果收益超過 "+x.required.toFixed(2)+" 分才可勝出。"+(x.profession?"｜專業要求："+zhDisplay(x.profession):""),"gt-muted"),button("匯出此門檻方案",()=>exportPlan(x.picks,x.name+" "+x.count+" 件",x.total)));shortlist.append(row);
+       }
+      }catch(e){shortlist.replaceChildren(node("p","掃描失敗："+e.message,"gt-muted"));}
+     });
+     add(setPanel,node("p","自動掃描只使用已登錄的啟動件數。效果未量化，不以面板損失宣稱 BiS；原方案已有的套裝收益也須扣除。","gt-muted"),scan,shortlist);
      const setSelect=select(sets.map(([n,c])=>[n,zhDisplay(n)+"（最多 "+c+" 件）"])),target=select([]),secondSet=select([]),secondTarget=select([]),detail=node("div"),tiers=node("div"),tierFields=node("div"),bonus=inp("留空＝未知","number");bonus.step="0.01";
      function targets(){const count=sets.find(([n])=>n===setSelect.value)?.[1]||2;target.replaceChildren(...Array.from({length:count-1},(_,i)=>new Option((i+2)+" 件",String(i+2))));target.value=String(Math.min(4,count));const old=secondSet.value;secondSet.replaceChildren(new Option("不指定第二套",""),...sets.filter(([n])=>n!==setSelect.value).map(([n,c])=>new Option(zhDisplay(n)+"（最多 "+c+" 件）",n)));if([...secondSet.options].some(o=>o.value===old))secondSet.value=old;secondTargets();}
      function secondTargets(){const count=sets.find(([n])=>n===secondSet.value)?.[1]||0;secondTarget.replaceChildren(...Array.from({length:Math.max(0,count-1)},(_,i)=>new Option((i+2)+" 件",String(i+2))));secondTarget.disabled=!count;if(count)secondTarget.value="2";}
