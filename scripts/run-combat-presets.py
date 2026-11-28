@@ -11,10 +11,13 @@ CASES=[
  ("spec-8","射擊／獨行遠程","ui/specs/hunter/dps/builds/mm.siml","ui/specs/hunter/dps/apls/turret.apl.siml"),
  ("spec-9","生存／近遠穿插","ui/specs/hunter/dps/builds/sv_weave.siml","ui/specs/hunter/dps/apls/default.apl.siml"),
  ("spec-5","防護騎／盾牌坦克","ui/specs/paladin/protection/defaults.siml","ui/specs/paladin/protection/apls/default.apl.siml"),
+ ("spec-9","生存／純近戰","ui/specs/hunter/dps/builds/sv_melee.siml","ui/specs/hunter/dps/apls/melee.apl.siml"),
+ ("spec-6","懲戒／聖印連動","ui/specs/paladin/retribution/builds/unsealed_wrath.siml","ui/specs/paladin/retribution/apls/uw_sor_sof.apl.siml"),
+ ("spec-6","懲戒／神聖震擊","ui/specs/paladin/retribution/builds/holy_shock.siml","ui/specs/paladin/retribution/apls/holy_shock.apl.siml"),
 ]
 def finite(x): return type(x) in (float,int) and math.isfinite(x)
 def invoke(cli,root,args,payload=None):
-    result=subprocess.run([str(cli),*args],cwd=root,input=payload,text=True,capture_output=True,timeout=85,check=True)
+    result=subprocess.run([str(cli),*args],cwd=root,input=payload,text=True,capture_output=True,timeout=45,check=True)
     data=json.loads(result.stdout)
     if not isinstance(data,dict) or data.get("error"):
         raise ValueError("Engine reported error: "+str(data.get("error"))[:500])
@@ -56,8 +59,9 @@ def main(cli,root,output):
                 try:d["tank"]=tank_result(cli,root,settings)
                 except (OSError,ValueError,subprocess.SubprocessError) as e:print("Tank metrics unavailable:",str(e)[:300])
             cases.append(d);print("Native engine preset:",spec,"iterations",d["iterations"],"timeline",len(d["timeline"]))
+            output.write_text(json.dumps({"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"scope":"Upstream presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."},ensure_ascii=False,allow_nan=False),encoding="utf-8")
         except (OSError,ValueError,subprocess.SubprocessError) as e:
             print("Preset unavailable:",spec,str(e)[:400])
     if not cases: raise SystemExit("No successful native engine samples")
-    output.write_text(json.dumps({"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"scope":"Upstream presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."},ensure_ascii=False,allow_nan=False),encoding="utf-8")
+
 if __name__=="__main__":main(*sys.argv[1:])
