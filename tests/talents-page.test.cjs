@@ -73,8 +73,8 @@ for(const p of catalog.profiles){
 }
 for(const g of Object.values(skills.specs))coreCount+=g.skills.length;
 assert.equal(coreCount,185);
-assert.equal(Object.values(skills.common).flat().length,45);
-console.log("PASS: 28 spec skill guides, 185 core entries, 45 class utility entries, every build mapped");
+assert.equal(Object.values(skills.common).flat().length,46);
+console.log("PASS: 28 spec skill guides, 185 core entries, 46 class utility entries, every build mapped");
 
 assert.ok(!skills.specs["spec-26"].skills.some(x=>x[1]==="Primal Bite"));
 assert.ok(skills.specs["spec-27"].skills.some(x=>x[1]==="Primal Bite"));
