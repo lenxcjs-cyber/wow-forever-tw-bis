@@ -69,11 +69,11 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None):
         if not thresholds:continue
         available=sets.get(name,{})
         # Restrict to positions already occupied by this set or a compatible
-        # same-subclass piece. No weapon, trinket or jewelry replacements.
+        # same-subclass piece. Include both rings and trinkets; weapons remain fixed.
         positions=[]
         reserved={num(x.get("id")) for x in gear if x.get("id")}
         used=set()
-        for i,slot in enumerate(SLOTS[:10]):
+        for i,slot in enumerate(SLOTS):
             old=current[i]
             if not old:continue
             old_id=num(old.get("id"));old_set=item_set(old)==name
@@ -99,13 +99,14 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None):
         if any(i<len(swapped) and swapped[i].get("id") for i,_,_,_ in positions):continue
         positions.sort(key=lambda x:(x[3],x[0]))
         cases=[]
-        # Run each exact implemented threshold, plus an all-scatter control.
-        for count in [0,*possible]:
+        # Prioritize registered thresholds, then adjacent pre-threshold counts.
+        adjacent=sorted({n-1 for n in possible if n>1 and n-1 not in possible})
+        for count in [0,*possible,*adjacent]:
             req=copy.deepcopy(request);g=player(req)["equipment"]["items"]
             for rank,(i,yes,no,_) in enumerate(positions):
                 g[i]={"id":num((yes if rank<count else no)["id"])}
             cases.append((count,req))
-        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"cases":cases,"positions":[i for i,_,_,_ in positions],"items":[{"slot":SLOTS[i],"setId":num(yes["id"]),"scatterId":num(no["id"])} for i,yes,no,_ in positions]}
+        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"adjacentCounts":adjacent,"cases":cases,"positions":[i for i,_,_,_ in positions],"items":[{"slot":SLOTS[i],"setId":num(yes["id"]),"scatterId":num(no["id"])} for i,yes,no,_ in positions]}
     return None
 
 def run(cli,root,site):
@@ -126,7 +127,7 @@ def run(cli,root,site):
                 plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded,prepared)
                 if not plan:break
                 excluded.add(plan["name"])
-                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"positions":plan["positions"],"items":plan["items"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
+                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"adjacentCounts":plan["adjacentCounts"],"positions":plan["positions"],"items":plan["items"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
                 results.append(row);jobs.append((row,plan["cases"]))
             if excluded:seen.add((sid,scenario))
         except (ValueError,KeyError,TypeError,OSError):continue
@@ -160,9 +161,16 @@ def run(cli,root,site):
             execute(row,*cases[0])
             if not row["cases"]:continue
             if len(cases)>1 and time.monotonic()-start<=660:execute(row,*cases[1])
-        for step in range(2,max((len(cases) for _,cases in cohort),default=0)):
+        for step in range(2,max((len(row["thresholds"])+1 for row,_ in cohort),default=0)):
             for row,cases in cohort:
                 if time.monotonic()-start>660:save(True);return
-                if step<len(cases) and any(c["pieces"]==0 for c in row["cases"]):execute(row,*cases[step])
+                if step<=len(row["thresholds"]) and any(c["pieces"]==0 for c in row["cases"]):execute(row,*cases[step])
+      # Additional adjacent-count trials follow all three encounters for this rank.
+      for scenario in order:
+        for row,cases in jobs:
+            if row["scenario"]!=scenario or row["candidateRank"]!=rank or not any(c["pieces"]==0 for c in row["cases"]):continue
+            for count,request in cases[len(row["thresholds"])+1:]:
+                if time.monotonic()-start>660:save(True);return
+                execute(row,count,request)
     save(True)
 if __name__=="__main__":run(*sys.argv[1:])
