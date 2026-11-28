@@ -334,6 +334,17 @@ class PresetTests(unittest.TestCase):
         self.assertEqual(plan["requiredProfession"],"Tailoring")
         self.assertEqual({x["scatterScore"] for x in plan["items"]},{50,60})
         self.assertIsNotNone(sets.set_plan(request,"spec-1",items,parsed))
+        items.append({**item(7,"Head","",40,65),"subclass":"Leather"})
+        cross=sets.set_plan(request,"spec-1",items,parsed,ep=rows)
+        self.assertTrue(cross["crossArmor"])
+        self.assertIn(7,{x["scatterId"] for x in cross["items"]})
+        same=sets.set_plan(request,"spec-1",items,parsed)
+        self.assertFalse(same["crossArmor"])
+        self.assertNotIn(7,{x["scatterId"] for x in same["items"]})
+        profiles={"spec-2":[{"variant":"fury"},{"variant":"fury2h"}]}
+        self.assertEqual(sets.profile_for(profiles,"spec-2","狂怒／雙手")["variant"],"fury2h")
+        self.assertEqual(sets.profile_for(profiles,"spec-2","狂怒／雙持")["variant"],"fury")
+        self.assertIsNone(sets.profile_for(profiles,"spec-19","秘法"))
 
 if __name__=="__main__":
     unittest.main()
