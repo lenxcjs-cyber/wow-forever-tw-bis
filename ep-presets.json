@@ -1,0 +1,1098 @@
+{
+  "commit": "3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",
+  "profiles": [
+    {
+      "spec": "spec-1",
+      "source": "ui/specs/warrior/dps/presets.ts",
+      "declaration": "PreBiSArmsEpWeights",
+      "label": "武器戰雙手",
+      "variant": "arms",
+      "catalogWeights": {
+        "strength": 2.2,
+        "agility": 1.76,
+        "attack_power": 1
+      },
+      "panelWeights": {
+        "力量": 2.2,
+        "敏捷": 1.76,
+        "攻擊強度": 1
+      },
+      "rawStats": {
+        "Strength": 2.2,
+        "Agility": 1.76,
+        "AttackPower": 1,
+        "ArmorPenetration": 0.46,
+        "HitRating": 5.03,
+        "HasteRating": 1.29,
+        "CritRating": 2.32,
+        "ExpertiseRating": 1.57
+      },
+      "rawPseudo": {
+        "MainHandDps": 16.71,
+        "OffHandDps": 0
+      },
+      "omitted": [
+        "ArmorPenetration",
+        "HitRating",
+        "HasteRating",
+        "CritRating",
+        "ExpertiseRating",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.OffHandDps"
+      ]
+    },
+    {
+      "spec": "spec-2",
+      "source": "ui/specs/warrior/dps/presets.ts",
+      "declaration": "PreBiSFuryEpWeights",
+      "label": "狂怒戰雙持",
+      "variant": "fury",
+      "catalogWeights": {
+        "strength": 2.2,
+        "agility": 1.7,
+        "attack_power": 1
+      },
+      "panelWeights": {
+        "力量": 2.2,
+        "敏捷": 1.7,
+        "攻擊強度": 1
+      },
+      "rawStats": {
+        "Strength": 2.2,
+        "Agility": 1.7,
+        "AttackPower": 1,
+        "ArmorPenetration": 0.39,
+        "HitRating": 1.69,
+        "HasteRating": 1.76,
+        "CritRating": 2.26,
+        "ExpertiseRating": 2.35
+      },
+      "rawPseudo": {
+        "MainHandDps": 12.59,
+        "OffHandDps": 2.66
+      },
+      "omitted": [
+        "ArmorPenetration",
+        "HitRating",
+        "HasteRating",
+        "CritRating",
+        "ExpertiseRating",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.OffHandDps"
+      ]
+    },
+    {
+      "spec": "spec-2",
+      "source": "ui/specs/warrior/dps/presets.ts",
+      "declaration": "PreBiSFury2HEpWeights",
+      "label": "狂怒戰雙手",
+      "variant": "fury2h",
+      "catalogWeights": {
+        "strength": 2.2,
+        "agility": 1.94,
+        "attack_power": 1
+      },
+      "panelWeights": {
+        "力量": 2.2,
+        "敏捷": 1.94,
+        "攻擊強度": 1
+      },
+      "rawStats": {
+        "Strength": 2.2,
+        "Agility": 1.94,
+        "AttackPower": 1,
+        "ArmorPenetration": 0.46,
+        "HitRating": 5.17,
+        "HasteRating": 2.06,
+        "CritRating": 2.55,
+        "ExpertiseRating": 2.26
+      },
+      "rawPseudo": {
+        "MainHandDps": 13.89,
+        "OffHandDps": 0
+      },
+      "omitted": [
+        "ArmorPenetration",
+        "HitRating",
+        "HasteRating",
+        "CritRating",
+        "ExpertiseRating",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.OffHandDps"
+      ]
+    },
+    {
+      "spec": "spec-3",
+      "source": "ui/specs/warrior/protection/presets.ts",
+      "declaration": "PreBiSBalancedEpWeights",
+      "label": "防護戰平衡",
+      "variant": "balanced",
+      "catalogWeights": {
+        "stamina": 1.15,
+        "strength": 0.62,
+        "agility": 0.66,
+        "attack_power": 0.27,
+        "block_value": 0.76,
+        "armor": 0.06
+      },
+      "panelWeights": {
+        "耐力": 1.15,
+        "力量": 0.62,
+        "敏捷": 0.66,
+        "攻擊強度": 0.27,
+        "格擋值": 0.76,
+        "護甲": 0.06
+      },
+      "rawStats": {
+        "Stamina": 1.15,
+        "Strength": 0.62,
+        "Agility": 0.66,
+        "AttackPower": 0.27,
+        "HitRating": 0.04,
+        "CritRating": 0.43,
+        "HasteRating": 0.17,
+        "ExpertiseRating": 2.35,
+        "ArmorPenetration": 0.11,
+        "DefenseRating": 0.53,
+        "BlockRating": 0,
+        "BlockValue": 0.76,
+        "DodgeRating": 0.29,
+        "ParryRating": 0.26,
+        "Armor": 0.06,
+        "BonusArmor": 0.06,
+        "ArmorNoMods": 0.06
+      },
+      "rawPseudo": {
+        "MainHandDps": 1.42
+      },
+      "omitted": [
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "ExpertiseRating",
+        "ArmorPenetration",
+        "DefenseRating",
+        "BlockRating",
+        "DodgeRating",
+        "ParryRating",
+        "BonusArmor",
+        "ArmorNoMods",
+        "PseudoStat.MainHandDps"
+      ]
+    },
+    {
+      "spec": "spec-3",
+      "source": "ui/specs/warrior/protection/presets.ts",
+      "declaration": "PreBiSOffensiveEpWeights",
+      "label": "防護戰進攻",
+      "variant": "offensive",
+      "catalogWeights": {
+        "stamina": 1.15,
+        "strength": 0.62,
+        "agility": 0.56,
+        "attack_power": 0.27,
+        "block_value": 0.63,
+        "armor": 0.05
+      },
+      "panelWeights": {
+        "耐力": 1.15,
+        "力量": 0.62,
+        "敏捷": 0.56,
+        "攻擊強度": 0.27,
+        "格擋值": 0.63,
+        "護甲": 0.05
+      },
+      "rawStats": {
+        "Stamina": 1.15,
+        "Strength": 0.62,
+        "Agility": 0.56,
+        "AttackPower": 0.27,
+        "HitRating": 0.06,
+        "CritRating": 0.43,
+        "HasteRating": 0.29,
+        "ExpertiseRating": 3.07,
+        "ArmorPenetration": 0.12,
+        "DefenseRating": 0.45,
+        "BlockRating": 0,
+        "BlockValue": 0.63,
+        "DodgeRating": 0.23,
+        "ParryRating": 0.22,
+        "Armor": 0.05,
+        "BonusArmor": 0.05,
+        "ArmorNoMods": 0.05
+      },
+      "rawPseudo": {
+        "MainHandDps": 1.45
+      },
+      "omitted": [
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "ExpertiseRating",
+        "ArmorPenetration",
+        "DefenseRating",
+        "BlockRating",
+        "DodgeRating",
+        "ParryRating",
+        "BonusArmor",
+        "ArmorNoMods",
+        "PseudoStat.MainHandDps"
+      ]
+    },
+    {
+      "spec": "spec-6",
+      "source": "ui/specs/paladin/retribution/presets.ts",
+      "declaration": "UnsealedWrathEpWeights",
+      "label": "懲戒聖印",
+      "variant": "unsealed",
+      "catalogWeights": {
+        "strength": 2.4,
+        "agility": 1.91,
+        "intellect": 1.48,
+        "spell_damage": 1.95,
+        "attack_power": 1,
+        "mp5": 0.01
+      },
+      "panelWeights": {
+        "力量": 2.4,
+        "敏捷": 1.91,
+        "智力": 1.48,
+        "法術傷害": 1.95,
+        "攻擊強度": 1,
+        "每5秒法力": 0.01
+      },
+      "rawStats": {
+        "Strength": 2.4,
+        "Agility": 1.91,
+        "Intellect": 1.48,
+        "SpellDamage": 1.95,
+        "HolyDamage": 1.59,
+        "SpellPiercing": 0.66,
+        "AttackPower": 1,
+        "HitRating": 7.76,
+        "CritRating": 2.74,
+        "HasteRating": 3.53,
+        "ArmorPenetration": 0.23,
+        "ExpertiseRating": 5.45,
+        "MP5": 0.01
+      },
+      "rawPseudo": {
+        "MainHandDps": 14.14
+      },
+      "omitted": [
+        "HolyDamage",
+        "SpellPiercing",
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "ArmorPenetration",
+        "ExpertiseRating",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.SchoolHitPercentHoly",
+        "PseudoStat.RangedHitPercent"
+      ]
+    },
+    {
+      "spec": "spec-6",
+      "source": "ui/specs/paladin/retribution/presets.ts",
+      "declaration": "HolyShockEpWeights",
+      "label": "懲戒神聖震擊",
+      "variant": "holyshock",
+      "catalogWeights": {
+        "strength": 2.4,
+        "agility": 1.91,
+        "intellect": 1.77,
+        "spell_damage": 2.47,
+        "attack_power": 1,
+        "mp5": 0.01
+      },
+      "panelWeights": {
+        "力量": 2.4,
+        "敏捷": 1.91,
+        "智力": 1.77,
+        "法術傷害": 2.47,
+        "攻擊強度": 1,
+        "每5秒法力": 0.01
+      },
+      "rawStats": {
+        "Strength": 2.4,
+        "Agility": 1.91,
+        "Intellect": 1.77,
+        "SpellDamage": 2.47,
+        "HolyDamage": 2.06,
+        "SpellPiercing": 0.84,
+        "AttackPower": 1,
+        "HitRating": 7.23,
+        "CritRating": 3,
+        "HasteRating": 2.73,
+        "ArmorPenetration": 0.22,
+        "ExpertiseRating": 4.81,
+        "MP5": 0.01
+      },
+      "rawPseudo": {
+        "MainHandDps": 14.02
+      },
+      "omitted": [
+        "HolyDamage",
+        "SpellPiercing",
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "ArmorPenetration",
+        "ExpertiseRating",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.SchoolHitPercentHoly",
+        "PseudoStat.RangedHitPercent"
+      ]
+    },
+    {
+      "spec": "spec-7",
+      "source": "ui/specs/hunter/dps/presets.ts",
+      "declaration": "TurretEpWeights",
+      "label": "獸王遠程參考",
+      "variant": "turret",
+      "catalogWeights": {
+        "agility": 1,
+        "intellect": 0.64,
+        "ranged_attack_power": 0.34,
+        "mp5": 0.41
+      },
+      "panelWeights": {
+        "敏捷": 1,
+        "智力": 0.64,
+        "遠程攻強": 0.34,
+        "每5秒法力": 0.41
+      },
+      "rawStats": {
+        "Agility": 1,
+        "Intellect": 0.64,
+        "RangedAttackPower": 0.34,
+        "HitRating": 1.26,
+        "CritRating": 0.87,
+        "HasteRating": 0.75,
+        "MP5": 0.41
+      },
+      "rawPseudo": {
+        "RangedDps": 3.29
+      },
+      "omitted": [
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "PseudoStat.RangedDps"
+      ]
+    },
+    {
+      "spec": "spec-8",
+      "source": "ui/specs/hunter/dps/presets.ts",
+      "declaration": "TurretEpWeights",
+      "label": "射擊遠程",
+      "variant": "turret",
+      "catalogWeights": {
+        "agility": 1,
+        "intellect": 0.64,
+        "ranged_attack_power": 0.34,
+        "mp5": 0.41
+      },
+      "panelWeights": {
+        "敏捷": 1,
+        "智力": 0.64,
+        "遠程攻強": 0.34,
+        "每5秒法力": 0.41
+      },
+      "rawStats": {
+        "Agility": 1,
+        "Intellect": 0.64,
+        "RangedAttackPower": 0.34,
+        "HitRating": 1.26,
+        "CritRating": 0.87,
+        "HasteRating": 0.75,
+        "MP5": 0.41
+      },
+      "rawPseudo": {
+        "RangedDps": 3.29
+      },
+      "omitted": [
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "PseudoStat.RangedDps"
+      ]
+    },
+    {
+      "spec": "spec-9",
+      "source": "ui/specs/hunter/dps/presets.ts",
+      "declaration": "WeaveEpWeights",
+      "label": "生存近遠穿插",
+      "variant": "weave",
+      "catalogWeights": {
+        "agility": 1,
+        "strength": 0.22,
+        "intellect": 0.44,
+        "attack_power": 0.2,
+        "ranged_attack_power": 0.2,
+        "mp5": 0.12
+      },
+      "panelWeights": {
+        "敏捷": 1,
+        "力量": 0.22,
+        "智力": 0.44,
+        "攻擊強度": 0.2,
+        "遠程攻強": 0.2,
+        "每5秒法力": 0.12
+      },
+      "rawStats": {
+        "Agility": 1,
+        "Strength": 0.22,
+        "Intellect": 0.44,
+        "AttackPower": 0.2,
+        "RangedAttackPower": 0.2,
+        "HitRating": 1.43,
+        "CritRating": 0.83,
+        "HasteRating": 0.82,
+        "MP5": 0.12
+      },
+      "rawPseudo": {
+        "MainHandDps": 2.93,
+        "RangedDps": 1.69
+      },
+      "omitted": [
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.RangedDps"
+      ]
+    },
+    {
+      "spec": "spec-9",
+      "source": "ui/specs/hunter/dps/presets.ts",
+      "declaration": "MeleeEpWeights",
+      "label": "生存近戰",
+      "variant": "melee",
+      "catalogWeights": {
+        "agility": 1,
+        "strength": 0.41,
+        "intellect": 0.7,
+        "attack_power": 0.37,
+        "ranged_attack_power": 0.15,
+        "mp5": 0.23
+      },
+      "panelWeights": {
+        "敏捷": 1,
+        "力量": 0.41,
+        "智力": 0.7,
+        "攻擊強度": 0.37,
+        "遠程攻強": 0.15,
+        "每5秒法力": 0.23
+      },
+      "rawStats": {
+        "Agility": 1,
+        "Strength": 0.41,
+        "Intellect": 0.7,
+        "AttackPower": 0.37,
+        "RangedAttackPower": 0.15,
+        "HitRating": 2.48,
+        "CritRating": 1,
+        "HasteRating": 0.91,
+        "MP5": 0.23
+      },
+      "rawPseudo": {
+        "MainHandDps": 4.86,
+        "OffHandDps": 1.18,
+        "RangedDps": 0.27
+      },
+      "omitted": [
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.OffHandDps",
+        "PseudoStat.RangedDps"
+      ]
+    },
+    {
+      "spec": "spec-10",
+      "source": "ui/specs/rogue/dps/presets.ts",
+      "declaration": "EP_PRESET_ASSASSINATION",
+      "label": "刺殺",
+      "variant": "assassination",
+      "catalogWeights": {
+        "stamina": 0.01,
+        "agility": 2.06,
+        "strength": 1.1,
+        "attack_power": 1
+      },
+      "panelWeights": {
+        "耐力": 0.01,
+        "敏捷": 2.06,
+        "力量": 1.1,
+        "攻擊強度": 1
+      },
+      "rawStats": {
+        "Stamina": 0.01,
+        "Agility": 2.06,
+        "Strength": 1.1,
+        "CritRating": 2.02,
+        "HasteRating": 1.93,
+        "HitRating": 2.8,
+        "ExpertiseRating": 2.77,
+        "ArmorPenetration": 0.4,
+        "SpellPiercing": 0.65,
+        "AttackPower": 1,
+        "PhysicalDamage": 10.55
+      },
+      "rawPseudo": {
+        "MainHandDps": 8.44,
+        "OffHandDps": 4.16
+      },
+      "omitted": [
+        "CritRating",
+        "HasteRating",
+        "HitRating",
+        "ExpertiseRating",
+        "ArmorPenetration",
+        "SpellPiercing",
+        "PhysicalDamage",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.OffHandDps"
+      ]
+    },
+    {
+      "spec": "spec-11",
+      "source": "ui/specs/rogue/dps/presets.ts",
+      "declaration": "EP_PRESET_COMBAT_SINISTER",
+      "label": "戰鬥邪惡攻擊",
+      "variant": "sinister",
+      "catalogWeights": {
+        "stamina": 0.01,
+        "agility": 1.96,
+        "strength": 1.1,
+        "attack_power": 1
+      },
+      "panelWeights": {
+        "耐力": 0.01,
+        "敏捷": 1.96,
+        "力量": 1.1,
+        "攻擊強度": 1
+      },
+      "rawStats": {
+        "Stamina": 0.01,
+        "Agility": 1.96,
+        "Strength": 1.1,
+        "CritRating": 1.7,
+        "HasteRating": 1.72,
+        "HitRating": 2.42,
+        "ExpertiseRating": 2.55,
+        "ArmorPenetration": 0.41,
+        "SpellPiercing": 0.19,
+        "AttackPower": 1,
+        "PhysicalDamage": 7.97
+      },
+      "rawPseudo": {
+        "MainHandDps": 10.57,
+        "OffHandDps": 2.93
+      },
+      "omitted": [
+        "CritRating",
+        "HasteRating",
+        "HitRating",
+        "ExpertiseRating",
+        "ArmorPenetration",
+        "SpellPiercing",
+        "PhysicalDamage",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.OffHandDps"
+      ]
+    },
+    {
+      "spec": "spec-11",
+      "source": "ui/specs/rogue/dps/presets.ts",
+      "declaration": "EP_PRESET_COMBAT_DAGS",
+      "label": "戰鬥匕首",
+      "variant": "daggers",
+      "catalogWeights": {
+        "stamina": 0.01,
+        "agility": 1.95,
+        "strength": 1.1,
+        "attack_power": 1
+      },
+      "panelWeights": {
+        "耐力": 0.01,
+        "敏捷": 1.95,
+        "力量": 1.1,
+        "攻擊強度": 1
+      },
+      "rawStats": {
+        "Stamina": 0.01,
+        "Agility": 1.95,
+        "Strength": 1.1,
+        "CritRating": 1.68,
+        "HasteRating": 1.7,
+        "HitRating": 2.35,
+        "ExpertiseRating": 2.21,
+        "ArmorPenetration": 0.43,
+        "SpellPiercing": 0.21,
+        "AttackPower": 1,
+        "PhysicalDamage": 9.9
+      },
+      "rawPseudo": {
+        "MainHandDps": 10.18,
+        "OffHandDps": 2.97
+      },
+      "omitted": [
+        "CritRating",
+        "HasteRating",
+        "HitRating",
+        "ExpertiseRating",
+        "ArmorPenetration",
+        "SpellPiercing",
+        "PhysicalDamage",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.OffHandDps"
+      ]
+    },
+    {
+      "spec": "spec-12",
+      "source": "ui/specs/rogue/dps/presets.ts",
+      "declaration": "EP_PRESET_SUBTLETY",
+      "label": "敏銳",
+      "variant": "subtlety",
+      "catalogWeights": {
+        "stamina": 0.01,
+        "agility": 1.93,
+        "strength": 1.1,
+        "attack_power": 1
+      },
+      "panelWeights": {
+        "耐力": 0.01,
+        "敏捷": 1.93,
+        "力量": 1.1,
+        "攻擊強度": 1
+      },
+      "rawStats": {
+        "Stamina": 0.01,
+        "Agility": 1.93,
+        "Strength": 1.1,
+        "CritRating": 1.63,
+        "HasteRating": 1.43,
+        "HitRating": 2.12,
+        "ExpertiseRating": 2.42,
+        "ArmorPenetration": 0.33,
+        "SpellPiercing": 0.16,
+        "AttackPower": 1,
+        "PhysicalDamage": 6.83
+      },
+      "rawPseudo": {
+        "MainHandDps": 10.47,
+        "OffHandDps": 2.27
+      },
+      "omitted": [
+        "CritRating",
+        "HasteRating",
+        "HitRating",
+        "ExpertiseRating",
+        "ArmorPenetration",
+        "SpellPiercing",
+        "PhysicalDamage",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.OffHandDps"
+      ]
+    },
+    {
+      "spec": "spec-13",
+      "source": "ui/specs/priest/healer/presets.ts",
+      "declaration": "DiscSingleTargetEpWeights",
+      "label": "戒律單體",
+      "variant": "single",
+      "catalogWeights": {
+        "healing": 1,
+        "intellect": 0.2,
+        "spirit": 0.15,
+        "mp5": 0.4
+      },
+      "panelWeights": {
+        "治療加成": 1,
+        "智力": 0.2,
+        "精神": 0.15,
+        "每5秒法力": 0.4
+      },
+      "rawStats": {
+        "HealingPower": 1,
+        "CritRating": 0.7,
+        "HasteRating": 0.15,
+        "Intellect": 0.2,
+        "Spirit": 0.15,
+        "MP5": 0.4
+      },
+      "rawPseudo": {},
+      "omitted": [
+        "CritRating",
+        "HasteRating"
+      ]
+    },
+    {
+      "spec": "spec-13",
+      "source": "ui/specs/priest/healer/presets.ts",
+      "declaration": "DiscRaidHealingEpWeights",
+      "label": "戒律團隊",
+      "variant": "raid",
+      "catalogWeights": {
+        "healing": 1,
+        "intellect": 0.2,
+        "spirit": 0.1,
+        "mp5": 0.19
+      },
+      "panelWeights": {
+        "治療加成": 1,
+        "智力": 0.2,
+        "精神": 0.1,
+        "每5秒法力": 0.19
+      },
+      "rawStats": {
+        "HealingPower": 1,
+        "CritRating": 0.48,
+        "HasteRating": 0.1,
+        "Intellect": 0.2,
+        "Spirit": 0.1,
+        "MP5": 0.19
+      },
+      "rawPseudo": {},
+      "omitted": [
+        "CritRating",
+        "HasteRating"
+      ]
+    },
+    {
+      "spec": "spec-14",
+      "source": "ui/specs/priest/healer/presets.ts",
+      "declaration": "HolySingleTargetEpWeights",
+      "label": "神聖單體",
+      "variant": "single",
+      "catalogWeights": {
+        "healing": 1,
+        "intellect": 0.35,
+        "spirit": 0.3,
+        "mp5": 0.6
+      },
+      "panelWeights": {
+        "治療加成": 1,
+        "智力": 0.35,
+        "精神": 0.3,
+        "每5秒法力": 0.6
+      },
+      "rawStats": {
+        "HealingPower": 1,
+        "CritRating": 0.3,
+        "HasteRating": 0.5,
+        "Intellect": 0.35,
+        "Spirit": 0.3,
+        "MP5": 0.6
+      },
+      "rawPseudo": {},
+      "omitted": [
+        "CritRating",
+        "HasteRating"
+      ]
+    },
+    {
+      "spec": "spec-14",
+      "source": "ui/specs/priest/healer/presets.ts",
+      "declaration": "HolyRaidHealingEpWeights",
+      "label": "神聖團隊",
+      "variant": "raid",
+      "catalogWeights": {
+        "healing": 1,
+        "intellect": 0.3,
+        "spirit": 0.25,
+        "mp5": 0.6
+      },
+      "panelWeights": {
+        "治療加成": 1,
+        "智力": 0.3,
+        "精神": 0.25,
+        "每5秒法力": 0.6
+      },
+      "rawStats": {
+        "HealingPower": 1,
+        "CritRating": 0.23,
+        "HasteRating": 0.48,
+        "Intellect": 0.3,
+        "Spirit": 0.25,
+        "MP5": 0.6
+      },
+      "rawPseudo": {},
+      "omitted": [
+        "CritRating",
+        "HasteRating"
+      ]
+    },
+    {
+      "spec": "spec-15",
+      "source": "ui/specs/priest/dps/presets.ts",
+      "declaration": "ShadowEpWeights",
+      "label": "暗影",
+      "variant": "shadow",
+      "catalogWeights": {
+        "intellect": 0.26,
+        "spell_damage": 1,
+        "mp5": 0.01
+      },
+      "panelWeights": {
+        "智力": 0.26,
+        "法術傷害": 1,
+        "每5秒法力": 0.01
+      },
+      "rawStats": {
+        "Intellect": 0.26,
+        "SpellDamage": 1,
+        "ShadowDamage": 1,
+        "SpellPiercing": 2.49,
+        "HitRating": 1.2,
+        "CritRating": 0.99,
+        "HasteRating": -0.09,
+        "MP5": 0.01
+      },
+      "rawPseudo": {},
+      "omitted": [
+        "ShadowDamage",
+        "SpellPiercing",
+        "HitRating",
+        "CritRating",
+        "HasteRating"
+      ]
+    },
+    {
+      "spec": "spec-16",
+      "source": "ui/specs/shaman/elemental/presets.ts",
+      "declaration": "DefaultEpWeights",
+      "label": "元素",
+      "variant": "elemental",
+      "catalogWeights": {
+        "intellect": 0.19,
+        "spirit": 0.02,
+        "spell_damage": 1,
+        "mp5": 0.04
+      },
+      "panelWeights": {
+        "智力": 0.19,
+        "精神": 0.02,
+        "法術傷害": 1,
+        "每5秒法力": 0.04
+      },
+      "rawStats": {
+        "Intellect": 0.19,
+        "Spirit": 0.02,
+        "SpellDamage": 1,
+        "FireDamage": 0.31,
+        "NatureDamage": 0.69,
+        "SpellPiercing": 1.81,
+        "HitRating": 1.18,
+        "CritRating": 0.61,
+        "HasteRating": 1.23,
+        "MP5": 0.04
+      },
+      "rawPseudo": {},
+      "omitted": [
+        "FireDamage",
+        "NatureDamage",
+        "SpellPiercing",
+        "HitRating",
+        "CritRating",
+        "HasteRating"
+      ]
+    },
+    {
+      "spec": "spec-17",
+      "source": "ui/specs/shaman/enhancement/presets.ts",
+      "declaration": "PreBiSEpWeights",
+      "label": "增強",
+      "variant": "enhancement",
+      "catalogWeights": {
+        "strength": 2.2,
+        "agility": 1.32,
+        "intellect": 1.99,
+        "attack_power": 1,
+        "spell_damage": 1.27
+      },
+      "panelWeights": {
+        "力量": 2.2,
+        "敏捷": 1.32,
+        "智力": 1.99,
+        "攻擊強度": 1,
+        "法術傷害": 1.27
+      },
+      "rawStats": {
+        "Strength": 2.2,
+        "Agility": 1.32,
+        "Intellect": 1.99,
+        "AttackPower": 1,
+        "HitRating": 5.2,
+        "CritRating": 2.42,
+        "HasteRating": 2.81,
+        "ExpertiseRating": 3.5,
+        "ArmorPenetration": 0.37,
+        "SpellDamage": 1.27,
+        "NatureDamage": 0.72,
+        "SpellPiercing": 2.52
+      },
+      "rawPseudo": {
+        "MainHandDps": 14.18
+      },
+      "omitted": [
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "ExpertiseRating",
+        "ArmorPenetration",
+        "NatureDamage",
+        "SpellPiercing",
+        "PseudoStat.MainHandDps"
+      ]
+    },
+    {
+      "spec": "spec-25",
+      "source": "ui/specs/druid/balance/presets.ts",
+      "declaration": "DefaultEpWeights",
+      "label": "平衡",
+      "variant": "balance",
+      "catalogWeights": {
+        "intellect": 0.23,
+        "spirit": 0.02,
+        "spell_damage": 1,
+        "mp5": 0.08
+      },
+      "panelWeights": {
+        "智力": 0.23,
+        "精神": 0.02,
+        "法術傷害": 1,
+        "每5秒法力": 0.08
+      },
+      "rawStats": {
+        "Intellect": 0.23,
+        "Spirit": 0.02,
+        "SpellDamage": 1,
+        "ArcaneDamage": 0.62,
+        "NatureDamage": 0.38,
+        "HitRating": 1.15,
+        "CritRating": 0.72,
+        "HasteRating": 1,
+        "MP5": 0.08
+      },
+      "rawPseudo": {},
+      "omitted": [
+        "ArcaneDamage",
+        "NatureDamage",
+        "HitRating",
+        "CritRating",
+        "HasteRating"
+      ]
+    },
+    {
+      "spec": "spec-26",
+      "source": "ui/specs/druid/feral_ep.ts",
+      "declaration": "CatEp",
+      "label": "野性貓",
+      "variant": "cat",
+      "catalogWeights": {
+        "strength": 0.5942180657086884,
+        "agility": 0.6546615973907315,
+        "attack_power": 0.24378941350988748
+      },
+      "panelWeights": {
+        "力量": 0.5942180657086884,
+        "敏捷": 0.6546615973907315,
+        "攻擊強度": 0.24378941350988748
+      },
+      "rawStats": {
+        "Strength": 0.5942180657086884,
+        "Agility": 0.6546615973907315,
+        "AttackPower": 0.24378941350988748,
+        "FeralAttackPower": 0.24313926679561954,
+        "HitRating": 0.5211576370723761,
+        "CritRating": 0.5057159311903373,
+        "HasteRating": 0.39306887257711326,
+        "ArmorPenetration": 0.07421506952196227,
+        "ExpertiseRating": 0.49040516114181354,
+        "PhysicalDamage": 1.8630615922745424
+      },
+      "rawPseudo": {
+        "MainHandDps": 2.142010195278739,
+        "FeralCombatSkill": 5.326180320036634
+      },
+      "omitted": [
+        "FeralAttackPower",
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "ArmorPenetration",
+        "ExpertiseRating",
+        "PhysicalDamage",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.FeralCombatSkill"
+      ]
+    },
+    {
+      "spec": "spec-27",
+      "source": "ui/specs/druid/feral_ep.ts",
+      "declaration": "BearEp",
+      "label": "野性熊",
+      "variant": "bear",
+      "catalogWeights": {
+        "strength": 0.4860504938346992,
+        "agility": 0.4334793978220709,
+        "stamina": 1.0028749432917183,
+        "attack_power": 0.22093229824112756,
+        "armor": 0.1743755390508764
+      },
+      "panelWeights": {
+        "力量": 0.4860504938346992,
+        "敏捷": 0.4334793978220709,
+        "耐力": 1.0028749432917183,
+        "攻擊強度": 0.22093229824112756,
+        "護甲": 0.1743755390508764
+      },
+      "rawStats": {
+        "Strength": 0.4860504938346992,
+        "Agility": 0.4334793978220709,
+        "Stamina": 1.0028749432917183,
+        "AttackPower": 0.22093229824112756,
+        "FeralAttackPower": 0.22093229824112756,
+        "HitRating": 0.6879449708049289,
+        "CritRating": 0.36326222397559405,
+        "HasteRating": 0.3581301339921136,
+        "ArmorPenetration": 0.08262889794633035,
+        "ExpertiseRating": 1.775973949024296,
+        "DefenseRating": 0.8758307060275772,
+        "DodgeRating": 0.10739498989242388,
+        "Armor": 0.1743755390508764,
+        "BonusArmor": 0.17437553905087635,
+        "Health": 0.07717112351322317,
+        "PhysicalDamage": 1.3666857276700761,
+        "ArmorNoMods": 0.03691185978147275
+      },
+      "rawPseudo": {
+        "MainHandDps": 3.0930521753757847,
+        "FeralCombatSkill": 2.5478378284939915
+      },
+      "omitted": [
+        "FeralAttackPower",
+        "HitRating",
+        "CritRating",
+        "HasteRating",
+        "ArmorPenetration",
+        "ExpertiseRating",
+        "DefenseRating",
+        "DodgeRating",
+        "BonusArmor",
+        "Health",
+        "PhysicalDamage",
+        "ArmorNoMods",
+        "PseudoStat.MainHandDps",
+        "PseudoStat.FeralCombatSkill"
+      ]
+    }
+  ],
+  "missing": [],
+  "scope": "Upstream EP presets, partial catalog fields; no caps, effects or universal BiS."
+}
