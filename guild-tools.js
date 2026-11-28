@@ -1896,6 +1896,32 @@ function combatGearTrial(request,equipment,id,mode,keepMatching=true,preserveEmp
  const changes=combatEquipmentDiff(before,after);
  return {baseline:JSON.parse(JSON.stringify(request)),candidate,changes};
 }
+// Action metrics are totals across all iterations (pinned upstream proto/api.proto).
+// Keep pets separate and never confuse target-level events with unique casts.
+function combatBrowserActionRows(raw,playerKey=""){
+ let players;try{players=combatResultPlayers(raw).filter(x=>!x.dummy);}catch(e){return [];}
+ const chosen=playerKey?players.find(x=>x.key===playerKey):players.length===1?players[0]:null;
+ if(!chosen)return [];
+ const n=raw.iterationsDone,rows=[],fields=["damage","threat","healing","shielding","casts","manualCasts"];
+ function visit(unit,owner,depth){
+  if(!unit||depth>3||rows.length>=10000)return;
+  for(const a of Array.isArray(unit.actions)?unit.actions:[]){
+   if(rows.length>=10000)break;
+   const aid=a?.id;if(!aid||!Array.isArray(a.targets))continue;
+   const kinds=["spellId","itemId","otherId"].filter(k=>aid[k]!=null&&aid[k]!==0&&aid[k]!=="OtherActionNone");
+   if(kinds.length!==1)continue;
+   const kind=kinds[0],id=aid[kind];if(kind==="otherId"?!(typeof id==="string"&&id.length>0&&id.length<=100||Number.isSafeInteger(id)&&id>0):!Number.isSafeInteger(id)||id<=0)continue;
+   const totals={};for(const k of fields){
+    let total=0,found=false;for(const t of a.targets){const v=t?.[k];if(Number.isFinite(v)&&v>=0){total+=v;found=true;}}
+    if(found&&Number.isFinite(total))totals[k]=total/n;
+   }
+   if(!Object.values(totals).some(x=>x>0))continue;
+   rows.push({owner:owner.slice(0,100),kind,id,tag:Number.isSafeInteger(aid.tag)?aid.tag:0,rank:Number.isSafeInteger(aid.rank)?aid.rank:0,passive:a.isPassive===true,...totals});
+  }
+  for(const [i,pet] of (Array.isArray(unit.pets)?unit.pets:[]).slice(0,20).entries())visit(pet,owner+"／"+(typeof pet?.name==="string"&&pet.name.trim()?pet.name:"寵物 "+(i+1)),depth+1);
+ }
+ visit(chosen.player,"角色",0);return rows;
+}
 function combatNativeActions(rows,metric="damage"){
  if(!["damage","threat","healing","shielding"].includes(metric)||!Array.isArray(rows))return [];
  return rows.filter(x=>x&&typeof x.owner==="string"&&["spellId","itemId","otherId"].includes(x.kind)&&(x.kind==="otherId"?typeof x.id==="string"||Number.isSafeInteger(x.id):Number.isSafeInteger(x.id)&&x.id>0)&&Number.isFinite(x[metric])&&x[metric]>0).sort((a,b)=>b[metric]-a[metric]).slice(0,80);
@@ -1908,15 +1934,16 @@ function combatNativeActionView(parent,rows,id){
   out.replaceChildren();
   const valid=combatNativeActions(rows,metric.value);
   if(!valid.length){out.append(node("p","未取得此類技能貢獻資料。","gt-muted"));return;}
+  const total=rows.reduce((n,x)=>n+(Number.isFinite(x?.[metric.value])&&x[metric.value]>0?x[metric.value]:0),0);
   for(const x of valid){
    const name=(x.kind==="spellId"?"技能":x.kind==="itemId"?"物品":"其他動作")+" "+x.id+(x.rank?"（等級 "+x.rank+"）":"")+(x.tag?"［"+x.tag+"］":"");
    const row=node("p");row.append(node("span",x.owner+" ｜ "));
    if(x.kind==="spellId"||x.kind==="itemId")row.append(link(name,"https://www.wowhead.com/forever/tw/"+(x.kind==="spellId"?"spell=":"item=")+x.id));else row.append(node("span",name));
-   row.append(node("span"," ｜ "+x[metric.value].toFixed(2)+(Number.isFinite(x.manualCasts)?" ｜ 平均手動施放目標事件 "+x.manualCasts.toFixed(2):"")+(x.passive?" ｜ 被動":"")));
+   row.append(node("span"," ｜ "+x[metric.value].toFixed(2)+(Number.isFinite(total)&&total>0?" ｜ 已收錄貢獻 "+(100*x[metric.value]/total).toFixed(1)+"%":"")+(Number.isFinite(x.manualCasts)?" ｜ 平均手動施放目標事件 "+x.manualCasts.toFixed(2):"")+(x.passive?" ｜ 被動":"")));
    out.append(row);
   }
  }
- metric.addEventListener("change",draw);add(d,node("summary","原生技能貢獻（每場平均總量）"),field("貢獻指標",metric),node("p","依目標動作統計加總並除以迭代數；寵物獨立列出。多目標事件數不等於獨立施法次數，前80列不一定涵蓋所有傷害或仇恨。","gt-muted"),out);parent.append(d);draw();
+ metric.addEventListener("change",draw);add(d,node("summary","原生技能貢獻（每場平均總量）"),field("貢獻指標",metric),node("p","依目標動作統計加總並除以迭代數；寵物獨立列出。百分比以本次已收錄動作為分母，不保證等於角色總指標；多目標事件數不等於獨立施法次數，前80列不一定涵蓋所有傷害或仇恨。","gt-muted"),out);parent.append(d);draw();
 }
 function combatRequestPath(path,id){
  if(typeof path!=="string"||!combatEngineURL(id))return null;
@@ -2266,6 +2293,7 @@ function nativeBrowserView(parent,id){
     if(m.death!==null)part.append(node("p","死亡機率 "+(m.death*100).toFixed(2)+"%"));
     const targets=raw.encounterMetrics?.targets;
     if(Array.isArray(targets))combatNativeTargetView(part,targets.map((t,i)=>({index:i,health:cfg.health,dps:t?.dtps?.avg})),cfg);
+    combatNativeActionView(part,combatBrowserActionRows(raw,m.playerKey),id);
     if(m.logs){const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=m.logs;add(d,node("summary","首次迭代戰鬥紀錄"),pre);part.append(d);}
     add(part,node("p","固定時間原生模擬；不是血量歸零停止的真實擊殺時間。","gt-muted"),button("下載此原生結果",()=>combatDownloadJSON(raw,"tomb-"+id+"-"+job.scenario+"-"+(job.variant??0)+"-result.json")));
     successful++;
