@@ -375,6 +375,18 @@ const server=http.createServer((req,res)=>{
   const scenarioDownload=page.waitForEvent("download");
   await lab.getByRole("button",{name:"下載 A 基準請求"}).click();
   assert.equal((await scenarioDownload).suggestedFilename(),"tomb-spec-26-A.json");
+  await lab.getByText("三種公會遭遇 × 多套配裝批次",{exact:true}).click();
+  await lab.getByLabel("批次方案名稱").fill("測試候選");
+  await lab.getByRole("button",{name:"加入目前配裝至批次",exact:true}).click();
+  assert.ok(await lab.getByText(/1｜測試候選｜/).isVisible());
+  const batchDownload=page.waitForEvent("download");
+  await lab.getByRole("button",{name:"下載三遭遇批次 JSON",exact:true}).click();
+  assert.equal((await batchDownload).suggestedFilename(),"tomb-spec-26-guild-batch.json");
+  const result={format:"tomb-guild-results/1",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",spec:"spec-26",finished:true,cases:[{scenario:"guild-50k",variant:0,name:"原始配裝",iterations:1000,duration:60,metrics:{dps:100,dpsStdev:10}},{scenario:"guild-50k",variant:1,name:"測試候選",iterations:1000,duration:60,metrics:{dps:150,dpsStdev:10}}]};
+  await lab.getByRole("textbox",{name:"三遭遇批次結果 JSON"}).fill(JSON.stringify(result));
+  await lab.getByRole("button",{name:"比較三遭遇批次結果",exact:true}).click();
+  assert.ok(await lab.getByText("本次候選中具勝出證據的最高平均值：測試候選",{exact:true}).isVisible());
+
   await lab.getByText("匯入外部或整套面板配裝",{exact:true}).click();
   await lab.getByLabel("匯入武器模式").selectOption("two");
   const importedGear={items:Array.from({length:17},(_,i)=>i===0?{id:123456789,enchant:22,randomSuffix:3}:i===14?{id:19323}:{})};
