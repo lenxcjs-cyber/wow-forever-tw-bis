@@ -316,7 +316,24 @@ def direct_comparison_group(request):
     e=request["encounter"]
     return "原生引擎同條件／"+str(e.get("duration"))+"±"+str(e.get("durationVariation",0))+"秒／"+key
 
-def direct_case(cli,root,job,duration=None):
+def write_request_file(output_dir,spec,request):
+    """Store the full validated request as a separate, content-addressed JSON file."""
+    if not re.fullmatch(r"spec-(?:[1-9]|1[0-9]|2[0-8])",spec):
+        raise ValueError("Invalid spec")
+    payload=json.dumps(request,ensure_ascii=False,sort_keys=True,allow_nan=False,indent=2)
+    if len(payload.encode("utf-8"))>8000000:
+        raise ValueError("Native request too large")
+    key=hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    directory=Path(output_dir)/"combat-requests"
+    directory.mkdir(parents=True,exist_ok=True)
+    name=spec+"-"+key+".json"
+    path=directory/name
+    temp=path.with_suffix(".json.tmp")
+    temp.write_text(payload,encoding="utf-8")
+    temp.replace(path)
+    return "combat-requests/"+name
+
+def direct_case(cli,root,job,duration=None,output_dir=None):
     spec,label,kind,_,_=job
     data,settings,apl,source_paths,config=direct_settings(root,cli,job)
     request=direct_request(data,duration)
@@ -337,7 +354,8 @@ def direct_case(cli,root,job,duration=None):
     raw=json.dumps(request,ensure_ascii=False,indent=2)
     sources.insert(0,{"path":"本站實際 RaidSimRequest（JSON）","text":raw[:24000],"truncated":len(raw)>24000})
     group=direct_comparison_group(request)
-    return {"spec":spec,"label":label+("／"+str(duration)+"秒" if duration is not None else ""),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
+    request_file=write_request_file(output_dir,spec,request) if output_dir is not None else None
+    return {"requestFile":request_file,"spec":spec,"label":label+("／"+str(duration)+"秒" if duration is not None else ""),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
 
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
@@ -369,7 +387,7 @@ def main(cli,root,output):
     def run_direct(job,duration=None):
         spec,label=job[:2]
         try:
-            d=direct_case(cli,root,job,duration)
+            d=direct_case(cli,root,job,duration,output.parent)
             json.dumps(d,ensure_ascii=False,allow_nan=False)
             cases.append(d)
             print("Native raw preset:",spec,d["label"],flush=True)
@@ -386,7 +404,14 @@ def main(cli,root,output):
             d.update({"spec":spec,"label":label,"settings":source,"apl":apl_source,"configuration":configuration,"comparisonGroup":comparison_group(spec,settings),"sources":collect_sources(root,settings,apl)})
             if spec in ("spec-5","spec-27"):
                 try:d["tank"]=tank_result(cli,root,settings)
-                except (OSError,ValueError,subprocess.SubprocessError) as e:print("Tank metrics unavailable:",str(e)[:300])
+                except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:print("Tank metrics unavailable:",str(e)[:300])
+            # A parsed settings request is a reproducible starting template, not
+            # necessarily identical to the special SIML APL simulation above.
+            try:
+                parsed=invoke(cli,root,["siml","parse","-json",settings])
+                d["templateFile"]=write_request_file(output.parent,spec,direct_request(parsed))
+            except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
+                print("Parsed settings template unavailable:",spec,str(e)[:200])
             # Reject invalid numeric payloads before adding them to the partial snapshot.
             json.dumps(d,ensure_ascii=False,allow_nan=False)
             cases.append(d);print("Native engine preset:",spec,"iterations",d["iterations"],"timeline",len(d["timeline"]))
@@ -395,6 +420,8 @@ def main(cli,root,output):
             print("Preset unavailable:",spec,str(e)[:400])
             failed.append({"spec":spec,"label":label})
             publish()
+    # Publish even when no case has completed yet; failures remain visible.
+    publish()
     # Execute baseline for every class first, before optional variants.
     # Interleave the two execution formats so neither class group starves.
     for index in range(max(len(first_direct),len(siml_first))):
