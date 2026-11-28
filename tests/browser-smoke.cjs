@@ -359,7 +359,15 @@ const server=http.createServer((req,res)=>{
   const gearDownload=page.waitForEvent("download");
   await lab.getByRole("button",{name:"下載替換配裝後的 RaidSimRequest"}).click();
   assert.equal((await gearDownload).suggestedFilename(),"tomb-spec-26-request.json");
-  await lab.getByText("A／B 共用戰鬥情境（選填）",{exact:true}).click();
+  assert.ok(await lab.getByRole("heading",{name:"公會標準實戰目標",exact:true}).isVisible());
+  assert.equal(await lab.getByLabel("公會標準目標").inputValue(),"guild-50k");
+  await lab.getByLabel("公會標準目標").selectOption("guild-5x50k");
+  assert.ok(await lab.getByLabel("相同目標數").isDisabled());
+  await lab.getByLabel("公會標準目標").selectOption("guild-boss");
+  await lab.getByRole("button",{name:"預覽 A／B 配裝變更"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"A／B 配裝變更",exact:true}).isVisible());
+  await lab.getByLabel("公會標準目標").selectOption("");
+  assert.equal(await lab.getByLabel("相同目標數").isDisabled(),false);
   await lab.getByLabel("名義戰鬥時間").selectOption("60");
   await lab.getByLabel("相同目標數").selectOption("3");
   await lab.getByRole("button",{name:"預覽 A／B 配裝變更"}).click();
