@@ -757,13 +757,13 @@ function catalogSetOptions(pools){
 // At most two items share a slot. Keep the best representative per known
 // exclusive group plus the best two ordinary items per set bucket.
 function catalogSlotChoices(rows,slot,capacity,names,exactCoverage=false){
- const buckets=new Map();
+ const buckets=new Map(),seen=new Set();
  for(const row of rows){
   const i=names.indexOf(catalogSetName(row.item));
   if(i<0&&!(row.score.total>0))continue;
   const group=questChoiceGroup(row.item.id),key=i+":"+group;
   if(!buckets.has(key))buckets.set(key,[]);
-  const list=buckets.get(key);if(!list.some(p=>String(p.item.id)===String(row.item.id)))list.push(row);
+  const list=buckets.get(key),id=String(row.item.id);if(!seen.has(id)){seen.add(id);list.push(row);}
  }
  const candidates=[...buckets].flatMap(([key,list])=>list.sort((a,b)=>b.score.total-a.score.total||Number(a.item.id)-Number(b.item.id)).slice(0,key.endsWith(":")?capacity:1));
  const best=new Map();
@@ -856,6 +856,22 @@ function catalogSetShortlist(pools,effects,baseline){
   }
  }
  return rows.sort((a,b)=>a.required-b.required||b.total-a.total||a.count-b.count||a.name.localeCompare(b.name));
+}
+// Bounded screening of the most promising single-set breakpoints. Actual effects
+// and their interactions still need to be evaluated by the native engine.
+function catalogDualSetShortlist(pools,effects,baseline,limit=12){
+ if(!Number.isInteger(limit)||limit<2||limit>20||!Array.isArray(baseline))return {rows:[],screened:0,available:0,tested:0};
+ const singles=catalogSetShortlist(pools,effects,baseline),selected=singles.slice(0,limit),total=baseline.reduce((sum,p)=>sum+p.score.total,0),rows=[],seen=new Set();let tested=0;
+ for(let i=0;i<selected.length;i++)for(let j=i+1;j<selected.length;j++){
+  const a=selected[i],b=selected[j];if(a.name===b.name||a.count+b.count>baseline.length)continue;
+  tested++;const plan=catalogMultiSetAlternative(pools,[{name:a.name,minimum:a.count},{name:b.name,minimum:b.count}],baseline);
+  if(!plan||!catalogSameCoverage(baseline,plan.picks))continue;
+  const key=plan.picks.map(p=>String(p.item.id)).sort().join(",");
+  if(seen.has(key))continue;seen.add(key);
+  const gap=total-plan.total;rows.push({...plan,gap,required:Math.max(0,gap),thresholds:[a,b].map(x=>({name:x.name,count:x.count,profession:x.profession}))});
+ }
+ rows.sort((a,b)=>a.required-b.required||b.total-a.total);
+ return {rows,screened:selected.length,available:singles.length,tested};
 }
 let setEffectsPromise=null;
 function loadSetEffects(){
@@ -1075,7 +1091,17 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
        shortlist.append(more);appendMore();
       }catch(e){shortlist.replaceChildren(node("p","掃描失敗："+e.message,"gt-muted"));}
      });
-     add(setPanel,node("p","自動掃描只使用已登錄的啟動件數。效果未量化，不以面板損失宣稱 BiS；原方案已有的套裝收益也須扣除。","gt-muted"),scan,shortlist);
+     const dualList=node("div",undefined,"gt-dual-set-shortlist"),dualScan=button("掃描雙套裝候選（前12個門檻）",()=>{
+      try{
+       const result=catalogDualSetShortlist(pools,effectRows,baseline);
+       dualList.replaceChildren(node("p","單套門檻共 "+result.available+" 組；本次取前 "+result.screened+" 組，測試 "+result.tested+" 種雙套組合，找到 "+result.rows.length+" 組不同配裝。非全域窮舉、未計效果，可能遺漏其他最佳組合。","gt-muted"));
+       for(const row of result.rows){
+        const label=row.sets.map(x=>zhDisplay(x.name)+" "+x.count+" 件（至少 "+x.minimum+"）").join("＋"),prof=row.thresholds.filter(x=>x.profession).map(x=>zhDisplay(x.profession)).join("、");
+        const item=node("div",undefined,"gt-card");add(item,node("p",label+"｜面板 "+row.total.toFixed(2)),node("p","相較原配裝，需額外淨效果超過 "+row.required.toFixed(2)+" 分"+(prof?"｜專業要求："+prof:""),"gt-muted"),button("匯出雙套裝方案",()=>exportPlan(row.picks,label,row.total)));dualList.append(item);
+       }
+      }catch(e){dualList.replaceChildren(node("p","雙套裝掃描失敗："+e.message,"gt-muted"));}
+     });
+     add(setPanel,node("p","自動掃描只使用已登錄的啟動件數。效果未量化，不以面板損失宣稱 BiS；原方案已有的套裝收益也須扣除。","gt-muted"),scan,shortlist,dualScan,dualList);
      const setSelect=select(sets.map(([n,c])=>[n,zhDisplay(n)+"（最多 "+c+" 件）"])),target=select([]),secondSet=select([]),secondTarget=select([]),detail=node("div"),tiers=node("div"),tierFields=node("div"),bonus=inp("留空＝未知","number");bonus.step="0.01";
      function targets(){const count=sets.find(([n])=>n===setSelect.value)?.[1]||2;target.replaceChildren(...Array.from({length:count-1},(_,i)=>new Option((i+2)+" 件",String(i+2))));target.value=String(Math.min(4,count));const old=secondSet.value;secondSet.replaceChildren(new Option("不指定第二套",""),...sets.filter(([n])=>n!==setSelect.value).map(([n,c])=>new Option(zhDisplay(n)+"（最多 "+c+" 件）",n)));if([...secondSet.options].some(o=>o.value===old))secondSet.value=old;secondTargets();}
      function secondTargets(){const count=sets.find(([n])=>n===secondSet.value)?.[1]||0;secondTarget.replaceChildren(...Array.from({length:Math.max(0,count-1)},(_,i)=>new Option((i+2)+" 件",String(i+2))));secondTarget.disabled=!count;if(count)secondTarget.value="2";}
