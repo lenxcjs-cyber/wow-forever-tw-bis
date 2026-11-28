@@ -1,5 +1,5 @@
 """Run a bounded subset of upstream WoWSims presets; never invent missing values."""
-import copy, json, math, re, subprocess, sys, tempfile, time
+import copy, hashlib, json, math, re, subprocess, sys, tempfile, time
 from pathlib import Path
 
 RELEASE="v1.0.12"
@@ -294,6 +294,19 @@ def direct_metrics(result):
         metrics["death"]=p["chanceOfDeath"]
     return metrics,duration,str(result.get("logs") or "")[:80000]
 
+def direct_comparison_group(request):
+    """Only rank cases with identical encounter and external conditions.
+    Builds can differ in gear, talents, rotation, personal consumables and race.
+    """
+    raid=request["raid"]
+    party=raid["parties"][0]
+    player=party["players"][0]
+    conditions={"encounter":request["encounter"],"raidBuffs":raid.get("buffs",{}),"partyBuffs":party.get("buffs",{}),"debuffs":raid.get("debuffs",{}),"playerBuffs":player.get("buffs",{}),"tanks":raid.get("tanks",[]),"healingModel":player.get("healingModel",{}),"targetDummies":raid.get("targetDummies",0),"inFront":player.get("inFrontOfTarget",False),"simOptions":request["simOptions"]}
+    encoded=json.dumps(conditions,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False)
+    key=hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:12]
+    e=request["encounter"]
+    return "原生引擎同條件／"+str(e.get("duration"))+"±"+str(e.get("durationVariation",0))+"秒／"+key
+
 def direct_case(cli,root,job,duration=None):
     spec,label,kind,_,_=job
     data,settings,apl,source_paths,config=direct_settings(root,cli,job)
@@ -303,8 +316,8 @@ def direct_case(cli,root,job,duration=None):
         path.write_text(json.dumps(request),encoding="utf-8")
         result=invoke(cli,root,["sim","--infile",str(path)])
     metrics,actual,logs=direct_metrics(result)
-    if spec in TANKS and not finite(metrics.get("tps")):
-        raise ValueError("Tank threat missing")
+    if spec in TANKS and (not finite(metrics.get("tps")) or not finite(metrics.get("dtps")) or not request["raid"].get("tanks")):
+        raise ValueError("Tank threat, incoming damage or assignment missing")
     p=data["player"]
     nominal=request["encounter"].get("duration")
     variation=request["encounter"].get("durationVariation",0)
@@ -314,10 +327,7 @@ def direct_case(cli,root,job,duration=None):
         sources.append({"path":name,"text":raw[:24000],"truncated":len(raw)>24000})
     raw=json.dumps(request,ensure_ascii=False,indent=2)
     sources.insert(0,{"path":"本站實際 RaidSimRequest（JSON）","text":raw[:24000],"truncated":len(raw)>24000})
-    group=label+"／"+str(nominal)+"秒"
-    # Compare reconstructed builds only when they use the same controlled encounter.
-    if kind=="reconstructed":
-        group="本站控制構築／"+str(nominal)+"秒（±"+str(variation)+"秒）"
+    group=direct_comparison_group(request)
     return {"spec":spec,"label":label+("／"+str(duration)+"秒" if duration is not None else ""),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
 
 def main(cli,root,output):
