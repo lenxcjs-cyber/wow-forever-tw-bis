@@ -1243,7 +1243,7 @@ const combatHealSpecs=new Set(["spec-4","spec-13","spec-14","spec-18","spec-28"]
 function combatRole(id){return combatTankSpecs.has(id)?"tank":combatHealSpecs.has(id)?"heal":"dps";}
 function combatMetric(id){return {tank:"threat",heal:"healing",dps:"damage"}[combatRole(id)];}
 function combatSnapshotValid(data){return !!data&&data.format===1&&data.release==="v1.0.12"&&data.commit===combatPresetCommit&&Array.isArray(data.cases);}
-function combatFailureLabel(reason){return ({timeout:"引擎逾時","missing-source":"上游設定檔缺少","engine-exit":"引擎執行失敗","invalid-json":"輸出 JSON 無效",validation:"結果或設定未通過驗證",io:"檔案讀寫失敗"})[reason]||"原因未提供";}
+function combatFailureLabel(reason){const labels={timeout:"引擎逾時","missing-source":"上游設定檔缺少","engine-exit":"引擎執行失敗","invalid-json":"輸出 JSON 無效",validation:"結果或設定未通過驗證",io:"檔案讀寫失敗"};return typeof reason==="string"&&Object.hasOwn(labels,reason)?labels[reason]:"原因未提供";}
 function combatCoverage(data){const valid=combatSnapshotValid(data);return Array.from({length:28},(_,i)=>{const id="spec-"+(i+1),count=combatPresetCases(data,id).length,failed=valid&&Array.isArray(data.failed)?data.failed.filter(x=>x?.spec===id).length:0,planned=valid&&Number.isSafeInteger(data.plannedBySpec?.[id])&&data.plannedBySpec[id]>=count+failed?data.plannedBySpec[id]:null;return {id,role:combatRole(id),count,failed,planned,pending:planned===null?null:planned-count-failed};});}
 function combatPresetCases(data,id){
  if(!combatSnapshotValid(data))return [];
@@ -1407,6 +1407,8 @@ function combatScenarioRequest(request,id,options={}){
  return result;
 }
 function combatGearTrial(request,equipment,id,mode,keepMatching=true,preserveEmpty=false){
+ if(!["one","two"].includes(mode))throw Error("武器模式不合法");
+ combatEquipmentRows(equipment,mode);
  const before=combatRequestPlayer(request,id).equipment;
  if(!Array.isArray(before?.items)||before.items.length!==17)throw Error("原請求沒有完整17格裝備，不能做控制變因比較");
  const candidate=combatApplyEquipment(request,equipment,id,keepMatching,preserveEmpty);
@@ -1451,7 +1453,7 @@ function combatReadJSON(text){
 }
 function combatFileInput(area,status,label){
  const input=node("input");input.type="file";input.accept=".json,application/json";input.setAttribute("aria-label",label);
- input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{if(file.size>8000000)throw Error("檔案超過 8 MB");const value=await file.text();combatReadJSON(value);area.value=value;status.textContent="已讀取 "+file.name+"，請確認內容後執行。";}catch(e){status.textContent="讀取失敗："+e.message;}finally{input.value="";}});
+ input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{if(file.size>8000000)throw Error("檔案超過 8 MB");const value=await file.text();combatReadJSON(value);area.value=value;area.dispatchEvent(new Event("input",{bubbles:true}));status.textContent="已讀取 "+file.name+"，請確認內容後執行。";}catch(e){status.textContent="讀取失敗："+e.message;}finally{input.value="";}});
  return input;
 }
 function combatGearView(parent,id,build){
@@ -1470,6 +1472,7 @@ function combatGearView(parent,id,build){
  const all=()=>[...selected].map(([name,el])=>({name,id:el.value,enchant:modifiers.get(name)?.enchant.value??"",randomSuffix:modifiers.get(name)?.randomSuffix.value??""}));
  const current=()=>combatEquipmentSpec(all(),mode.value);
  function refresh(){
+  preview.replaceChildren();
   try{const gear=current();output.value=JSON.stringify(gear,null,2);msg.textContent="已選 "+gear.items.filter(x=>x.id).length+" 件；未選欄位保留空白。可手動設定附魔／詞綴 ID；空白時沿用相同裝備或不設定。須在引擎核對合法性。";}catch(e){output.value="";msg.textContent="配裝無法匯出："+e.message;}
  }
  function draw(){
@@ -1503,7 +1506,7 @@ function combatGearView(parent,id,build){
  const importBox=node("details");add(importBox,node("summary","匯入外部或整套面板配裝"),field("匯入武器模式",importMode),imported,combatFileInput(imported,msg,"上傳配裝 JSON"),button("載入17格配裝",loadEquipment));
  const preview=node("div"),durationPick=select([["","沿用原遭遇"],["30","30秒"],["60","60秒"],["120","120秒"],["180","180秒"],["300","300秒"]]),targetPick=select([["","沿用原遭遇"],["1","1個目標"],["3","3個相同目標"],["5","5個相同目標"],["8","8個相同目標"]]),variation=inp("0","number");
  variation.value="0";variation.min="0";variation.max="60";variation.step="1";variation.disabled=true;durationPick.addEventListener("change",()=>{variation.disabled=!durationPick.value;preview.replaceChildren();});
- targetPick.addEventListener("change",()=>preview.replaceChildren());variation.addEventListener("input",()=>preview.replaceChildren());
+ targetPick.addEventListener("change",()=>preview.replaceChildren());variation.addEventListener("input",()=>preview.replaceChildren());request.addEventListener("input",()=>preview.replaceChildren());keep.addEventListener("change",()=>preview.replaceChildren());preserve.addEventListener("change",()=>preview.replaceChildren());
  const scenario=node("details");add(scenario,node("summary","A／B 共用戰鬥情境（選填）"),field("名義戰鬥時間",durationPick),field("時間浮動秒數",variation),field("相同目標數",targetPick),node("p","只在原遭遇為單體且無複雜目標設定時允許複製敵人；兩份請求使用完全相同遭遇。群體目標仍可能需要在引擎確認仇恨與技能策略。","gt-muted"));
  function trial(){const base=combatScenarioRequest(combatReadJSON(request.value),id,{duration:durationPick.value?Number(durationPick.value):null,variation:durationPick.value?Number(variation.value):null,targets:targetPick.value?Number(targetPick.value):null});return combatGearTrial(base,current(),id,mode.value,keep.checked,preserve.checked);}
  function compareGear(){
@@ -1523,7 +1526,7 @@ function combatGearView(parent,id,build){
   const response=await fetch(valid,{cache:"no-cache"});if(!response.ok)throw Error("HTTP "+response.status);
   const content=await response.text();combatReadJSON(content);
   if(!c.isConnected)return;
-  request.value=content;details.open=true;msg.textContent="已載入原生案例請求；請確認天賦、技能與裝備後再匯出。";request.focus();request.scrollIntoView({block:"nearest"});
+  request.value=content;request.dispatchEvent(new Event("input",{bubbles:true}));details.open=true;msg.textContent="已載入原生案例請求；請確認天賦、技能與裝備後再匯出。";request.focus();request.scrollIntoView({block:"nearest"});
  };
 }
 function combatLab(){
