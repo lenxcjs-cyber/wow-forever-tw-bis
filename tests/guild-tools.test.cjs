@@ -255,6 +255,38 @@ assert.equal(armorPlan.expected,14);assert.equal(armorPlan.filled,4);assert.equa
 assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"敏捷":1},{excludeEffects:true}).total,37);
 assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"敏捷":1},{minQuality:4}).filled,0);
 assert.equal(expansion.catalogArmorPlan({id:"spec-2"},planItems,planProf,{"命中機率":1}).filled,0);
+const questReview=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+section("function catalogQuestReview(","function catalogQuestView(")+";return catalogQuestReview;")();
+const questItems=[
+ itemForPlan(501,"Chest","Leather",30,{quality:3,source_summary:"Quest: Example reward"}),
+ itemForPlan(502,"Chest","Plate",20,{quality:4,source_summary:"Boss drop"}),
+ itemForPlan(503,"Chest","Leather",10,{quality:2,source_summary:"任務獎勵；聲望崇拜"}),
+ itemForPlan(504,"Trinket","Miscellaneous",0,{source_summary:"Quest reward",effects:"Use: special"}),
+ itemForPlan(505,"Chest","Plate",100,{source_summary:"Quest reward",estimated:1}),
+ itemForPlan(506,"Chest","Leather",99,{source_summary:"Quest reward",required_level:61}),
+ itemForPlan(501,"Chest","Leather",30,{source_summary:"Quest reward"})
+];
+assert.ok(expansion.acquisitionMatches({acquisition:"聲望",source:"聲望任務獎勵"},"任務"));
+assert.ok(expansion.acquisitionMatches({acquisition:"任務",source:"Unknown"},"任務"));
+assert.ok(!expansion.acquisitionMatches({source:"Conquest vendor"},"任務"));
+assert.ok(expansion.gearCatalogTags({source_summary:"任务奖励"}).includes("任務"));
+assert.ok(expansion.gearCatalogTags({source_summary:"Quest reward; vendor",required_reputation:"Faction"}).includes("任務"));
+assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Boss drop"},{questOnly:true}),false);
+assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Quest reward",estimated:1},{questOnly:true}),false);
+assert.equal(expansion.catalogArmorPlan({id:"spec-2"},questItems,planProf,{"敏捷":1},{questOnly:true}).total,30);
+const qr=questReview({id:"spec-2"},questItems,planProf,{"敏捷":1});
+assert.equal(qr.total,4);assert.equal(qr.recorded,3);
+const chestQuest=qr.groups.find(g=>g.position==="胸部");
+assert.deepEqual(chestQuest.ranked.map(x=>[x.item.id,x.rank,x.gap]),[[501,1,0],[503,3,20]]);
+assert.equal(chestQuest.unranked[0].id,505);
+assert.equal(qr.groups.find(g=>g.position==="飾品").unranked[0].id,504);
+assert.equal(questReview({id:"spec-2"},questItems,planProf,{}).groups.find(g=>g.position==="胸部").rankedCount,0);
+const questWeapon={id:507,item_class:"Weapon",slot:"One-Hand",subclass:"Dagger",quality:3,source_summary:"Quest reward",dps:40};
+const questWeaponBad={...questWeapon,id:508,dps:100,dps_approx:1};
+const qrWeapons=questReview({id:"spec-10"},[questWeapon,questWeaponBad],rogue,{"武器DPS":1});
+assert.equal(qrWeapons.total,2);
+for(const hand of ["主手","副手"]){const g=qrWeapons.groups.find(x=>x.position===hand);assert.equal(g.ranked[0].item.id,507);assert.equal(g.unranked[0].id,508);}
+console.log("PASS: quest source overlap, low-quality BiS contenders, all-source position ranks, unknown effects and weapon hand gates");
+
 console.log("PASS: catalog armor plan honors cross-armor, distinct ring IDs, quality, source evidence and score limitations");
 
 // Full catalog weapons: exact DPS, distinct IDs, main/off restrictions and shield requirements.
