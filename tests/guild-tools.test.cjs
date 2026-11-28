@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel,combatGuildScenario,combatGuildKill,combatNativeTargetRows};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel,combatGuildScenario,combatGuildKill,combatNativeTargetRows,combatGuildBatch,combatGuildCoverage};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -747,3 +747,30 @@ assert.equal(cStudy.rows[0].confirmedWin,false);
 assert.equal(cStudy.rows[1].confirmedWin,true);
 assert.equal(confidence.nativeSetUncertainty(cRow(0,1000),{...cRow(2,1001),iterations:1},"dps"),null);
 console.log("PASS: health-limited kills, sequential retarget, exact overkill, per-target native estimates and conservative set uncertainty");
+
+
+// All three encounters preserve an immutable baseline and each variant's gear.
+const batchGear=combat.combatEquipmentSpec([{name:"頭部",id:"123456",enchant:"99"}],"one");
+const batchSource=JSON.parse(JSON.stringify(gearRequest));
+const batchBefore=JSON.stringify(batchSource);
+const batch=combat.combatGuildBatch(batchSource,"spec-1",[{name:"套裝候選",mode:"one",equipment:batchGear,preserveEmpty:true}]);
+assert.equal(batch.cases.length,6);assert.equal(batch.cases[0].name,"原始配裝");
+assert.deepEqual(batch.cases.map(x=>x.request.encounter.targets.length),[1,1,1,1,5,5]);
+assert.equal(batch.cases[1].request.raid.parties[0].players[0].equipment.items[0].id,123456);
+assert.equal(batch.cases[1].request.raid.parties[0].players[0].equipment.items[0].enchant,99);
+assert.equal(JSON.stringify(batchSource),batchBefore);
+assert.throws(()=>combat.combatGuildBatch(batchSource,"spec-1",[]));
+assert.throws(()=>combat.combatGuildBatch(batchSource,"spec-1",[{name:"原始配裝",mode:"one",equipment:batchGear}]));
+const batchImport=new Function(section("function nativeSetUncertainty(","function nativeSetComparison(")+section("const combatPaths=","function combatLab(")+";return {combatGuildBatchResults};")();
+const batchOut=(cases,spec="spec-1")=>({format:"tomb-guild-results/1",commit:combat.combatPresetCommit,spec,cases});
+const batchMetric=(variant,name,dps,scenario="guild-50k")=>({scenario,variant,name,iterations:1000,duration:scenario==="guild-boss"?180:60,metrics:{dps,dpsStdev:50}});
+const batchRows=[batchMetric(0,"原始配裝",100),batchMetric(1,"方案A",101),batchMetric(2,"方案B",120),batchMetric(1,"方案A",999,"guild-boss")];
+const batchRanks=batchImport.combatGuildBatchResults(batchOut(batchRows),"spec-1");
+assert.equal(batchRanks.groups[0].best.name,"方案B");
+assert.equal(batchRanks.groups[0].comparisons[1].confirmed,false);
+assert.equal(batchRanks.groups[1].best,null);
+assert.throws(()=>batchImport.combatGuildBatchResults(batchOut([...batchRows,batchRows[0]]),"spec-1"));
+assert.throws(()=>batchImport.combatGuildBatchResults(batchOut(batchRows),"spec-2"));
+const guildCoverage=combat.combatGuildCoverage({plannedScenarios:{"spec-1":{"guild-50k":3,"guild-boss":2,"guild-5x50k":1}},cases:[{spec:"spec-1",scenario:"guild-50k",iterations:1000,duration:60,dps:100,targetCount:1,targetHealth:50000,targetLevel:60,inFrontOfTarget:false},{spec:"spec-1",scenario:"guild-boss",iterations:1000,duration:180,dps:200,targetCount:1,targetHealth:300000,targetLevel:63,inFrontOfTarget:true}],failed:[{spec:"spec-1",scenario:"guild-50k"}]},"spec-1");
+assert.equal(guildCoverage[0].ok,1);assert.equal(guildCoverage[0].failures,1);assert.equal(guildCoverage[0].planned,3);assert.equal(guildCoverage[1].ok,0);
+console.log("PASS: multi-variant guild batches, immutable gear, per-scenario ranks, uncertainty, and validated encounter coverage");
