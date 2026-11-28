@@ -774,3 +774,13 @@ assert.throws(()=>batchImport.combatGuildBatchResults(batchOut(batchRows),"spec-
 const guildCoverage=combat.combatGuildCoverage({plannedScenarios:{"spec-1":{"guild-50k":3,"guild-boss":2,"guild-5x50k":1}},cases:[{spec:"spec-1",scenario:"guild-50k",iterations:1000,duration:60,dps:100,targetCount:1,targetHealth:50000,targetLevel:60,inFrontOfTarget:false},{spec:"spec-1",scenario:"guild-boss",iterations:1000,duration:180,dps:200,targetCount:1,targetHealth:300000,targetLevel:63,inFrontOfTarget:true}],failed:[{spec:"spec-1",scenario:"guild-50k"}]},"spec-1");
 assert.equal(guildCoverage[0].ok,1);assert.equal(guildCoverage[0].failures,1);assert.equal(guildCoverage[0].planned,3);assert.equal(guildCoverage[1].ok,0);
 console.log("PASS: multi-variant guild batches, immutable gear, per-scenario ranks, uncertainty, and validated encounter coverage");
+
+
+const adjacentSet=confidence.nativeSetComparison({thresholds:[2,4],adjacentCounts:[1,3],cases:[cRow(0,1000),cRow(1,990),cRow(2,1020),cRow(4,1040)]},"dps");
+assert.equal(adjacentSet.rows[0].activation,false);
+assert.equal(adjacentSet.rows[1].activation,true);
+assert.equal(adjacentSet.rows[1].previousDelta,30);
+assert.equal(adjacentSet.rows[2].previousDelta,null);
+assert.deepEqual(adjacentSet.missingAdjacent,[3]);
+assert.deepEqual(adjacentSet.missing,[]);
+console.log("PASS: native set activation threshold versus adjacent-count controls and marginal deltas");
