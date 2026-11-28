@@ -359,6 +359,21 @@ const server=http.createServer((req,res)=>{
   const gearDownload=page.waitForEvent("download");
   await lab.getByRole("button",{name:"下載替換配裝後的 RaidSimRequest"}).click();
   assert.equal((await gearDownload).suggestedFilename(),"tomb-spec-26-request.json");
+  await lab.getByText("A／B 共用戰鬥情境（選填）",{exact:true}).click();
+  await lab.getByLabel("名義戰鬥時間").selectOption("60");
+  await lab.getByLabel("相同目標數").selectOption("3");
+  await lab.getByRole("button",{name:"預覽 A／B 配裝變更"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"A／B 配裝變更",exact:true}).isVisible());
+  const scenarioDownload=page.waitForEvent("download");
+  await lab.getByRole("button",{name:"下載 A 基準請求"}).click();
+  assert.equal((await scenarioDownload).suggestedFilename(),"tomb-spec-26-A.json");
+  await lab.getByText("匯入外部或整套面板配裝",{exact:true}).click();
+  await lab.getByLabel("匯入武器模式").selectOption("two");
+  const importedGear={items:Array.from({length:17},(_,i)=>i===0?{id:123456789,enchant:22,randomSuffix:3}:i===14?{id:19323}:{})};
+  await lab.getByRole("textbox",{name:"匯入配裝 JSON"}).fill(JSON.stringify(importedGear));
+  await lab.getByRole("button",{name:"載入17格配裝"}).click();
+  assert.deepEqual(JSON.parse(await lab.getByRole("textbox",{name:"模擬配裝 JSON"}).inputValue()).items[0],{id:123456789,enchant:22,randomSuffix:3});
+
 
   await lab.locator(".gt-combat-presets").getByText("第一輪技能時間軸（最多400個事件）",{exact:true}).click();
   const nativeCard=lab.locator(".gt-combat-presets");
@@ -411,6 +426,13 @@ const server=http.createServer((req,res)=>{
   await spec.selectOption("spec-28");
   assert.equal(await lab.getByLabel("最佳化目標").inputValue(),"healing");
   await lab.getByText("尚缺可驗證治療遭遇",{exact:true}).waitFor({state:"visible"});
+  await lab.getByRole("textbox",{name:"模擬結果 A"}).fill(JSON.stringify({iterationsDone:1000,avgIterationDuration:60,raidMetrics:{parties:[{players:[{name:"Fixture healer",dps:{avg:0},hps:{avg:200,stdev:10}},{name:"Target Dummy 1",dtps:{avg:100},hps:{avg:0}}]}]}}));
+  await lab.getByRole("button",{name:"讀取方案 A 的角色"}).click();
+  await lab.getByLabel("方案 A 分析角色").selectOption("0:0");
+  await lab.getByRole("button",{name:"比較已完成的模擬"}).click();
+  assert.ok(await lab.getByText("DPS 0.00 ｜ TPS 未提供 ｜ HPS 200.00 ｜ DTPS 未提供",{exact:true}).isVisible());
+  assert.ok(await lab.getByText("HPS 標準差 10.00",{exact:true}).isVisible());
+
   await lab.getByRole("button",{name:"載入治療教學範例（非遊戲數值）"}).click();
   await lab.getByRole("button",{name:"比較有效治療及溢補"}).click();
   assert.ok(await lab.getByRole("heading",{name:"治療情境比較",exact:true}).isVisible());
