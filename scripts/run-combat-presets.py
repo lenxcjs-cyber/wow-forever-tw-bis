@@ -51,6 +51,24 @@ RECONSTRUCTED=[
 ]
 HEALERS={"spec-4":"paladin/holy","spec-13":"priest/healer","spec-14":"priest/healer","spec-18":"shaman/restoration","spec-28":"druid/restoration"}
 TANKS={"spec-3","spec-5","spec-27"}
+GUILD_SCENARIOS={"guild-50k":{"label":"60級單體／5萬血","level":60,"health":50000,"count":1,"duration":60},"guild-boss":{"label":"63級首領／30萬血","level":63,"health":300000,"count":1,"duration":180},"guild-5x50k":{"label":"60級五目標／各5萬血","level":60,"health":50000,"count":5,"duration":60}}
+def guild_scenario(request,spec,key,duration=None):
+    """Fixed-duration engine fixture; health is not a kill-stop condition."""
+    cfg=GUILD_SCENARIOS[key]
+    result=copy.deepcopy(request)
+    p=result["raid"]["parties"][0]["players"][0]
+    tank=spec in TANKS
+    p["inFrontOfTarget"]=tank
+    result["raid"]["tanks"]=[{"type":"Player","index":0}] if tank else []
+    stats=[0]*39
+    stats[29]=cfg["health"]
+    swing=1000 if cfg["level"]==63 else 300
+    result["encounter"]={"apiVersion":result["encounter"].get("apiVersion",2),"duration":cfg["duration"] if duration is None else duration,"durationVariation":0,"executeProportion20":0.2,"executeProportion35":0.35,"targets":[{"name":cfg["label"]+" "+str(i+1),"level":cfg["level"],"mobType":"MobTypeUnknown","stats":stats.copy(),"minBaseDamage":swing,"damageSpread":0,"swingSpeed":2,"tankIndex":0 if tank else -1,"canCrush":cfg["level"]==63,"parryHaste":False} for i in range(cfg["count"])]}
+    debuffs=result["raid"].get("debuffs",{})
+    for name in list(debuffs):
+        if re.search(r"sunder|exposeArmor|faerieFire|curseOfRecklessness|curseOfElements|curseOfShadow|armor|resistance",name,re.I):
+            del debuffs[name]
+    return result
 def finite(x): return type(x) in (float,int) and math.isfinite(x)
 def invoke(cli,root,args,payload=None):
     result=subprocess.run([str(cli),*args],cwd=root,input=payload,text=True,capture_output=True,timeout=45,check=True)
@@ -406,10 +424,11 @@ def write_request_file(output_dir,spec,request):
     temp.replace(path)
     return "combat-requests/"+name
 
-def direct_case(cli,root,job,duration=None,output_dir=None,targets=None):
+def direct_case(cli,root,job,duration=None,output_dir=None,targets=None,scenario=None):
     spec,label,kind,_,_=job
     data,settings,apl,source_paths,config=direct_settings(root,cli,job)
     request=direct_request(data,duration,targets)
+    if scenario is not None:request=guild_scenario(request,spec,scenario,duration)
     with tempfile.TemporaryDirectory() as tmp:
         path=Path(tmp)/"request.json"
         path.write_text(json.dumps(request),encoding="utf-8")
@@ -428,8 +447,9 @@ def direct_case(cli,root,job,duration=None,output_dir=None,targets=None):
     sources.insert(0,{"path":"本站實際 RaidSimRequest（JSON）","text":raw[:24000],"truncated":len(raw)>24000})
     group=direct_comparison_group(request)
     request_file=write_request_file(output_dir,spec,request) if output_dir is not None else None
-    suffix=("／"+str(duration)+"秒" if duration is not None else "")+("／"+str(targets)+"目標" if targets is not None else "")
-    return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeActions":direct_action_rows(result),"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
+    suffix=("／"+GUILD_SCENARIOS[scenario]["label"] if scenario else "")+("／"+str(duration)+"秒" if duration is not None else "")+("／"+str(targets)+"目標" if targets is not None else "")
+    if scenario:config+=" 公會標準遭遇覆蓋原目標；零基礎護甲及抗性、固定時間、坦克正面／其他背面；坦克受擊為示意每2秒300（首領1000）基礎傷害。非擊殺模擬。"
+    return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"scenario":scenario,"targetHealth":GUILD_SCENARIOS[scenario]["health"] if scenario else None,"targetLevel":GUILD_SCENARIOS[scenario]["level"] if scenario else None,"inFrontOfTarget":request["raid"]["parties"][0]["players"][0].get("inFrontOfTarget"),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeActions":direct_action_rows(result),"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
 
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
@@ -452,26 +472,26 @@ def main(cli,root,output):
         (siml_extra if entry[0] in seen else siml_first).append(entry)
         seen.add(entry[0])
     all_base=first_direct+[(spec,label,"siml","__LOCAL__:"+settings,(source,apl,configuration)) for spec,label,settings,apl,source,configuration in siml_first]
-    scenario_grid=[(job,60,None) for job in all_base]+[(job,60,3) for job in all_base]+[(job,30,None) for job in all_base]+[(job,120,None) for job in all_base]
-    planned_by_spec=Counter([x[0] for x in cases_to_run+feral_extra+first_direct+extra_direct]+[job[0] for job,_,_ in scenario_grid])
+    scenario_grid=[(job,key) for key in GUILD_SCENARIOS for job in all_base]
+    planned_by_spec=Counter([x[0] for x in cases_to_run+feral_extra+first_direct+extra_direct]+[job[0] for job,_ in scenario_grid])
     planned=sum(planned_by_spec.values())
     start=time.monotonic()
     started_at=datetime.now(timezone.utc).isoformat()
     def publish(complete=False):
-        payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":planned,"plannedBySpec":dict(planned_by_spec),"failed":failed,"finished":complete,"startedAt":started_at,"elapsedSeconds":round(time.monotonic()-start,1),"healerPending":[{"spec":spec,"source":"ui/specs/"+folder+"/presets.ts","reason":"尚缺可驗證的治療遭遇、完整技能策略及有效治療基準；不以 DPS 代替 HPS。"} for spec,folder in HEALERS.items()],"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
+        payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":planned,"plannedBySpec":dict(planned_by_spec),"failed":failed,"finished":complete,"startedAt":started_at,"elapsedSeconds":round(time.monotonic()-start,1),"healerPending":[{"spec":spec,"source":"ui/specs/"+folder+"/presets.ts","reason":"尚缺可驗證的治療遭遇、完整技能策略及有效治療基準；不以 DPS 代替 HPS。"} for spec,folder in HEALERS.items()],"guildScenarios":GUILD_SCENARIOS,"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
         temp=output.with_suffix(output.suffix+".tmp")
         temp.write_text(json.dumps(payload,ensure_ascii=False,allow_nan=False),encoding="utf-8")
         temp.replace(output)
-    def run_direct(job,duration=None,targets=None):
+    def run_direct(job,duration=None,targets=None,scenario=None):
         spec,label=job[:2]
         try:
-            d=direct_case(cli,root,job,duration,output.parent,targets)
+            d=direct_case(cli,root,job,duration,output.parent,targets,scenario)
             json.dumps(d,ensure_ascii=False,allow_nan=False)
             cases.append(d)
             print("Native raw preset:",spec,d["label"],flush=True)
         except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
             print("Native raw preset unavailable:",spec,str(e)[:300],flush=True)
-            failed.append({"spec":spec,"label":label+("／"+str(duration)+"秒" if duration else "")+("／"+str(targets)+"目標" if targets else ""),"reason":failure_kind(e)})
+            failed.append({"spec":spec,"label":label+("／"+GUILD_SCENARIOS[scenario]["label"] if scenario else "")+("／"+str(duration)+"秒" if duration else "")+("／"+str(targets)+"目標" if targets else ""),"reason":failure_kind(e),"scenario":scenario})
         publish()
     def run_siml_case(entry):
         spec,label,settings,apl,source,configuration=entry
@@ -502,25 +522,21 @@ def main(cli,root,output):
             publish()
     # Publish even when no case has completed yet; failures remain visible.
     publish()
-    # Execute baseline for every class first, before optional variants.
-    # Interleave the two execution formats so neither class group starves.
+    # The three guild fixtures take priority over legacy encounters and variants.
+    for job,key in scenario_grid:
+        if time.monotonic()-start>1200:break
+        run_direct(job,scenario=key)
+    # Preserve legacy baseline evidence only if time remains.
     for index in range(max(len(first_direct),len(siml_first))):
+        if time.monotonic()-start>1200:break
         if index<len(first_direct):run_direct(first_direct[index])
         if index<len(siml_first):run_siml_case(siml_first[index])
-    # Run 60s single-target and then 60s three-target trials for all specs,
-    # before extra builds. Additional lengths are attempted in fair rounds.
-    for job,duration,targets in scenario_grid[:2*len(all_base)]:
-        if time.monotonic()-start>1200:break
-        run_direct(job,duration,targets)
     for entry in siml_extra:
         if time.monotonic()-start>1200:break
         run_siml_case(entry)
     for job in extra_direct:
         if time.monotonic()-start>1200:break
         run_direct(job)
-    for job,duration,targets in scenario_grid[2*len(all_base):]:
-        if time.monotonic()-start>1200:break
-        run_direct(job,duration,targets)
     for entry in feral_extra:
         if time.monotonic()-start>1200:break
         run_siml_case(entry)
