@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -494,3 +494,30 @@ const nativeGroups=combat.combatNativeGroups([{comparisonGroup:"30",dps:1},{comp
 assert.deepEqual(nativeGroups.map(x=>[x.label,x.rows.length]),[["30",2],["180",1]]);
 assert.equal(combat.combatNativeGroups([{comparisonGroup:" ",dps:10}]).length,0);
 console.log("PASS: native results remain grouped by explicit encounter; unknown groups excluded");
+
+
+// Multi-target damage and threat, healing not duplicated, bounded buff intervals, shared cooldown.
+const aoeSkill={name:"AoE",cost:0,gain:0,cd:0,cast:0,damage:10,threat:20,healing:5,targetCap:2};
+const aoeBase={duration:3,gcd:1,cap:100,initial:100,regen:0,targets:3,skills:[aoeSkill]};
+const aoeResult=combat.simulatePriority(aoeBase);
+assert.equal(aoeResult.totals.damage,60);assert.equal(aoeResult.totals.threat,120);assert.equal(aoeResult.totals.healing,15);
+assert.deepEqual(aoeResult.targetThreat,[60,60,0]);
+assert.equal(combat.combatObjective(aoeResult,"threat","weakest"),0);
+assert.equal(combat.combatObjective(aoeResult,"threat","total"),40);
+const timedBuff=combat.simulatePriority({...aoeBase,buffs:[{name:"external",start:1,duration:1,damage:2}]});
+assert.equal(timedBuff.totals.damage,80);
+assert.deepEqual(timedBuff.events.map(x=>x.buffs),[[],["external"],[]]);
+const buffSkill={...aoeSkill,name:"Buff",cd:10,damage:0,threat:0,healing:0,buff:{name:"active",duration:2,damage:2}};
+const personalBuff=combat.simulatePriority({...aoeBase,skills:[buffSkill,aoeSkill]});
+assert.equal(personalBuff.totals.damage,60);
+assert.deepEqual(personalBuff.events.map(x=>x.buffs),[[],["active"],[]]);
+const cooldownGroup=combat.simulatePriority({...aoeBase,duration:4,skills:[{...aoeSkill,cd:10,group:"g",groupCd:2},{...aoeSkill,name:"B",group:"g",groupCd:2}]});
+assert.deepEqual(cooldownGroup.events.map(x=>x.time),[0,2]);
+const single={...aoeSkill,name:"single",targetCap:1,threat:200};
+const many={...aoeSkill,name:"many",targetCap:3,threat:30};
+const targetCompare={...aoeBase,skills:[single,many]};
+assert.equal(combat.combatBestPriority(targetCompare,"threat","total").order[0],"single");
+assert.equal(combat.combatBestPriority(targetCompare,"threat","weakest").order[0],"many");
+assert.deepEqual(combat.combatTargetSweep(aoeBase,"threat","weakest").map(x=>x.targets),[1,2,3,5,8]);
+for(const invalid of [{targets:0},{targets:21},{targets:1.5},{buffs:[{name:"bad",start:0,duration:1,damage:4}]},{skills:[{...aoeSkill,targetCap:0}]},{skills:[{...aoeSkill,group:"g"}]}])assert.throws(()=>combat.simulatePriority({...aoeBase,...invalid}));
+console.log("PASS: multi-target caps, per-target threat, minimum-target optimization, timed buffs, shared cooldown and invalid input");
