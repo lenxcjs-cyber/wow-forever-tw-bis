@@ -38,6 +38,26 @@ const partialRows=partial.classes.flatMap(c=>c.talents.map(t=>[c.token+":"+t.tre
 const partialIndex=Object.fromEntries(partialRows);
 assert.equal(Object.keys(partialIndex).length,partialRows.length);
 assert.equal(partialIndex["druid:1:Ferocity"].icon,132190);
+const {iconFile,talentIconURLs}=require("../talents-page.js");
+const fallbackIcons=JSON.parse(fs.readFileSync(path.join(__dirname,"..","talent-icons-fallback.json"),"utf8"));
+assert.equal(fallbackIcons.build,partial.build);
+assert.equal(new Set(partialRows.map(([,t])=>String(t.icon))).size,116);
+for(const [key,t] of partialRows){
+ const cls=key.split(":")[0],name=fallbackIcons.icons[String(t.icon)];
+ assert.ok(/^[a-z][a-z0-9_]+$/.test(name),key);
+ assert.equal(fallbackIcons.icons[key],name);
+ assert.equal(iconFile(t,cls,fallbackIcons.icons),name);
+ assert.equal(iconFile({name:t.name,tree:t.tree},cls,fallbackIcons.icons),name);
+ const urls=talentIconURLs(t,cls,fallbackIcons.icons);
+ assert.equal(urls.length,3);assert.ok(urls[0].startsWith("https://render-classic-us.worldofwarcraft.com/icons/56/"));assert.ok(urls.every(u=>u.endsWith("/"+name+".jpg")));
+}
+assert.equal(iconFile({name:"Ferocity",tree:1,icon:99999999},"druid",fallbackIcons.icons),"");
+assert.equal(iconFile({name:"Ferocity",tree:0},"druid",fallbackIcons.icons),"");
+assert.equal(iconFile({icon:"../../other"},"druid",{}),"");
+assert.equal(iconFile({icon:"INV_Misc_QuestionMark"},"druid",{}),"");
+assert.equal(iconFile({icon:"Ability_Druid_Bash"},"druid",{}),"ability_druid_bash");
+console.log("PASS: all 116 partial original FileDataIDs, exact tree aliases, Blizzard-first same-texture URLs and missing icon safeguards");
+
 assert.equal(partialIndex["rogue:1:Precision"].maxRank,3);
 assert.equal(partialBuildCheck({cls:"rogue",talents:[{},{"Precision":4},{}]},partialIndex).issues.length,2);
 assert.equal(partialBuildCheck({cls:"rogue",talents:[{},{"Unknown":5},{}]},partialIndex).matched,0);
