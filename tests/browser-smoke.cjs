@@ -335,6 +335,23 @@ const server=http.createServer((req,res)=>{
   assert.equal(await shop.locator("input").first().inputValue(),"1");
   assert.equal(Number(await shop.locator(".gt-shopping-remaining").first().textContent()),before-1);
   console.log("PASS: actual recipe selection, material shortage calculation and persisted inventory");
+  await openTab("combat");
+  const lab=page.locator(".gt-panel");
+  assert.ok(await lab.getByRole("heading",{name:"實戰模擬",exact:true}).isVisible());
+  assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).getAttribute("href"),"https://www.wowsims.com/forever/druid/feralcat/");
+  await lab.getByRole("button",{name:"載入純教學範例（非遊戲數值）"}).click();
+  await lab.getByRole("button",{name:"執行 A／B 優先序試算"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"A：原優先序",exact:true}).isVisible());
+  await lab.getByText("逐次施放時間軸",{exact:true}).first().click();
+  assert.ok((await lab.locator(".gt-combat-log").first().textContent()).includes("0.00s"));
+  await lab.getByRole("button",{name:"搜尋最佳固定優先序（最多5技能）"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"假設模型最佳固定優先序"}).isVisible());
+  await lab.getByRole("textbox",{name:"模擬結果 A"}).fill(JSON.stringify({iterationsDone:1000,avgIterationDuration:180,raidMetrics:{parties:[{players:[{dps:{avg:500},threat:{avg:700}}]}]}}));
+  await lab.getByRole("button",{name:"比較已完成的模擬"}).click();
+  assert.ok(await lab.getByText("DPS 500.00 ｜ TPS 700.00 ｜ HPS 未提供 ｜ DTPS 未提供",{exact:true}).isVisible());
+  await spec.selectOption("spec-27");
+  assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).getAttribute("href"),"https://www.wowsims.com/forever/druid/feralbear/");
+  console.log("PASS: real engine route, user-defined time axis, priority search, result import and spec switching");
   await page.locator("#gt-mode-blue").click();
   for(const selector of ["#class-select","#spec-select","#gt-build-bar","#guild-tools .gt-tabs"]){assert.equal(await page.locator(selector).isVisible(),false,selector);}
   assert.equal(await page.locator("section.spec:visible").count(),0);
