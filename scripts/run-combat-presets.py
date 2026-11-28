@@ -271,13 +271,25 @@ def direct_settings(root,cli,job):
     if tank: desc+=" 採上游防戰治療模型760 HPS。"
     return data,gear_path,apl_path,[gear_path,apl_path,base+"/presets.ts"],desc
 
-def direct_request(data,duration=None):
+def direct_request(data,duration=None,targets=None):
     p=copy.deepcopy(data.get("player"))
     encounter=copy.deepcopy(data.get("encounter"))
     if not isinstance(p,dict) or not p.get("rotation") or not isinstance(encounter,dict) or not encounter.get("targets"):
         raise ValueError("Missing character, rotation or encounter")
     if duration is not None:
+        if type(duration) not in (int,float) or not 1<=duration<=600:
+            raise ValueError("Invalid encounter duration")
         encounter["duration"]=duration
+    if targets is not None:
+        if type(targets) is not int or not 1<=targets<=8 or len(encounter["targets"])!=1:
+            raise ValueError("Target variant requires a single-target base and 1–8 targets")
+        base=encounter["targets"][0]
+        if not isinstance(base,dict) or base.get("disabledAtStart") or base.get("targetInputs") or base.get("secondTankIndex"):
+            raise ValueError("Complex encounter is not a valid identical-target template")
+        encounter["targets"]=[copy.deepcopy(base) for _ in range(targets)]
+        for i,target in enumerate(encounter["targets"]):
+            target["name"]=str(base.get("name") or "Raid Target")+" "+str(i+1)
+            # Every copy has the same tank assignment as the source.
     raid={"parties":[{"players":[p],"buffs":data.get("partyBuffs",{})},{},{},{},{}],"buffs":data.get("raidBuffs",{}),"debuffs":data.get("debuffs",{}),"tanks":data.get("tanks",[]),"targetDummies":data.get("targetDummies",0)}
     return {"raid":raid,"encounter":encounter,"simOptions":{"iterations":ITERATIONS,"randomSeed":str(SEED),"debugFirstIteration":True},"type":"SimTypeIndividual"}
 
@@ -314,7 +326,7 @@ def direct_comparison_group(request):
     encoded=json.dumps(conditions,sort_keys=True,separators=(",",":"),ensure_ascii=False,allow_nan=False)
     key=hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:12]
     e=request["encounter"]
-    return "原生引擎同條件／"+str(e.get("duration"))+"±"+str(e.get("durationVariation",0))+"秒／"+key
+    return "原生引擎同條件／"+str(e.get("duration"))+"±"+str(e.get("durationVariation",0))+"秒／"+str(len(e.get("targets",[])))+"目標／"+key
 
 def write_request_file(output_dir,spec,request):
     """Store the full validated request as a separate, content-addressed JSON file."""
@@ -333,10 +345,10 @@ def write_request_file(output_dir,spec,request):
     temp.replace(path)
     return "combat-requests/"+name
 
-def direct_case(cli,root,job,duration=None,output_dir=None):
+def direct_case(cli,root,job,duration=None,output_dir=None,targets=None):
     spec,label,kind,_,_=job
     data,settings,apl,source_paths,config=direct_settings(root,cli,job)
-    request=direct_request(data,duration)
+    request=direct_request(data,duration,targets)
     with tempfile.TemporaryDirectory() as tmp:
         path=Path(tmp)/"request.json"
         path.write_text(json.dumps(request),encoding="utf-8")
@@ -355,7 +367,8 @@ def direct_case(cli,root,job,duration=None,output_dir=None):
     sources.insert(0,{"path":"本站實際 RaidSimRequest（JSON）","text":raw[:24000],"truncated":len(raw)>24000})
     group=direct_comparison_group(request)
     request_file=write_request_file(output_dir,spec,request) if output_dir is not None else None
-    return {"requestFile":request_file,"spec":spec,"label":label+("／"+str(duration)+"秒" if duration is not None else ""),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
+    suffix=("／"+str(duration)+"秒" if duration is not None else "")+("／"+str(targets)+"目標" if targets is not None else "")
+    return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
 
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
@@ -377,23 +390,25 @@ def main(cli,root,output):
     for entry in cases_to_run:
         (siml_extra if entry[0] in seen else siml_first).append(entry)
         seen.add(entry[0])
-    planned=len(cases_to_run)+len(feral_extra)+len(first_direct)*2+len(extra_direct)+len(siml_first)
+    all_base=first_direct+[(spec,label,"siml","__LOCAL__:"+settings,(source,apl,configuration)) for spec,label,settings,apl,source,configuration in siml_first]
+    scenario_grid=[(job,60,None) for job in all_base]+[(job,60,3) for job in all_base]+[(job,30,None) for job in all_base]+[(job,120,None) for job in all_base]
+    planned=len(cases_to_run)+len(feral_extra)+len(first_direct)+len(extra_direct)+len(scenario_grid)
     start=time.monotonic()
     def publish():
         payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":planned,"failed":failed,"healerPending":[{"spec":spec,"source":"ui/specs/"+folder+"/presets.ts","reason":"尚缺可驗證的治療遭遇、完整技能策略及有效治療基準；不以 DPS 代替 HPS。"} for spec,folder in HEALERS.items()],"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
         temp=output.with_suffix(output.suffix+".tmp")
         temp.write_text(json.dumps(payload,ensure_ascii=False,allow_nan=False),encoding="utf-8")
         temp.replace(output)
-    def run_direct(job,duration=None):
+    def run_direct(job,duration=None,targets=None):
         spec,label=job[:2]
         try:
-            d=direct_case(cli,root,job,duration,output.parent)
+            d=direct_case(cli,root,job,duration,output.parent,targets)
             json.dumps(d,ensure_ascii=False,allow_nan=False)
             cases.append(d)
             print("Native raw preset:",spec,d["label"],flush=True)
         except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
             print("Native raw preset unavailable:",spec,str(e)[:300],flush=True)
-            failed.append({"spec":spec,"label":label+("／"+str(duration)+"秒" if duration else "")})
+            failed.append({"spec":spec,"label":label+("／"+str(duration)+"秒" if duration else "")+("／"+str(targets)+"目標" if targets else "")})
         publish()
     def run_siml_case(entry):
         spec,label,settings,apl,source,configuration=entry
@@ -427,20 +442,20 @@ def main(cli,root,output):
     for index in range(max(len(first_direct),len(siml_first))):
         if index<len(first_direct):run_direct(first_direct[index])
         if index<len(siml_first):run_siml_case(siml_first[index])
-    # Bounded second pass: every DPS/tank spec gets a short encounter trial before optional builds.
-    for job in first_direct:
+    # Run 60s single-target and then 60s three-target trials for all specs,
+    # before extra builds. Additional lengths are attempted in fair rounds.
+    for job,duration,targets in scenario_grid[:2*len(all_base)]:
         if time.monotonic()-start>1200:break
-        run_direct(job,60)
-    for spec,label,settings,apl,source,configuration in siml_first:
-        if time.monotonic()-start>1200:break
-        # Parse the complete settings into a raw RaidSimRequest, retaining its APL.
-        run_direct((spec,label,"siml","__LOCAL__:"+settings,(source,apl,configuration)),60)
+        run_direct(job,duration,targets)
     for entry in siml_extra:
         if time.monotonic()-start>1200:break
         run_siml_case(entry)
     for job in extra_direct:
         if time.monotonic()-start>1200:break
         run_direct(job)
+    for job,duration,targets in scenario_grid[2*len(all_base):]:
+        if time.monotonic()-start>1200:break
+        run_direct(job,duration,targets)
     for entry in feral_extra:
         if time.monotonic()-start>1200:break
         run_siml_case(entry)
