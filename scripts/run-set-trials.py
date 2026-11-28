@@ -29,17 +29,21 @@ def item_set(item):
 def player(request):
     return request["raid"]["parties"][0]["players"][0]
 
-def set_plan(request,spec_id,items,registry):
+def set_plan(request,spec_id,items,registry,excluded=()):
     p=player(request);gear=p.get("equipment",{}).get("items",[])
     if len(gear)!=17 or p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or '"itemSwap":' in json.dumps(p.get("rotation",{})):return None
     cls=CLASSES[int(spec_id.split("-")[1])-1]
     index={num(x.get("id")):x for x in items}
     current=[index.get(num(x.get("id"))) for x in gear[:14]]
     if any(x is None and gear[i].get("id") for i,x in enumerate(current)):return None
-    # Only an existing worn set is considered, avoiding arbitrary cross-spec
-    # set selection and unsupported high-tier sets from the complete catalog.
+    # Prefer worn sets, then explicitly class-restricted candidate sets.
     names=Counter(item_set(x) for x in current if x and item_set(x))
-    for name,_ in sorted(names.items(),key=lambda x:(-x[1],x[0])):
+    bit=1<<(CLASS_IDS[cls]-1)
+    class_sets=Counter(item_set(x) for x in items if item_set(x) and eligible(x,cls) and num(x.get("class_mask"),-1) not in (-1,0) and num(x.get("class_mask"),-1)&bit)
+    order=list(set(names)|set(class_sets))
+    order.sort(key=lambda name:(-names.get(name,0),-class_sets.get(name,0),name))
+    for name in order:
+        if name in excluded:continue
         matches=[s for s in registry if name in (s.get("name"),s.get("alternativeName"))]
         if len(matches)!=1:continue
         registered=matches[0]
@@ -71,7 +75,7 @@ def set_plan(request,spec_id,items,registry):
             used.update((num(chosen["id"]),num(loose["id"])))
             positions.append((i,chosen,loose,abs(num(chosen.get("item_level"))-num(loose.get("item_level")))))
         worn={i for i,x in enumerate(current) if x and item_set(x)==name}
-        if not worn or not worn<={i for i,_,_,_ in positions}:continue
+        if not worn<={i for i,_,_,_ in positions}:continue
         possible=[n for n in thresholds if n<=len(positions)]
         if not possible:continue
         swapped=p.get("itemSwap",{}).get("items",[])
@@ -100,16 +104,19 @@ def run(cli,root,site):
         if scenario not in order or not isinstance(sid,str) or sid not in {"spec-"+str(i) for i in range(1,29)} or not file or (sid,scenario) in seen:continue
         if not isinstance(file,str) or not file.startswith("combat-requests/"+sid+"-") or ".." in file:continue
         try:
-            request=read(file);plan=set_plan(request,sid,catalog["items"],registry["sets"])
-            if not plan:continue
-            seen.add((sid,scenario))
-            row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"positions":plan["positions"],"items":plan["items"],"baseLabel":case.get("label"),"cases":[],"failed":[]}
-            results.append(row);jobs.append((row,plan["cases"]))
+            request=read(file);excluded=set()
+            for rank in range(3):
+                plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded)
+                if not plan:break
+                excluded.add(plan["name"])
+                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"positions":plan["positions"],"items":plan["items"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
+                results.append(row);jobs.append((row,plan["cases"]))
+            if excluded:seen.add((sid,scenario))
         except (ValueError,KeyError,TypeError,OSError):continue
     start=time.monotonic()
     def save(finished=False):
         dest=site/"set-trials.json";temp=dest.with_suffix(".tmp")
-        temp.write_text(json.dumps({"commit":mod.COMMIT,"release":mod.RELEASE,"catalogBuild":catalog["meta"].get("client_build"),"scope":"同部位、同護甲類型、接近物品等級的原生套裝控制比較；不代表最佳散件或完整BiS。","finished":finished,"elapsedSeconds":round(time.monotonic()-start,1),"trials":results},ensure_ascii=False,allow_nan=False),encoding="utf-8");temp.replace(dest)
+        temp.write_text(json.dumps({"commit":mod.COMMIT,"release":mod.RELEASE,"catalogBuild":catalog["meta"].get("client_build"),"scope":"同部位、同護甲類型、接近物品等級的原生套裝控制比較；每專精遭遇最多3套候選，優先已穿套裝及明確職業限定套裝，不代表最佳散件或完整BiS。","finished":finished,"elapsedSeconds":round(time.monotonic()-start,1),"trials":results},ensure_ascii=False,allow_nan=False),encoding="utf-8");temp.replace(dest)
     save()
     def execute(row,count,request):
         try:
@@ -128,8 +135,9 @@ def run(cli,root,site):
     # Pair 0 pieces with the first threshold so limited CI time produces
     # useful comparisons instead of many isolated controls. Then add higher
     # thresholds in rounds, prioritizing the same boss for each spec.
-    for scenario in order:
-        cohort=[(row,cases) for row,cases in jobs if row["scenario"]==scenario]
+    for rank in range(3):
+      for scenario in order:
+        cohort=[(row,cases) for row,cases in jobs if row["scenario"]==scenario and row["candidateRank"]==rank]
         for row,cases in cohort:
             if time.monotonic()-start>660:save(True);return
             execute(row,*cases[0])
