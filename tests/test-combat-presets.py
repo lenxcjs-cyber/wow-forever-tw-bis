@@ -169,5 +169,57 @@ class PresetTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.direct_metrics({**valid,"raidMetrics":{"parties":[{"players":[{"dps":{"avg":0}}]}]}})
 
+    def test_set_trials_plan_preserves_control_conditions(self):
+        import copy
+        path=SCRIPT.with_name("run-set-trials.py")
+        loader=importlib.util.spec_from_file_location("set_trials",path)
+        sets=importlib.util.module_from_spec(loader)
+        loader.loader.exec_module(sets)
+        def item(i,slot,name="",**kwargs):
+            return {"id":i,"slot":slot,"item_class":"Armor","subclass":"Plate","item_set":name,
+                    "source_summary":"Dungeon fixture","item_level":60,"quality":3,"required_level":60,**kwargs}
+        items=[item(1,"Head","Fixture"),item(2,"Shoulder","Fixture"),item(3,"Chest"),
+               item(4,"Head"),item(5,"Shoulder"),item(6,"Chest","Fixture"),
+               item(7,"Head",required_reputation="Exalted")]
+        gear=[{} for _ in range(17)]
+        for i,j in [(0,1),(2,2),(4,3)]:gear[i]={"id":j,"enchant":99}
+        request={"raid":{"parties":[{"players":[{"equipment":{"items":gear},"rotation":{"type":"TypeAPL"},"talentsString":"fixture"}]}]},"encounter":{"duration":180},"simOptions":{"iterations":1000}}
+        before=copy.deepcopy(request)
+        registry=[{"name":"Fixture","id":99,"bonuses":[{"pieces":2},{"pieces":3},{"pieces":4}]}]
+        plan=sets.set_plan(request,"spec-1",items,registry)
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan["thresholds"],[2,3])
+        self.assertEqual(plan["registeredThresholds"],[2,3,4])
+        self.assertEqual([x[0] for x in plan["cases"]],[0,2,3])
+        self.assertEqual(len(plan["items"]),3)
+        self.assertEqual(request,before)
+        for n,req in plan["cases"]:
+            g=sets.player(req)["equipment"]["items"]
+            self.assertEqual(sum(x.get("id") in (1,2,6) for x in g),n)
+            self.assertTrue(all("enchant" not in g[i] for i in (0,2,4)))
+            self.assertNotIn(7,[x.get("id") for x in g])
+            self.assertEqual(req["encounter"],request["encounter"])
+            self.assertEqual(req["simOptions"],request["simOptions"])
+        swapped=copy.deepcopy(request)
+        sets.player(swapped)["enableItemSwap"]=True
+        self.assertIsNone(sets.set_plan(swapped,"spec-1",items,registry))
+
+    def test_guild_standard_targets(self):
+        source={"player":{"rotation":{"type":"TypeAPL"},"inFrontOfTarget":True},"encounter":{"duration":180,"targets":[{}]},"debuffs":{"sunderArmor":True,"curseOfElements":True,"judgementOfWisdom":True}}
+        request=mod.direct_request(source)
+        for key,level,hp,count in (("guild-50k",60,50000,1),("guild-boss",63,300000,1),("guild-5x50k",60,50000,5)):
+            for sid,tank in (("spec-1",False),("spec-3",True)):
+                result=mod.guild_scenario(request,sid,key)
+                self.assertEqual(result["raid"]["parties"][0]["players"][0]["inFrontOfTarget"],tank)
+                self.assertEqual(len(result["encounter"]["targets"]),count)
+                for target in result["encounter"]["targets"]:
+                    self.assertEqual(target["level"],level)
+                    self.assertEqual(target["stats"][29],hp)
+                    self.assertEqual(sum(target["stats"]),hp)
+                    self.assertEqual(target["tankIndex"],0 if tank else -1)
+                self.assertEqual(result["raid"]["debuffs"],{"judgementOfWisdom":True})
+        self.assertTrue(request["raid"]["parties"][0]["players"][0]["inFrontOfTarget"])
+        self.assertEqual(len(request["encounter"]["targets"]),1)
+
 if __name__=="__main__":
     unittest.main()
