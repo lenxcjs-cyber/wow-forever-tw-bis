@@ -360,8 +360,8 @@ const server=http.createServer((req,res)=>{
   await upload.evaluate(input=>{
    const file=new File(['{"stale":true}'],"stale.json",{type:"application/json"});
    file.text=()=>new Promise(resolve=>{window.gtFinishStaleRead=()=>resolve('{"stale":true}');});
-   const transfer=new DataTransfer();transfer.items.add(file);input.files=transfer.files;
-   input.dispatchEvent(new Event("change",{bubbles:true}));
+   Object.defineProperty(input,"files",{configurable:true,value:[file]});
+   try{input.dispatchEvent(new Event("change",{bubbles:true}));}finally{delete input.files;}
   });
   const latest=JSON.stringify({latest:true});
   await characterArea.fill(latest);
