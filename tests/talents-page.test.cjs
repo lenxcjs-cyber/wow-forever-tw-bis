@@ -4,6 +4,24 @@ const {LEVEL,questPath,available,validateClass,mapBuild,levelAt,levelState}=requ
 const fixture={token:"warrior",trees:[{index:0},{index:1},{index:2}],arrows:[{from:1,to:2,required:true}],talents:[]};
 for(let tree=0;tree<3;tree++)for(let i=0;i<14;i++){const id=tree*100+i+1;fixture.talents.push({id,tree,row:i<2?1:Math.floor(i/2)+1,column:i%2+1,pointsInTreeRequired:i<2?0:5*Math.floor(i/2),maxRank:5,name:"Talent "+id,ranks:["Example only"]});}
 assert.ok(validateClass(fixture));assert.equal(available(fixture,fixture.talents[1],{}),false);
+for(const mutate of [
+ c=>c.trees[2].index=1,
+ c=>c.talents[1].id=c.talents[0].id,
+ c=>c.talents[1].name=c.talents[0].name.toUpperCase(),
+ c=>c.talents[0].name=null,
+ c=>c.talents[0].row=0,
+ c=>c.talents[0].pointsInTreeRequired=-1,
+ c=>c.arrows.push({from:1,to:1}),
+ c=>c.arrows.push({from:2,to:1,required:true}),
+ c=>c.arrows.push(null)
+]){
+ const damaged=JSON.parse(JSON.stringify(fixture));mutate(damaged);assert.equal(validateClass(damaged),false);
+}
+const optionalCycle=JSON.parse(JSON.stringify(fixture));optionalCycle.arrows.push({from:2,to:1,required:false});assert.equal(validateClass(optionalCycle),true);
+const repeated=mapBuild(fixture,{talents:[{"Talent 1":1,"talent 1":2,"Talent 2":"5"},{},{}]});
+assert.equal(repeated.complete,false);assert.deepEqual(repeated.ranks,{1:1});assert.ok(repeated.issues.some(x=>x.includes("重複")));
+assert.equal(mapBuild(fixture,{talents:{}}).complete,false);
+assert.equal(mapBuild(fixture,{talents:[null,{},{}]}).complete,false);
 const run=(cls,plan)=>{const steps=questPath(cls,plan),r={};assert.equal(steps.length,51,cls.token);for(let i=0;i<steps.length;i++){const x=steps[i];assert.equal(x.level,i+10);assert.ok(available(cls,x.talent,r),cls.token+" invalid level "+x.level);r[x.talent.id]=(r[x.talent.id]||0)+1;assert.equal(r[x.talent.id],x.rank);}};
 run(fixture,{main:0,second:1,priority:["Talent 1","Talent 2"]});
 const pathSteps=questPath(fixture,{main:0,second:1,priority:["Talent 1","Talent 2"]});
