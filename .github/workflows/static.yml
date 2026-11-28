@@ -146,7 +146,7 @@ jobs:
           git -C "$work/source" init -q
           git -C "$work/source" remote add origin https://github.com/wowsims/forever.git
           git -C "$work/source" sparse-checkout init --cone
-          git -C "$work/source" sparse-checkout set ui/specs sim
+          git -C "$work/source" sparse-checkout set ui/specs ui/features/settings/model sim
           git -C "$work/source" fetch --depth=1 --filter=blob:none origin 3b9c125a9b1387cd53ce2bb12969e0c6b54b813e
           git -C "$work/source" checkout --detach FETCH_HEAD
           test "$(git -C "$work/source" rev-parse HEAD)" = "3b9c125a9b1387cd53ce2bb12969e0c6b54b813e"
