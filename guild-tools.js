@@ -1717,7 +1717,14 @@ function combatReadJSON(text){
 }
 function combatFileInput(area,status,label){
  const input=node("input");input.type="file";input.accept=".json,application/json";input.setAttribute("aria-label",label);
- input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;try{if(file.size>8000000)throw Error("檔案超過 8 MB");const value=await file.text();combatReadJSON(value);area.value=value;area.dispatchEvent(new Event("input",{bubbles:true}));status.textContent="已讀取 "+file.name+"，請確認內容後執行。";}catch(e){status.textContent="讀取失敗："+e.message;}finally{input.value="";}});
+ let revision=0;
+ area.addEventListener("input",()=>{revision++;});
+ input.addEventListener("change",async()=>{
+  const file=input.files?.[0],token=++revision;input.value="";
+  if(!file||input.disabled||area.disabled)return;
+  const current=()=>token===revision&&!input.disabled&&!area.disabled&&area.isConnected&&input.isConnected;
+  try{if(file.size>8000000)throw Error("檔案超過 8 MB");const value=await file.text();if(!current())return;combatReadJSON(value);area.value=value;area.dispatchEvent(new Event("input",{bubbles:true}));status.textContent="已讀取 "+file.name+"，請確認內容後執行。";}catch(e){if(current())status.textContent="讀取失敗："+e.message;}
+ });
  return input;
 }
 function combatGearView(parent,id,build,nativeView){
@@ -1920,11 +1927,12 @@ function nativeBrowserView(parent,id){
  const c=box(parent,"站內原生實戰模擬","本機瀏覽器 WebAssembly 運算；角色 JSON 不傳送外部模擬服務。引擎載入及運算會消耗記憶體與 CPU。");
  const status=node("p","檢查站內引擎與固定版本裝備資料…","gt-muted"),templatePick=select([["","尚未載入範本"]]),area=node("textarea"),readyText=node("p","","gt-muted"),preview=node("div"),results=node("div"),scenario=select([["all","全部三種公會遭遇"],...Object.entries(guildScenarios).map(([k,v])=>[k,v.label])]),iterations=select([["50","50次快速測試"],["200","200次初步比較"],["1000","1000次正式比較"]]);
  area.rows=6;area.placeholder='貼上 WoWSims Exporter /wse export 的完整 JSON，或個人 RaidSimRequest';area.setAttribute("aria-label","角色匯入 JSON");
- let manifest=null,metadata=null,templates=[],character=null,worker=null,active=0,ready=false;
+ let manifest=null,metadata=null,templates=[],character=null,worker=null,active=0,ready=false,timer=null;
+ const upload=combatFileInput(area,status,"上傳角色 JSON");
  const runBtn=button("在本站開始模擬",()=>run()),stopBtn=button("停止模擬",()=>stop("已停止，保留完成的結果。")),importBtn=button("匯入並核對角色",()=>importCharacter(false)),defaultBtn=button("直接載入範本角色",()=>importCharacter(true)),sendBtn=button("帶入目前原生配裝編輯器",()=>{if(character)c.dispatchEvent(new CustomEvent("gt-native-request",{bubbles:true,detail:{request:character.request,mode:metadata.items[combatRequestPlayer(character.request,id).equipment.items[14]?.id]?.[1]===4?"two":"one"}}));}),downloadBtn=button("下載已核對角色請求",()=>{if(character)combatDownloadJSON(character.request,"tomb-"+id+"-character.json");});
- function sync(){runBtn.disabled=!ready||!character||!!worker;stopBtn.disabled=!worker;importBtn.disabled=!ready||!!worker;defaultBtn.disabled=!ready||!templatePick.value||!!worker;downloadBtn.disabled=!character;sendBtn.disabled=!character;templatePick.disabled=!!worker;area.disabled=!!worker;scenario.disabled=!!worker;iterations.disabled=!!worker;}
- function stop(message){active++;if(worker)worker.terminate();worker=null;status.textContent=message;sync();}
- function clear(){active++;character=null;preview.replaceChildren();results.replaceChildren();sync();}
+ function sync(){runBtn.disabled=!ready||!character||!!worker;stopBtn.disabled=!worker;importBtn.disabled=!ready||!!worker;defaultBtn.disabled=!ready||!templatePick.value||!!worker;downloadBtn.disabled=!character;sendBtn.disabled=!character;templatePick.disabled=!!worker;area.disabled=!!worker;scenario.disabled=!!worker;iterations.disabled=!!worker;upload.disabled=!!worker;}
+ function stop(message){active++;clearTimeout(timer);timer=null;if(worker)worker.terminate();worker=null;status.textContent=message;sync();}
+ function clear(){if(worker)stop("角色資料已變更，停止舊模擬。");active++;character=null;preview.replaceChildren();results.replaceChildren();sync();}
  area.addEventListener("input",clear);templatePick.addEventListener("change",clear);
  async function read(url){const res=await fetch(url,{cache:"no-cache",credentials:"same-origin"});if(!res.ok)throw Error("HTTP "+res.status);return res.json();}
  async function importCharacter(useDefault){
@@ -1934,7 +1942,7 @@ function nativeBrowserView(parent,id){
    if(token!==active||!c.isConnected)return;
    if(useDefault&&!template)throw Error("尚無此專精範本");
    character=nativeCharacterRequest(useDefault?template:raw,template,id,metadata);
-   const p=combatRequestPlayer(character.request,id);
+   const p=combatRequestPlayer(character.request,id),party=character.request.raid.parties.find(x=>x?.players?.includes(p));
    add(preview,node("h4","角色資料核對"),node("p",(p.name||"未命名角色")+" ｜ "+zhDisplay(p.race||"未知種族")+" ｜ 天賦 "+(p.talentsString||"未設定")),node("p","專業："+[p.profession1,p.profession2].filter(Boolean).map(zhDisplay).join("、")),node("p","裝備 "+p.equipment.items.filter(x=>x.id).length+"／17格"));
    for(const note of character.notes)preview.append(node("p",note,"gt-muted"));
    const gear=node("details");gear.append(node("summary","核對17格裝備與附魔"));
@@ -1942,14 +1950,14 @@ function nativeBrowserView(parent,id){
     const line=node("p");line.append(node("span",combatEquipmentNames[i]+"："));if(x.id)line.append(link(zhItem({id:x.id,name:"物品 "+x.id})+"（"+x.id+"）","https://www.wowhead.com/forever/tw/item="+x.id),node("span",(x.enchant?" ｜ 附魔 "+x.enchant:"")+(x.randomSuffix?" ｜ 詞綴 "+x.randomSuffix:"")));else line.append(node("span","空欄"));gear.append(line);
    }preview.append(gear);
    const config=node("details"),rawPreview=node("textarea"),configMsg=node("p","","gt-muted");
-   const editable=()=>({talentsString:p.talentsString||"",rotation:p.rotation,consumables:p.consumables||{},buffs:p.buffs||{},raidBuffs:character.request.raid.buffs||{},partyBuffs:character.request.raid.parties[0].buffs||{},debuffs:character.request.raid.debuffs||{}});
+   const editable=()=>({talentsString:p.talentsString||"",rotation:p.rotation,consumables:p.consumables||{},buffs:p.buffs||{},raidBuffs:character.request.raid.buffs||{},partyBuffs:party.buffs||{},debuffs:character.request.raid.debuffs||{}});
    rawPreview.rows=10;rawPreview.value=JSON.stringify(editable(),null,2);rawPreview.setAttribute("aria-label","原生戰鬥設定 JSON");
    const applyConfig=button("套用戰鬥設定修改",()=>{try{
     if(worker)throw Error("請先停止模擬");
     const o=combatReadJSON(rawPreview.value),allowed=["talentsString","rotation","consumables","buffs","raidBuffs","partyBuffs","debuffs"];
     if(!o||typeof o!=="object"||Array.isArray(o)||Object.keys(o).length!==allowed.length||!allowed.every(k=>Object.hasOwn(o,k))||typeof o.talentsString!=="string"||!/^[0-5]*-[0-5]*-[0-5]*$/.test(o.talentsString)||allowed.slice(1).some(k=>!o[k]||typeof o[k]!=="object"||Array.isArray(o[k])))throw Error("請保留全部欄位，天賦碼及設定須為合法 JSON");
     for(const k of ["talentsString","rotation","consumables","buffs"])p[k]=o[k];
-    character.request.raid.buffs=o.raidBuffs;character.request.raid.parties[0].buffs=o.partyBuffs;character.request.raid.debuffs=o.debuffs;
+    character.request.raid.buffs=o.raidBuffs;party.buffs=o.partyBuffs;character.request.raid.debuffs=o.debuffs;
     results.replaceChildren();configMsg.textContent="已套用；重新執行才會取得新結果。";status.textContent="戰鬥設定已更新，請核對天賦與技能策略。";
    }catch(e){configMsg.textContent="修改失敗："+e.message;}});
    add(config,node("summary","核對／修改技能策略、消耗品及團隊增益"),node("p","初次使用建議沿用範本。進階使用者可修改原生 JSON；技能與消耗品使用引擎 ID，輸入內容由原生引擎驗證。","gt-muted"),rawPreview,applyConfig,button("還原為目前已套用設定",()=>{rawPreview.value=JSON.stringify(editable(),null,2);configMsg.textContent="已還原未儲存變更。";}),configMsg);preview.append(config);
@@ -1977,7 +1985,7 @@ function nativeBrowserView(parent,id){
    part.append(button("下載批次比較結果",()=>combatDownloadJSON(payload,"tomb-"+id+"-guild-results.json")));
   }
   status.textContent="載入同站引擎中…";
-  let index=0,timer=null;
+  let index=0;
   try{worker=new Worker("native-engine/worker.js?v="+combatPresetCommit.slice(0,8));}catch(e){status.textContent="無法啟動 Worker："+e.message;worker=null;sync();return;}
   const w=worker;sync();
   const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(active===token)stop("模擬超過時間限制；請減少迭代數或改為單一遭遇。");},180000);};
@@ -2007,7 +2015,7 @@ function nativeBrowserView(parent,id){
   resetTimer();
  }
  const help=node("details");help.open=true;add(help,node("summary","如何匯入遊戲角色？"),node("p","1. 安裝支援永恆版的 WoWSims Exporter 插件並在遊戲啟用。"),link("下載 WoWSims Exporter 插件","https://www.curseforge.com/wow/addons/wowsimsexporter"),node("p","2. 登入60級角色，穿好要測的裝備，在聊天欄輸入 /wse export，複製產生的完整 JSON。"),node("p","3. 本站切換相符職業專精，選擇對應技能構築範本，貼上 JSON 或上傳檔案，按「匯入並核對角色」。"),node("p","4. 核對種族、天賦、裝備、附魔、消耗品與 APL；選擇公會遭遇及迭代數，按「在本站開始模擬」。"),node("p","插件資料通常不含團隊增益、消耗品及戰鬥循環，這些沿用範本。也可直接匯入完整原生 RaidSimRequest，不需要外部網站。","gt-muted"));
- add(c,help,readyText,field("原生構築範本",templatePick),defaultBtn,field("角色 JSON",area),combatFileInput(area,status,"上傳角色 JSON"),importBtn,preview,downloadBtn,sendBtn,field("實戰目標",scenario),field("原生迭代數",iterations),runBtn,stopBtn,status,results,link("原生引擎來源 WoWSims Forever（MIT）","https://github.com/wowsims/forever"));
+ add(c,help,readyText,field("原生構築範本",templatePick),defaultBtn,field("角色 JSON",area),upload,importBtn,preview,downloadBtn,sendBtn,field("實戰目標",scenario),field("原生迭代數",iterations),runBtn,stopBtn,status,results,link("原生引擎來源 WoWSims Forever（MIT）","https://github.com/wowsims/forever"));
  sync();Promise.all([read("native-engine/manifest.json"),read("native-engine/items.json"),read("combat-templates.json").catch(()=>null)]).then(([m,meta,t])=>{
   if(!c.isConnected)return;
   if(m?.format!=="tomb-wasm/1"||m.commit!==combatPresetCommit||m.verified!==true||m.browserVerified!==true||!meta?.items||Object.keys(meta.items).length<1000)throw Error("引擎或物品資料版本不符");
@@ -2019,7 +2027,7 @@ function nativeBrowserView(parent,id){
   status.textContent="可匯入角色。";sync();
  }).catch(e=>{if(!c.isConnected)return;readyText.textContent="站內原生引擎尚未發布或載入失敗："+e.message+"。不以自訂模型冒充原生模擬。";status.textContent="目前無法在本站執行原生引擎。";sync();});
  // Stop CPU work if the user navigates away from the combat view.
- const watch=new MutationObserver(()=>{if(!c.isConnected){watch.disconnect();if(worker)stop("頁面切換，已停止。");}});watch.observe(parent,{childList:true});
+ const watch=new MutationObserver(()=>{if(!c.isConnected){watch.disconnect();if(worker)stop("頁面切換，已停止。");}});watch.observe(document.body,{childList:true,subtree:true});
  return {load:raw=>{if(worker){status.textContent="請先停止目前運算。";return;}area.value=JSON.stringify(raw,null,2);clear();c.scrollIntoView({block:"start"});return importCharacter(false);},runBatch:batch=>{if(worker){status.textContent="請先停止目前運算。";return;}c.scrollIntoView({block:"start"});return run(batch);}};
 }
 function combatLab(){
