@@ -1846,15 +1846,14 @@ function nativeImportGear(gear,meta){
 function nativeCharacterRequest(raw,template,id,meta){
  if(!raw||typeof raw!=="object"||Array.isArray(raw))throw Error("角色資料必須是 JSON 物件");
  if(raw.raid&&raw.encounter){const r=JSON.parse(JSON.stringify(raw)),p=combatRequestPlayer(r,id);p.equipment=nativeImportGear(p.equipment,meta);return {request:r,notes:["完整原生請求；請核對技能策略與目前專精。"]};}
+ if(raw.player&&raw.encounter){
+  const r={type:"SimTypeIndividual",raid:{parties:[{players:[raw.player],buffs:raw.partyBuffs||{}},{},{},{},{}],buffs:raw.raidBuffs||{},debuffs:raw.debuffs||{},tanks:raw.tanks||[],targetDummies:raw.targetDummies||0},encounter:raw.encounter,simOptions:{iterations:50,randomSeed:"1"}};
+  const request=JSON.parse(JSON.stringify(r)),p=combatRequestPlayer(request,id);
+  p.equipment=nativeImportGear(p.equipment,meta);
+  return {request,notes:["完整個人設定；使用本站迭代設定。"]};
+ }
  if(!template)throw Error("請先選擇本站對應專精的原生範本");
  const r=JSON.parse(JSON.stringify(template)),p=combatRequestPlayer(r,id),notes=[];
- if(raw.player&&raw.encounter){
-  const q=raw.player;if(!q||typeof q!=="object")throw Error("個人設定缺少角色");
-  r.raid.parties[0].players[0]=JSON.parse(JSON.stringify(q));combatRequestPlayer(r,id);
-  r.encounter=JSON.parse(JSON.stringify(raw.encounter));r.raid.buffs=raw.raidBuffs||{};r.raid.debuffs=raw.debuffs||{};r.raid.parties[0].buffs=raw.partyBuffs||{};r.raid.tanks=raw.tanks||[];r.raid.targetDummies=raw.targetDummies||0;
-  r.raid.parties[0].players[0].equipment=nativeImportGear(q.equipment,meta);
-  return {request:r,notes:["完整個人設定；使用本站迭代設定。"]};
- }
  const isAddon=typeof raw.class==="string",gear=isAddon?raw.gear:raw.items?raw:raw.equipment;
  if(isAddon){
   if(raw.flavor!=="forever")throw Error("請使用永恆版 WoWSims Exporter 匯出，不能混用其他版本");
@@ -1875,6 +1874,7 @@ function nativeCharacterRequest(raw,template,id,meta){
  if(!gear)throw Error("角色匯出缺少 gear.items");
  p.equipment=nativeImportGear(gear,meta);
  notes.push("消耗品、團隊增減益、寵物及其他戰鬥設定沿用範本；請核對。");
+ if(gear.items.length!==17)notes.push("匯出省略空欄，依引擎物品類型重新排列；戒指／飾品的原始空欄及單手武器手位請特別核對。");
  if(p.enableItemSwap||p.itemSwap?.items?.some(x=>x?.id)||p.itemSwap?.swapSets?.length)notes.push("範本含換裝設定，請核對額外武器與技能策略。");
  return {request:r,notes};
 }
@@ -1882,6 +1882,7 @@ function nativeBrowserRequest(request,id,scenario,iterations,seed=1){
  if(!Number.isInteger(iterations)||iterations<1||iterations>1000||!Number.isSafeInteger(seed)||seed<1)throw Error("迭代數須為1–1000，種子須為正整數");
  const result=combatGuildScenario(request,id,scenario),p=combatRequestPlayer(result,id);
  if(p.database)throw Error("本站不接受匯入自訂引擎資料庫");
+ const expectedClass=nativeClassNames[gearClassIndex(id)],classId=[1,2,3,4,5,7,8,9,11][gearClassIndex(id)];if(p.class!=null&&p.class!==classId&&String(p.class).toLowerCase()!=="class"+expectedClass)throw Error("原生角色職業與專精不符");
  if(!Array.isArray(p.equipment?.items)||p.equipment.items.length!==17)throw Error("缺少完整17格原生裝備");
  if(!p.rotation||typeof p.rotation!=="object")throw Error("缺少技能優先序");
  if(!Number.isInteger(result.raid.targetDummies??0)||(result.raid.targetDummies??0)<0||(result.raid.targetDummies??0)>25)throw Error("治療假人數量不合法");
@@ -1940,7 +1941,18 @@ function nativeBrowserView(parent,id){
    for(const [i,x] of p.equipment.items.entries()){
     const line=node("p");line.append(node("span",combatEquipmentNames[i]+"："));if(x.id)line.append(link(zhItem({id:x.id,name:"物品 "+x.id})+"（"+x.id+"）","https://www.wowhead.com/forever/tw/item="+x.id),node("span",(x.enchant?" ｜ 附魔 "+x.enchant:"")+(x.randomSuffix?" ｜ 詞綴 "+x.randomSuffix:"")));else line.append(node("span","空欄"));gear.append(line);
    }preview.append(gear);
-   const config=node("details"),rawPreview=node("textarea");rawPreview.readOnly=true;rawPreview.rows=8;rawPreview.value=JSON.stringify({talentsString:p.talentsString,rotation:p.rotation,consumables:p.consumables,buffs:p.buffs,raidBuffs:character.request.raid.buffs,debuffs:character.request.raid.debuffs},null,2);add(config,node("summary","核對技能策略、消耗品及團隊增益"),rawPreview);preview.append(config);
+   const config=node("details"),rawPreview=node("textarea"),configMsg=node("p","","gt-muted");
+   const editable=()=>({talentsString:p.talentsString||"",rotation:p.rotation,consumables:p.consumables||{},buffs:p.buffs||{},raidBuffs:character.request.raid.buffs||{},partyBuffs:character.request.raid.parties[0].buffs||{},debuffs:character.request.raid.debuffs||{}});
+   rawPreview.rows=10;rawPreview.value=JSON.stringify(editable(),null,2);rawPreview.setAttribute("aria-label","原生戰鬥設定 JSON");
+   const applyConfig=button("套用戰鬥設定修改",()=>{try{
+    if(worker)throw Error("請先停止模擬");
+    const o=combatReadJSON(rawPreview.value),allowed=["talentsString","rotation","consumables","buffs","raidBuffs","partyBuffs","debuffs"];
+    if(!o||typeof o!=="object"||Array.isArray(o)||Object.keys(o).length!==allowed.length||!allowed.every(k=>Object.hasOwn(o,k))||typeof o.talentsString!=="string"||!/^[0-5]*-[0-5]*-[0-5]*$/.test(o.talentsString)||allowed.slice(1).some(k=>!o[k]||typeof o[k]!=="object"||Array.isArray(o[k])))throw Error("請保留全部欄位，天賦碼及設定須為合法 JSON");
+    for(const k of ["talentsString","rotation","consumables","buffs"])p[k]=o[k];
+    character.request.raid.buffs=o.raidBuffs;character.request.raid.parties[0].buffs=o.partyBuffs;character.request.raid.debuffs=o.debuffs;
+    results.replaceChildren();configMsg.textContent="已套用；重新執行才會取得新結果。";status.textContent="戰鬥設定已更新，請核對天賦與技能策略。";
+   }catch(e){configMsg.textContent="修改失敗："+e.message;}});
+   add(config,node("summary","核對／修改技能策略、消耗品及團隊增益"),node("p","初次使用建議沿用範本。進階使用者可修改原生 JSON；技能與消耗品使用引擎 ID，輸入內容由原生引擎驗證。","gt-muted"),rawPreview,applyConfig,button("還原為目前已套用設定",()=>{rawPreview.value=JSON.stringify(editable(),null,2);configMsg.textContent="已還原未儲存變更。";}),configMsg);preview.append(config);
    status.textContent="已匯入，請確認構築、裝備與戰鬥設定。";
   }catch(e){status.textContent="匯入失敗："+e.message;character=null;}sync();
  }
@@ -1969,7 +1981,7 @@ function nativeBrowserView(parent,id){
   try{worker=new Worker("native-engine/worker.js?v="+combatPresetCommit.slice(0,8));}catch(e){status.textContent="無法啟動 Worker："+e.message;worker=null;sync();return;}
   const w=worker;sync();
   const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(active===token)stop("模擬超過時間限制；請減少迭代數或改為單一遭遇。");},180000);};
-  const next=()=>{if(token!==active||!c.isConnected){clearTimeout(timer);w.terminate();return;}if(index>=jobs.length){clearTimeout(timer);reportBatch();stop("全部所選遭遇完成。");return;}const job=jobs[index];status.textContent="原生運算 "+(index+1)+"／"+jobs.length+"："+guildScenarios[job.scenario].label+"／"+job.name+"（"+n+"次）";resetTimer();w.postMessage({type:"run",request:JSON.stringify(job.request)});};
+  const next=()=>{if(token!==active||!c.isConnected){clearTimeout(timer);w.terminate();return;}if(index>=jobs.length){clearTimeout(timer);try{reportBatch();stop("全部所選遭遇完成。");}catch(e){stop("原生運算已結束，但批次排名無法驗證："+e.message);}return;}const job=jobs[index];status.textContent="原生運算 "+(index+1)+"／"+jobs.length+"："+guildScenarios[job.scenario].label+"／"+job.name+"（"+n+"次）";resetTimer();w.postMessage({type:"run",request:JSON.stringify(job.request)});};
   w.onmessage=e=>{
    if(token!==active||worker!==w)return;
    if(!c.isConnected){clearTimeout(timer);stop("頁面已切換，停止模擬。");return;}
@@ -1980,6 +1992,7 @@ function nativeBrowserView(parent,id){
    const job=jobs[index],cfg=guildScenarios[job.scenario],part=box(results,cfg.label+"｜"+job.name,n+"次原生迭代");
    try{
     const raw=e.data.result,m=nativeBrowserResult(raw,id,n);
+    if(batch&&Math.abs(m.duration-cfg.duration)>1e-6)throw Error("實際平均時間與標準遭遇不符，不能納入批次比較");
     if(batch){const metrics={};for(const k of ["dps","tps","hps","dtps","death"])if(Number.isFinite(m[k]))metrics[k]=m[k];for(const [k,v] of Object.entries(m.stdev||{}))if(Number.isFinite(v))metrics[k+"Stdev"]=v;batchRows.push({scenario:job.scenario,variant:job.variant,name:job.name,metrics,iterations:n,duration:m.duration});}
     for(const [key,label] of [["dps","DPS"],["tps","TPS"],["hps","HPS"],["dtps","DTPS"]])if(Number.isFinite(m[key]))part.append(node("p",label+" "+m[key].toFixed(2)+(Number.isFinite(m.stdev?.[key])?" ｜ 標準差 "+m.stdev[key].toFixed(2):"")));
     if(m.death!==null)part.append(node("p","死亡機率 "+(m.death*100).toFixed(2)+"%"));
