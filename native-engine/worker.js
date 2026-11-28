@@ -1,7 +1,7 @@
 "use strict";
 // Same-origin engine only. No remote simulator, no character upload.
 let ready=false,busy=false,failed=false;
-const fail=e=>{if(failed)return;failed=true;postMessage({type:"error",message:String(e?.message||e).slice(0,1200)});};
+const fail=(e,jobId=null)=>{if(failed)return;failed=true;postMessage({type:"error",jobId,message:String(e?.message||e).slice(0,1200)});};
 self.onmessage=e=>{
  if(!ready||busy||failed||e.data?.type!=="run")return;
  busy=true;
@@ -12,8 +12,8 @@ self.onmessage=e=>{
   if(typeof raw!=="string")throw Error("Native engine did not return JSON");
   const result=JSON.parse(raw);
   if(result.error)throw Error(result.error.message||"Native simulation failed");
-  postMessage({type:"result",result});
- }catch(err){fail(err);}finally{busy=false;}
+  postMessage({type:"result",jobId:e.data.jobId??null,result});
+ }catch(err){fail(err,e.data.jobId??null);}finally{busy=false;}
 };
 (async()=>{
  try{
