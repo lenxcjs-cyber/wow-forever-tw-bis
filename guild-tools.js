@@ -803,14 +803,15 @@ function catalogExactSet(pools,name,count){
  }
  const r=states.get(count);return r?{count,...r}:null;
 }
-function catalogSetTierComparison(pools,name,max,bonuses=[]){
+function catalogSetTierComparison(pools,name,max,bonuses=[],thresholdsKnown=bonuses.length>0){
  if(!Number.isInteger(max)||max<1||max>14||!Array.isArray(bonuses))return null;
  const base=catalogExactSet(pools,name,0);if(!base)return null;
  const rows=[];
  for(let n=1;n<=max;n++){
   const plan=catalogExactSet(pools,name,n);if(!plan)continue;
   const active=bonuses.filter(b=>Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=n);
-  const complete=active.length>0&&new Set(active.map(b=>b.pieces)).size===active.length&&active.every(b=>Number.isFinite(b.value));
+  const validThresholds=bonuses.every(b=>b&&Number.isInteger(b.pieces)&&b.pieces>0&&b.pieces<=14)&&new Set(bonuses.map(b=>b.pieces)).size===bonuses.length;
+  const complete=validThresholds&&(active.length>0||thresholdsKnown)&&active.every(b=>Number.isFinite(b.value));
   const value=complete?active.reduce((sum,b)=>sum+b.value,0):null;
   const comparable=catalogSameCoverage(base.picks,plan.picks);
   rows.push({...plan,comparable,loss:comparable?base.total-plan.total:null,active,bonus:value,net:value===null||!comparable?null:plan.total+value-base.total});
@@ -819,7 +820,7 @@ function catalogSetTierComparison(pools,name,max,bonuses=[]){
 }
 let setEffectsPromise=null;
 function loadSetEffects(){
- if(!setEffectsPromise)setEffectsPromise=fetch("set-effects.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("套裝資料未生成");return r.json();}).then(d=>d?.commit===combatPresetCommit&&Array.isArray(d.sets)?d.sets:[]).catch(()=>[]);
+ if(!setEffectsPromise)setEffectsPromise=fetch("set-effects.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("套裝資料未生成");return r.json();}).then(d=>d?.commit===combatPresetCommit&&Array.isArray(d.sets)?d.sets.filter(x=>x&&typeof x.name==="string"&&Array.isArray(x.bonuses)&&x.bonuses.length>0&&x.bonuses.every(b=>b&&Number.isInteger(b.pieces)&&b.pieces>=1&&b.pieces<=14)&&new Set(x.bonuses.map(b=>b.pieces)).size===x.bonuses.length):[]).catch(()=>[]);
  return setEffectsPromise;
 }
 function nativeSetUncertainty(a,b,metric){
@@ -1015,26 +1016,37 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
      const setSelect=select(sets.map(([n,c])=>[n,zhDisplay(n)+"（最多 "+c+" 件）"])),target=select([]),secondSet=select([]),secondTarget=select([]),detail=node("div"),tiers=node("div"),tierFields=node("div"),bonus=inp("留空＝未知","number");bonus.step="0.01";
      function targets(){const count=sets.find(([n])=>n===setSelect.value)?.[1]||2;target.replaceChildren(...Array.from({length:count-1},(_,i)=>new Option((i+2)+" 件",String(i+2))));target.value=String(Math.min(4,count));const old=secondSet.value;secondSet.replaceChildren(new Option("不指定第二套",""),...sets.filter(([n])=>n!==setSelect.value).map(([n,c])=>new Option(zhDisplay(n)+"（最多 "+c+" 件）",n)));if([...secondSet.options].some(o=>o.value===old))secondSet.value=old;secondTargets();}
      function secondTargets(){const count=sets.find(([n])=>n===secondSet.value)?.[1]||0;secondTarget.replaceChildren(...Array.from({length:Math.max(0,count-1)},(_,i)=>new Option((i+2)+" 件",String(i+2))));secondTarget.disabled=!count;if(count)secondTarget.value="2";}
-     let tierInputs=[];
+     let tierInputs=[],knownThresholds=false;
      function drawTiers(){
       tiers.replaceChildren();
       const name=setSelect.value,max=sets.find(([n])=>n===name)?.[1]||0;
       const bonuses=tierInputs.map(x=>({pieces:x.pieces,value:x.input.value.trim()===""?null:Number(x.input.value)}));
-      const study=catalogSetTierComparison(pools,name,max,bonuses);if(!study)return;
+      const study=catalogSetTierComparison(pools,name,max,bonuses,knownThresholds);if(!study)return;
       add(tiers,node("h4","指定套裝逐件損益（相對完全不穿此套裝）"),node("p","基準：0 件指定套裝，面板分 "+study.base.total.toFixed(2)+"。其他套裝與觸發未計入；表中收益為手動輸入的額外面板等價分數，不是 DPS。","gt-muted"));
-      for(const x of study.rows){const activated=x.active.map(b=>b.pieces+"件").join("＋")||"無已知門檻";const line=node("div",undefined,"gt-card");add(line,node("p",x.count+" 件 ｜ 啟動 "+activated+" ｜ 面板 "+x.total.toFixed(2)+" ｜ "+(x.comparable?"相對0件 "+(-x.loss).toFixed(2):"裝備欄覆蓋不一致")),node("p",!x.comparable?"散件與套裝的已填裝備欄不同，不判定勝負。":x.net===null?"需額外淨收益超過 "+Math.max(0,x.loss).toFixed(2)+" 分；效果未核算。":"計入已填效果後差額 "+x.net.toFixed(2)+" 分"+(x.net>0?"（勝過0件）":"")));line.append(button("匯出 "+x.count+" 件方案",()=>exportPlan(x.picks,name+" "+x.count+" 件",x.total)));tiers.append(line);}
+      for(const x of study.rows){const activated=x.active.map(b=>b.pieces+"件").join("＋")||(knownThresholds?"尚未啟動已登錄效果":"未取得完整門檻");const line=node("div",undefined,"gt-card");add(line,node("p",x.count+" 件 ｜ 啟動 "+activated+" ｜ 面板 "+x.total.toFixed(2)+" ｜ "+(x.comparable?"相對0件 "+(-x.loss).toFixed(2):"裝備欄覆蓋不一致")),node("p",!x.comparable?"散件與套裝的已填裝備欄不同，不判定勝負。":x.net===null?"需額外淨收益超過 "+Math.max(0,x.loss).toFixed(2)+" 分；效果未核算。":"計入已填效果後差額 "+x.net.toFixed(2)+" 分"+(x.net>0?"（勝過0件）":"")));line.append(button("匯出 "+x.count+" 件方案",()=>exportPlan(x.picks,name+" "+x.count+" 件",x.total)));tiers.append(line);}
       tiers.append(node("p",study.firstWin===null?"尚無已填收益證明哪個件數勝過0件。":"依已填收益，最少 "+study.firstWin+" 件勝過0件（仍需原生驗證）。","gt-muted"));
       tiers.append(button("匯出0件對照組",()=>exportPlan(study.base.picks,name+" 0 件對照",study.base.total)));
      }
      function setupTiers(){
       tierFields.replaceChildren();tierInputs=[];
       const name=setSelect.value,max=sets.find(([n])=>n===name)?.[1]||0,match=effectRows.filter(r=>r.name===name||r.alternativeName===name);
-      const thresholds=match.length===1?match[0].bonuses:[]; 
+      const thresholds=match.length===1&&Array.isArray(match[0].bonuses)?match[0].bonuses:[];
+      knownThresholds=thresholds.length>0;
       add(tierFields,node("h4","套裝效果啟動門檻"),node("p",thresholds.length?"來自固定版本 WoWSims 已登錄套裝實作；不保證所有遊戲效果皆已支援。":"未取得唯一對應的引擎套裝門檻。可填寫已核對的件數收益，但不能當作正式 BiS。","gt-muted"));
       if(match.length===1&&match[0].requiredProfession)tierFields.append(node("p","啟動專業要求："+zhDisplay(match[0].requiredProfession)+"；手動權重試算不驗證角色專業。","gt-muted"));
       if(match.length===1&&match[0].source)tierFields.append(link("引擎套裝實作","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+match[0].source));
-      for(const row of thresholds.filter(x=>x.pieces<=max)){
-       const input=inp("未知＝留空","number");input.step="0.01";tierInputs.push({pieces:row.pieces,input});input.addEventListener("input",drawTiers);add(tierFields,field(row.pieces+" 件額外收益（面板分）",input),node("p",row.effect||"引擎實作已登錄，效果數值待核","gt-muted"));
+      function addTier(pieces,description,manual=false){
+       const input=inp("未知＝留空","number");input.step="0.01";tierInputs.push({pieces,input});input.addEventListener("input",drawTiers);
+       add(tierFields,field(pieces+" 件額外收益（面板分）",input),node("p",description+(manual?"（手動門檻，未驗證）":""),"gt-muted"));
+      }
+      for(const row of thresholds.filter(x=>x.pieces<=max))addTier(row.pieces,row.effect||"引擎實作已登錄，效果數值待核");
+      if(!knownThresholds){
+       const picker=select(Array.from({length:Math.max(0,max-1)},(_,i)=>[String(i+2),(i+2)+" 件"])),msg=node("p","","gt-muted");
+       const addBtn=button("新增手動效果門檻",()=>{
+        const pieces=Number(picker.value);if(!Number.isInteger(pieces)||pieces<2||pieces>max||tierInputs.some(x=>x.pieces===pieces)){msg.textContent="請選擇尚未加入的有效門檻。";return;}
+        addTier(pieces,"自行核對的額外套裝效果",true);msg.textContent="已加入 "+pieces+" 件門檻；未填數值仍視為未知。";drawTiers();
+       });
+       add(tierFields,field("手動件數門檻",picker),addBtn,msg);
       }
       drawTiers();
      }
