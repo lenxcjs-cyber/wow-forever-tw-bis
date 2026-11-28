@@ -17,7 +17,7 @@ def num(value,default=0):
     try:return int(value)
     except (ValueError,TypeError):return default
 def eligible(item,cls):
-    if item.get("item_class")!="Armor" or num(item.get("estimated")) or not item.get("source_summary") or num(item.get("required_level"))>60:return False
+    if item.get("item_class")!="Armor" or num(item.get("estimated")) or not item.get("source_summary") or num(item.get("required_level"))>60 or item.get("required_reputation") or item.get("required_skill") or item.get("required_profession"):return False
     mask=num(item.get("class_mask"),-1)
     if mask not in (0,-1) and not mask&(1<<(CLASS_IDS[cls]-1)):return False
     sub=item.get("subclass")
@@ -31,7 +31,7 @@ def player(request):
 
 def set_plan(request,spec_id,items,registry):
     p=player(request);gear=p.get("equipment",{}).get("items",[])
-    if len(gear)!=17:return None
+    if len(gear)!=17 or p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or '"itemSwap":' in json.dumps(p.get("rotation",{})):return None
     cls=CLASSES[int(spec_id.split("-")[1])-1]
     index={num(x.get("id")):x for x in items}
     current=[index.get(num(x.get("id"))) for x in gear[:14]]
@@ -39,7 +39,7 @@ def set_plan(request,spec_id,items,registry):
     # Only an existing worn set is considered, avoiding arbitrary cross-spec
     # set selection and unsupported high-tier sets from the complete catalog.
     names=Counter(item_set(x) for x in current if x and item_set(x))
-    for name,_ in names.most_common():
+    for name,_ in sorted(names.items(),key=lambda x:(-x[1],x[0])):
         matches=[s for s in registry if name in (s.get("name"),s.get("alternativeName"))]
         if len(matches)!=1:continue
         registered=matches[0]
@@ -84,7 +84,7 @@ def set_plan(request,spec_id,items,registry):
             for rank,(i,yes,no,_) in enumerate(positions):
                 g[i]={"id":num((yes if rank<count else no)["id"])}
             cases.append((count,req))
-        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"cases":cases,"positions":[i for i,_,_,_ in positions]}
+        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"cases":cases,"positions":[i for i,_,_,_ in positions],"items":[{"slot":SLOTS[i],"setId":num(yes["id"]),"scatterId":num(no["id"])} for i,yes,no,_ in positions]}
     return None
 
 def run(cli,root,site):
@@ -93,42 +93,51 @@ def run(cli,root,site):
     snapshot=read("combat-presets.json");catalog=read("gear-catalog.json");registry=read("set-effects.json")
     if snapshot.get("commit")!=mod.COMMIT or registry.get("commit")!=mod.COMMIT:raise ValueError("Mismatched native snapshot")
     results=[];jobs=[];seen=set()
-    for case in snapshot.get("cases",[]):
+    # First boss, then single mob, then five mobs. Round-robin specs within each.
+    order={"guild-boss":0,"guild-50k":1,"guild-5x50k":2}
+    for case in sorted(snapshot.get("cases",[]),key=lambda x:(order.get(x.get("scenario"),9),num(str(x.get("spec","")).split("-")[-1]))):
         sid=case.get("spec");scenario=case.get("scenario");file=case.get("requestFile")
-        if not scenario or not file or (sid,scenario) in seen:continue
+        if scenario not in order or not isinstance(sid,str) or sid not in {"spec-"+str(i) for i in range(1,29)} or not file or (sid,scenario) in seen:continue
         if not isinstance(file,str) or not file.startswith("combat-requests/"+sid+"-") or ".." in file:continue
         try:
             request=read(file);plan=set_plan(request,sid,catalog["items"],registry["sets"])
             if not plan:continue
             seen.add((sid,scenario))
-            row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"positions":plan["positions"],"baseLabel":case.get("label"),"cases":[],"failed":[]}
+            row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"positions":plan["positions"],"items":plan["items"],"baseLabel":case.get("label"),"cases":[],"failed":[]}
             results.append(row);jobs.append((row,plan["cases"]))
         except (ValueError,KeyError,TypeError,OSError):continue
     start=time.monotonic()
-    def save():
+    def save(finished=False):
         dest=site/"set-trials.json";temp=dest.with_suffix(".tmp")
-        temp.write_text(json.dumps({"commit":mod.COMMIT,"release":mod.RELEASE,"catalogBuild":catalog["meta"].get("client_build"),"scope":"同部位、同護甲類型、接近物品等級的原生套裝控制比較；不代表最佳散件或完整BiS。","trials":results},ensure_ascii=False,allow_nan=False),encoding="utf-8");temp.replace(dest)
+        temp.write_text(json.dumps({"commit":mod.COMMIT,"release":mod.RELEASE,"catalogBuild":catalog["meta"].get("client_build"),"scope":"同部位、同護甲類型、接近物品等級的原生套裝控制比較；不代表最佳散件或完整BiS。","finished":finished,"elapsedSeconds":round(time.monotonic()-start,1),"trials":results},ensure_ascii=False,allow_nan=False),encoding="utf-8");temp.replace(dest)
     save()
-    # Run each scenario's control and smallest threshold together; then expand
-    # additional thresholds fairly, within the explicit CI time budget.
-    for step in range(max((len(cases) for _,cases in jobs),default=0)):
-        for row,cases in jobs:
-            if time.monotonic()-start>660:save();return
-            if step>=len(cases):continue
-            count,request=cases[step]
-            # A failed zero-piece baseline cannot establish a useful delta.
-            if step and not any(c["pieces"]==0 for c in row["cases"]):continue
-            try:
-                import tempfile
-                with tempfile.TemporaryDirectory() as tmp:
-                    path=Path(tmp)/"request.json";path.write_text(json.dumps(request),encoding="utf-8")
-                    raw=mod.invoke(cli,root,["sim","--infile",str(path)])
-                metrics,duration,_=mod.direct_metrics(raw)
-                if row["spec"] in mod.TANKS and not all(mod.finite(metrics.get(k)) for k in ("tps","dtps")):raise ValueError("Tank metrics missing")
-                file=mod.write_request_file(site,row["spec"],request)
-                row["cases"].append({"pieces":count,"metrics":metrics,"duration":duration,"requestFile":file})
-                print("Set trial:",row["spec"],row["scenario"],row["setName"],count,flush=True)
-            except (OSError,ValueError,KeyError,TypeError,mod.subprocess.SubprocessError) as e:
-                row["failed"].append({"pieces":count,"reason":mod.failure_kind(e)})
-            save()
+    def execute(row,count,request):
+        try:
+            import tempfile
+            with tempfile.TemporaryDirectory() as tmp:
+                path=Path(tmp)/"request.json";path.write_text(json.dumps(request),encoding="utf-8")
+                raw=mod.invoke(cli,root,["sim","--infile",str(path)])
+            metrics,duration,_=mod.direct_metrics(raw)
+            if row["spec"] in mod.TANKS and not all(mod.finite(metrics.get(k)) for k in ("tps","dtps","death")):raise ValueError("Tank metrics missing")
+            file=mod.write_request_file(site,row["spec"],request)
+            row["cases"].append({"pieces":count,"metrics":metrics,"duration":duration,"requestFile":file})
+            print("Set trial:",row["spec"],row["scenario"],row["setName"],count,flush=True)
+        except (OSError,ValueError,KeyError,TypeError,mod.subprocess.SubprocessError) as e:
+            row["failed"].append({"pieces":count,"reason":mod.failure_kind(e)})
+        save()
+    # Pair 0 pieces with the first threshold so limited CI time produces
+    # useful comparisons instead of many isolated controls. Then add higher
+    # thresholds in rounds, prioritizing the same boss for each spec.
+    for scenario in order:
+        cohort=[(row,cases) for row,cases in jobs if row["scenario"]==scenario]
+        for row,cases in cohort:
+            if time.monotonic()-start>660:save(True);return
+            execute(row,*cases[0])
+            if not row["cases"]:continue
+            if len(cases)>1 and time.monotonic()-start<=660:execute(row,*cases[1])
+        for step in range(2,max((len(cases) for _,cases in cohort),default=0)):
+            for row,cases in cohort:
+                if time.monotonic()-start>660:save(True);return
+                if step<len(cases) and any(c["pieces"]==0 for c in row["cases"]):execute(row,*cases[step])
+    save(True)
 if __name__=="__main__":run(*sys.argv[1:])
