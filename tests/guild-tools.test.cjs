@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -630,3 +630,34 @@ assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2}
 assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:3},{name:"B",minimum:2}]),null);
 assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2},{name:"A",minimum:2}]),null);
 console.log("PASS: simultaneous two-set piece constraints and infeasible combination rejection");
+
+
+// Shared native encounter parameters and explicit healer/dummy selection.
+const scenarioRequest=combat.combatScenarioRequest(gearRequest,"spec-1",{duration:60,variation:5,targets:3});
+assert.equal(scenarioRequest.encounter.duration,60);
+assert.equal(scenarioRequest.encounter.durationVariation,5);
+assert.equal(scenarioRequest.encounter.targets.length,3);
+assert.equal(gearRequest.encounter.targets.length,1);
+assert.equal(gearRequest.encounter.duration,180);
+const scenarioTrial=combat.combatGearTrial(scenarioRequest,explicitEnchant,"spec-1","one",true,true);
+assert.deepEqual(scenarioTrial.baseline.encounter,scenarioTrial.candidate.encounter);
+assert.deepEqual(scenarioTrial.baseline.simOptions,scenarioTrial.candidate.simOptions);
+assert.throws(()=>combat.combatScenarioRequest(scenarioRequest,"spec-1",{targets:5}));
+assert.throws(()=>combat.combatScenarioRequest(gearRequest,"spec-1",{duration:30,variation:30}));
+const complex=JSON.parse(JSON.stringify(gearRequest));complex.encounter.targets[0].targetInputs=[{}];
+assert.throws(()=>combat.combatScenarioRequest(complex,"spec-1",{targets:3}));
+const healerRaw={iterationsDone:1000,avgIterationDuration:60,raidMetrics:{parties:[{players:[{name:"Priest",hps:{avg:200,stdev:10},dps:{avg:0},secondsOomAvg:3},{name:"Target Dummy 1",hps:{avg:0},dtps:{avg:100}}]}]}};
+assert.equal(combat.combatResultPlayers(healerRaw).length,2);
+assert.equal(combat.combatResultPlayers(healerRaw)[1].dummy,true);
+assert.throws(()=>combat.combatResult(healerRaw));
+assert.throws(()=>combat.combatResult(healerRaw,"0:3"));
+const healerResult=combat.combatResult(healerRaw,"0:0");
+assert.equal(healerResult.hps,200);
+assert.equal(healerResult.oom,3);
+assert.equal(healerResult.stdev.hps,10);
+const resultDelta=combat.combatResultDelta(healerResult,{...healerResult,hps:250,oom:1,duration:90,iterations:500},"heal");
+assert.equal(resultDelta.rows[0].percent,25);
+assert.equal(resultDelta.rows[1].delta,-2);
+assert.equal(resultDelta.warnings.length,2);
+assert.equal(combat.combatResultDelta({dps:0,iterations:1,duration:60},{dps:20,iterations:1,duration:60},"dps").rows[0].percent,null);
+console.log("PASS: shared A/B encounter, explicit native character selection, healer metrics and comparison warnings");
