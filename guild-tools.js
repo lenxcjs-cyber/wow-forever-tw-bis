@@ -1098,7 +1098,7 @@ function simulatePriority(raw,reverse=false){
  if(!Number.isInteger(targets)||targets<1||targets>20)throw Error("目標數必須為 1–20 的整數");
  const metrics=["damage","threat","healing"];
  const demand=raw.healingDemand;
- if(demand!=null&&(!finite(demand.initial??0,0,1e9)||!finite(demand.rate??0,0,1e7)||demand.bursts!=null&&(!Array.isArray(demand.bursts)||demand.bursts.length>30||demand.bursts.some(b=>!b||!finite(b.time,0,600)||!finite(b.amount,0,1e9)))))throw Error("治療需求參數不合法");
+ if(demand!=null&&(typeof demand!=="object"||Array.isArray(demand)||!finite(demand.initial??0,0,1e9)||!finite(demand.rate??0,0,1e7)||demand.bursts!=null&&(!Array.isArray(demand.bursts)||demand.bursts.length>30||demand.bursts.some(b=>!b||!finite(b.time,0,600)||!finite(b.amount,0,1e9)))))throw Error("治療需求參數不合法");
  const incoming=demand?(demand.bursts??[]).slice().sort((a,b)=>a.time-b.time):[];
  let deficit=demand?.initial??0,peakDeficit=deficit,burstIndex=0,effective=0,overheal=0,incomingTotal=deficit;
  const parseBuff=(b,external=false)=>{
@@ -1304,6 +1304,9 @@ function combatLab(){
    if(x.nativeMetrics){
     const m=x.nativeMetrics,valid=k=>Number.isFinite(m[k])&&m[k]>=0;
     add(c,node("p",["tps","dtps","hps"].filter(valid).map(k=>k.toUpperCase()+" "+m[k].toFixed(2)).join(" ｜ ")+(Number.isFinite(m.death)&&m.death>=0&&m.death<=1?" ｜ 死亡機率 "+(100*m.death).toFixed(1)+"%":"")));
+    const deviation=["dps","tps","hps","dtps"].filter(k=>valid(k+"Stdev")).map(k=>k.toUpperCase()+" 標準差 "+m[k+"Stdev"].toFixed(2));
+    if(deviation.length)c.append(node("p",deviation.join(" ｜ ")+"（迭代間波動，不是平均值誤差）","gt-muted"));
+    if(valid("secondsOomAvg")||valid("tto"))c.append(node("p",[valid("secondsOomAvg")?"平均缺資源秒數 "+m.secondsOomAvg.toFixed(2):"",valid("tto")?"平均耗盡法力時間 "+m.tto.toFixed(2)+"s":""].filter(Boolean).join(" ｜ "),"gt-muted"));
     if(typeof x.nativeLog==="string"&&x.nativeLog.trim()){
      const d=node("details"),q=inp("輸入技能或事件關鍵字"),pre=node("pre"),lines=x.nativeLog.slice(0,80000).split("\n");pre.className="gt-combat-log";
      const draw=()=>{const term=q.value.trim().toLowerCase();pre.textContent=lines.filter(l=>!term||l.toLowerCase().includes(term)||zhDisplay(l).toLowerCase().includes(term)).join("\n")||"沒有符合的紀錄。";};
@@ -1332,7 +1335,7 @@ function combatLab(){
     const c=box(comparison,group.label,"同組遭遇；請核對裝備及技能策略差異，不等同於全域最佳。");
     const sorted=group.rows.filter(x=>Number.isFinite(value(x))&&value(x)>=0).sort((a,b)=>value(b)-value(a));
     if(sorted.length<2)c.append(node("p","此組缺少至少兩個可比較的引擎數值。","gt-muted"));
-    else for(const x of sorted){const delta=value(x)-value(sorted[0]);c.append(node("p",x.label+" ｜ "+metric+" "+value(x).toFixed(2)+" ｜ 與本組最高差 "+delta.toFixed(2)+(tankSpec&&Number.isFinite(x.tank?.dtps)?" ｜ DTPS "+x.tank.dtps.toFixed(2):"")+(tankSpec&&Number.isFinite(x.tank?.death)?" ｜ 死亡機率 "+(100*x.tank.death).toFixed(1)+"%":"")));}
+    else for(const x of sorted){const delta=value(x)-value(sorted[0]);c.append(node("p",x.label+" ｜ "+metric+" "+value(x).toFixed(2)+" ｜ 與本組最高差 "+delta.toFixed(2)+(tankSpec&&Number.isFinite((x.nativeMetrics??x.tank)?.dtps)?" ｜ DTPS "+(x.nativeMetrics??x.tank).dtps.toFixed(2):"")+(tankSpec&&Number.isFinite((x.nativeMetrics??x.tank)?.death)?" ｜ 死亡機率 "+(100*(x.nativeMetrics??x.tank).death).toFixed(1)+"%":"")));}
    }
    if(cases.some(x=>typeof x.comparisonGroup!=="string"||!x.comparisonGroup.trim()))comparison.append(node("p","未標示共同遭遇的案例只提供個別數值，不做最佳排名。","gt-muted"));
   }
