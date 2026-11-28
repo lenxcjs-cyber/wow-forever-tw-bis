@@ -889,8 +889,12 @@ assert.equal(uneven.rows[0].comparable,true);
 assert.equal(uneven.rows[0].bonus,0);
 assert.equal(uneven.rows[0].net,5);
 assert.equal(uneven.firstWin,1); // Same shoulder slot wins on stats alone; two pieces remain incomparable.
+assert.equal(uneven.firstActiveWin,null);
 assert.equal(tierLogic.catalogSetTierComparison(tierPools,"A",3,[{pieces:2,value:5},{pieces:2,value:5}]).firstWin,null);
 assert.equal(adjacentSet.best.pieces,4);assert.equal(adjacentSet.bestConfirmed.pieces,4);
+assert.equal(adjacentSet.firstActivationWin,2);assert.equal(adjacentSet.firstActivationConfirmed,2);
+const onePieceWin=confidence.nativeSetComparison({thresholds:[2],cases:[cRow(0,1000),cRow(1,1030),cRow(2,1020)]},"dps");
+assert.equal(onePieceWin.firstConfirmed,1);assert.equal(onePieceWin.firstActivationConfirmed,2);
 const epHelper=new Function(section("function epProfilesFor(","let epProfilesPromise=")+";const catalogWeightFields={strength:'力量',agility:'敏捷'};const combatPresetCommit='3b9c125a9b1387cd53ce2bb12969e0c6b54b813e';return epProfilesFor;")();
 const ep={spec:"spec-1",label:"武器戰",variant:"arms",source:"ui/specs/warrior/dps/presets.ts",declaration:"PreBiSArmsEpWeights",panelWeights:{"力量":2.2,"敏捷":1.76}};
 const epData={commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",profiles:[ep,{...ep,label:"duplicate"},{...ep,variant:"bad",panelWeights:{"命中":1}}]};
