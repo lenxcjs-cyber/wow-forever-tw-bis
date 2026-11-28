@@ -42,6 +42,7 @@ function talentIconURLs(t,cls,index=iconIndex){
  const key=iconFile(t,cls,index);return key?["https://render-classic-us.worldofwarcraft.com/icons/56/"+key+".jpg","https://render-us.worldofwarcraft.com/icons/56/"+key+".jpg","https://wow.zamimg.com/images/wow/icons/large/"+key+".jpg"]:[];
 }
 function sumIcon(t,cls){return talentIconURLs(t,cls)[0]||"";}
+function talentIconCounts(states){const result={total:0,loaded:0,loading:0,unmapped:0,unavailable:0};for(const state of states){if(["loaded","loading","unmapped","unavailable"].includes(state)){result.total++;result[state]++;}}return result;}
 const sum=(m)=>Object.values(m).reduce((a,b)=>a+b,0);
 function treeSum(cls,ranks,tree){return cls.talents.filter(t=>t.tree===tree).reduce((a,t)=>a+(ranks[t.id]||0),0);}
 function deps(cls,t){return (cls.arrows||[]).filter(a=>String(a.to)===String(t.id)&&a.required!==false).map(a=>cls.talents.find(x=>String(x.id)===String(a.from))||null);}
@@ -113,7 +114,7 @@ function investedTalentRows(profile,cls){
   return {name,points,tree:i,talent:t||null,valid:t?points<=t.maxRank&&!t.notYetAvailable:null};
  }));
 }
-if(typeof module!=="undefined"&&module.exports)module.exports={skillBuildNote,skillScenarios,skillGuideMatch,skillClientRecord,investedTalentRows,validateCommunitySnapshot,partialBuildCheck,exactProfile,zh,talentSymbol,iconFile,sumIcon,talentIconURLs,mergeTalentIconIndex,LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
+if(typeof module!=="undefined"&&module.exports)module.exports={skillBuildNote,skillScenarios,skillGuideMatch,skillClientRecord,investedTalentRows,validateCommunitySnapshot,partialBuildCheck,exactProfile,zh,talentSymbol,iconFile,sumIcon,talentIconURLs,talentIconCounts,mergeTalentIconIndex,LEVEL,questPath,validateClass,mapBuild,available,levelAt,levelState,lowerPoints,validateSnapshot};
 if(typeof document!=="undefined"){
 const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;},add=(p,...xs)=>{p.append(...xs);return p;},link=(text,url)=>{const a=el("a",text);a.href=url;a.target="_blank";a.rel="noopener noreferrer";return a;};
 const options=(e,rows,value)=>{e.replaceChildren(...rows.map(([v,t])=>new Option(t,v)));if(rows.some(x=>x[0]===value))e.value=value;};
@@ -128,11 +129,12 @@ function syncSelectors(){if(!catalog)return;const profiles=catalog.profiles.filt
 function purpose(t){const name=t.name,desc=(t.ranks||[]).join(" ");const reasons=[];if(/damage|critical|attack power|spell power/i.test(desc))reasons.push("傷害／爆擊：依實際技能使用比例衡量輸出收益");if(/mana|rage|energy|combo point/i.test(desc))reasons.push("資源管理：影響續航、技能施放頻率或連擊點");if(/heal|absorb|armor|health|dodge|parry|block|damage taken/i.test(desc))reasons.push("治療／生存：依實際承傷與治療需求評估");if(/movement speed|slow|root|stun|cooldown|cast time/i.test(desc))reasons.push("機動／控制／施法節奏：降低跑圖或戰鬥耗時");if(/chance to hit|hit chance/i.test(desc))reasons.push("命中：只套用原文所指的攻擊類別，勿直接當通用命中");return reasons.length?reasons.join("；"):"按此天賦原文及解鎖技能評估；本站尚未提供專屬數值權重。";}
 function localized(t){return localeIndex[classSel.value+":"+t.tree+":"+t.name]?.name||zh(t.name);}
 function localizedRanks(t){const ranks=localeIndex[classSel.value+":"+t.tree+":"+t.name]?.ranks;return Array.isArray(ranks)&&ranks.length===t.ranks?.length?ranks:null;}
+const successfulIconURLs=new Map();
 function talentArt(t,tree){
  const known=partialIndex[classSel.value+":"+tree+":"+t.name],holder=el("span","圖示待查","talent-symbol talent-icon-missing"),urls=talentIconURLs({...t,tree,icon:t.icon||known?.icon},classSel.value);
  holder.dataset.iconState=urls.length?"loading":"unmapped";holder.title=urls.length?"正在載入遊戲原始圖示":"未取得原始圖示對應";
- if(urls.length){const img=el("img");img.alt="";img.width=56;img.height=56;img.loading="lazy";img.decoding="async";img.referrerPolicy="no-referrer";let i=0;
-  img.onload=()=>{holder.dataset.iconState="loaded";holder.title="遊戲原始圖示";holder.classList.remove("talent-icon-missing");label.hidden=true;};
+ if(urls.length){const cached=successfulIconURLs.get(urls[0]);if(cached&&urls.includes(cached)){urls.splice(urls.indexOf(cached),1);urls.unshift(cached);}const original=talentIconURLs({...t,tree,icon:t.icon||known?.icon},classSel.value)[0];const img=el("img");img.alt="";img.width=56;img.height=56;img.loading="lazy";img.decoding="async";img.referrerPolicy="no-referrer";let i=0;
+  img.onload=()=>{successfulIconURLs.set(original,urls[i]);holder.dataset.iconState="loaded";holder.title="遊戲原始圖示";holder.classList.remove("talent-icon-missing");label.hidden=true;};
   img.onerror=()=>{if(++i<urls.length){img.src=urls[i];return;}holder.dataset.iconState="unavailable";holder.title="原始圖示暫不可用";img.remove();label.textContent="圖示未載入";};
   const label=el("span","載入中","talent-icon-label");holder.replaceChildren(label,img);img.src=urls[0];
  }return holder;
@@ -209,6 +211,7 @@ function syncTreeNavigation(){
  if(skills&&!skills.hidden){const b=el("button","技能使用指南");b.type="button";b.onclick=()=>skills.scrollIntoView({block:"start"});nav.append(b);}
  const d=el("button","技能效果");d.type="button";d.onclick=()=>$("detail").scrollIntoView({block:"start"});nav.append(d);
 }
+function updateIconCoverage(){const host=$("iconCoverage"),area=$("treeArea");if(!host||!area)return;const counts=talentIconCounts([...area.querySelectorAll(".talent-symbol")].map(x=>x.dataset.iconState));host.hidden=!counts.total;host.textContent=counts.total?"原始圖示：已顯示 "+counts.loaded+"／"+counts.total+"｜等待載入 "+counts.loading+"｜無對應 "+counts.unmapped+"｜載入失敗 "+counts.unavailable+"（僅目前天賦樹）":"";}
 function renderTree(cls,issues){const a=$("treeArea");a.replaceChildren();for(const tree of cls.trees){const card=el("section",undefined,"tree"),grid=el("div",undefined,"talents");add(card,el("h3",TREE_NAMES[CLASSES.indexOf(classSel.value)][tree.index]+" · "+treeSum(cls,ranks,tree.index)+"點"),grid);for(const t of cls.talents.filter(x=>x.tree===tree.index)){const n=ranks[t.id]||0,b=el("button",undefined,"talent"+(n?" picked":"")+(n>t.maxRank?" invalid":""));b.type="button";b.dataset.id=t.id;b.style.gridRow=String(t.row);b.style.gridColumn=String(t.column);b.title=localized(t)+"（"+t.name+"） "+n+"/"+t.maxRank;add(b,talentArt(t,t.tree),el("strong",n+"/"+t.maxRank),el("span",localized(t)));b.onclick=()=>detail(t);grid.append(b);}a.append(card);}syncTreeNavigation();const focus=cls.talents.find(t=>t.id===selected)||cls.talents.find(t=>ranks[t.id]>0)||cls.talents[0];if(focus)detail(focus);}
 function updateURL(){if(embedded)return;const p=new URLSearchParams({class:classSel.value,mode});if(q.get("embed")==="1")p.set("embed","1");if(mode==="build"){p.set("spec",specSel.value);p.set("build",buildSel.value);}else p.set("level",String(level));history.replaceState(null,"","?"+p.toString());const share=$("shareLink");if(share){p.delete("embed");share.href="talents.html?"+p.toString();}}
 function sources(){const s=$("sources");s.replaceChildren(el("h2","資料來源與限制"),link("Zephras 客戶端天賦資料 1.60.1.71139",DATA_URL),el("p"),link("繁中天賦計算器（外部對照）","https://wowforeverpath.com/zh-TW/talents/"),el("p","圖示採遊戲原始材質檔名／FileDataID 對應，優先讀取 Blizzard 圖片服務，備援為同檔名的 Wowhead 原始材質；缺少或無法載入時明確標示，不使用自創符號。繁中名稱優先採已核對資料，其他為參考譯名。","muted"),el("p",db?.format==="gt-community-talents/1"?"格位、圖示及前置關係來自 Talents Forever；各職業來源日期不一，路線為本站演算法建議。":"天賦位置、上限與先決條件來自指定版客戶端。本站配點不是官方最佳解，也不是完整輸出模擬。","muted"),link("Talents Forever（CC BY 4.0）","https://talentsforever.com/about"),el("p",getClass()?.generated?"社群資料日期："+getClass().generated:"","muted"),link("MMonster 各職業練等路線（外部參考）","https://mmonster.co/wow-forever/tools/talent-path"),el("p"),link("ForeverSpec 天賦計算器","https://foreverspec.com/talent-calculator/"),el("p"),link("逐項滿等構築研究來源","https://www.wofwforever.com/en/guides/wow-forever-"+classSel.value+"-level-60-talents/"));}
@@ -240,5 +243,6 @@ async function init(){mode=q.get("mode")==="level"?"level":"build";level=levelAt
  for(const url of ["talent-client.json","talent-community.json",DATA_URL]){if(db)break;try{const d=await loadJSON(url);if(db)break;if(!validateSnapshot(d)&&!validateCommunitySnapshot(d))throw Error("資料格式或前置條件不完整");db=d;source=url==="talent-community.json"?"網站內建社群快照":url==="talent-client.json"?"網站快照":"公開來源";}catch(e){}}
  snapshotStatus(source);render();
 }
+const treeArea=$("treeArea");if(treeArea&&typeof MutationObserver==="function"){const observer=new MutationObserver(updateIconCoverage);observer.observe(treeArea,{childList:true,subtree:true,attributes:true,attributeFilter:["data-icon-state"]});}
 init();
 }
