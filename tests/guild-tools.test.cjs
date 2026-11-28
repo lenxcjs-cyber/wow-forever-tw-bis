@@ -361,7 +361,7 @@ assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Reputation vend
 assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Drop",bonding:"Binds when picked up"},{boeOnly:true}),false);
 console.log("PASS: source constraints for reputation and BoE equipment plans");
 
-const weaponDisplay=new Function(section("function auditSlotOrder(","function audit(")+";return {auditWeaponGroups,auditWeaponVisible,auditWeaponPreference,auditOtherWeaponMatches};")();
+const weaponDisplay=new Function(section("function auditSlotOrder(","function audit(")+";return {auditWeaponGroups,auditWeaponVisible,auditWeaponPreference,auditOtherWeaponMatches,auditEquipmentSlots,auditEquipmentChoices};")();
 const mixedSlots=[{name:"頭部",items:[{id:1,type:"布甲"}]},{name:"主手",items:[{id:2,type:"法杖"},{id:3,type:"單手錘"}]},{name:"雙手武器",items:[{id:2,type:"法杖"}]},{name:"副手物品",items:[{id:4,type:"持有型副手"}]},{name:"遠程武器",items:[{id:5,type:"魔杖"}]}];
 const partition=weaponDisplay.auditWeaponGroups(mixedSlots);
 assert.deepEqual(partition.modes,["two","one"]);
@@ -392,3 +392,22 @@ assert.deepEqual(prepHelpers.recipeShoppingRows([["草",10],["瓶",2],["石",5]]
 assert.equal(prepHelpers.recipeSearchMatches({name:"測試配方",mat:"Dreamfoil×2",where:"商人"},"夢葉草 商人",v=>v.replace("Dreamfoil","夢葉草")),true);
 assert.equal(prepHelpers.recipeSearchMatches({name:"測試",mat:"夢葉草×2"},"夢葉草 商人"),false);
 console.log("PASS: recipe quantities, missing materials, owned inventory, multilingual multi-term search");
+
+const paper=weaponDisplay.auditWeaponGroups([...mixedSlots,{name:"戒指",items:[{id:6},{id:7},{id:6}]},{name:"指環",items:[{id:8}]},{name:"飾品",items:[{id:9}]},{name:"聖物",items:[{id:10}]}]);
+const paperTwo=weaponDisplay.auditEquipmentSlots(paper,"two"),paperOne=weaponDisplay.auditEquipmentSlots(paper,"one");
+assert.equal(paperTwo.length,16);
+assert.equal(paperOne.length,17);
+assert.deepEqual(paperTwo.filter(x=>x.group==="戒指").map(x=>x.name),["戒指 1","戒指 2"]);
+assert.deepEqual(paperTwo.filter(x=>x.group==="飾品").map(x=>x.name),["飾品 1","飾品 2"]);
+assert.equal(paperTwo.filter(x=>x.group==="遠程／聖物").length,1);
+assert.equal(paperTwo.find(x=>x.group==="遠程／聖物").items.length,2);
+assert.ok(!paperTwo.some(x=>/副手|主手/.test(x.name)));
+const picks=weaponDisplay.auditEquipmentChoices(paperTwo);
+assert.deepEqual(picks.filter(x=>x.group==="戒指").map(x=>x.featured.id),[6,7]);
+assert.deepEqual(picks.filter(x=>x.group==="飾品").map(x=>x.featured?.id||null),[9,null]);
+assert.equal(new Set(picks.filter(x=>x.featured).map(x=>x.featured.id)).size,picks.filter(x=>x.featured).length);
+assert.equal(weaponDisplay.auditEquipmentChoices(paperTwo,x=>x.id===6).filter(x=>x.featured).length,1);
+assert.equal(coverage(paperTwo.map(x=>x.items),{"6":true,"7":true,"9":true}).have,3);
+const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"飾品",item:{id,name:"測試"},score:{total:5}})));
+assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
+console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
