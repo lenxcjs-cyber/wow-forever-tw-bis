@@ -20,6 +20,9 @@ def parse_sets(text,source):
                 if k in ("Name","AlternativeName") and v.startswith('"'):
                     fields[k]=json.loads(v)
                 if k=="ID" and v.isdigit():fields[k]=int(v)
+                if k=="RequiredProfession":
+                    expr=ts[j+2:j+5]
+                    fields[k]=expr[2].removeprefix("Profession_") if len(expr)==3 and expr[:2]==["proto","."] and expr[2].startswith("Profession_") else "unknown"
                 if k=="Bonuses":
                     start=j+2
                     while start<len(ts) and ts[start]!="{":start+=1
@@ -40,7 +43,7 @@ def parse_sets(text,source):
             elif t=="}":depth-=1
             j+=1
         if fields.get("Name") and bonuses:
-            rows.append({"name":fields["Name"],"id":fields.get("ID"),"alternativeName":fields.get("AlternativeName",""),"source":source,"bonuses":sorted(bonuses,key=lambda b:b["pieces"])})
+            rows.append({"name":fields["Name"],"id":fields.get("ID"),"alternativeName":fields.get("AlternativeName",""),"source":source,"requiredProfession":fields.get("RequiredProfession"),"bonuses":sorted(bonuses,key=lambda b:b["pieces"])})
     return rows
 
 def main(root,output,commit):
