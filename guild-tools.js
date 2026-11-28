@@ -1819,7 +1819,14 @@ function nativeImportGear(gear,meta){
  const items=Array.from({length:17},()=>({})),seen=new Set(),uniqueSlots={1:0,2:1,3:2,4:3,5:4,6:5,7:6,8:7,9:8,10:9,14:16};
  let two=false;
  const positive=(v,max=2147483647)=>Number.isInteger(v)&&v>0&&v<=max;
- for(const [sourceIndex,x] of gear.items.entries()){
+ // Compact addon exports may list an explicitly main-hand-only weapon after a flexible one.
+ // Reserve fixed weapon positions first; preserve the original order of rings and trinkets.
+ const entries=[...gear.items.entries()];
+ if(gear.items.length!==17){
+  const flexible=([,x])=>{const m=meta.items[x?.id];return m?.[0]===13&&m[1]===2&&![5,7].includes(m[2]);};
+  entries.sort((a,b)=>Number(flexible(a))-Number(flexible(b)));
+ }
+ for(const [sourceIndex,x] of entries){
   if(x==null||x?.id===0||x&&typeof x==="object"&&!Object.keys(x).length)continue;
   if(!x||!positive(x.id)||!Array.isArray(meta.items[x.id]))throw Error("引擎缺少物品 ID "+(x?.id??"未知"));
   if(seen.has(x.id))throw Error("同 ID 重複裝備，唯一裝備資格尚未驗證："+x.id);
@@ -2006,14 +2013,14 @@ function nativeBrowserView(parent,id){
    try{
     const raw=e.data.result,m=nativeBrowserResult(raw,id,n);
     if(batch&&Math.abs(m.duration-cfg.duration)>1e-6)throw Error("實際平均時間與標準遭遇不符，不能納入批次比較");
-    successful++;
-    if(batch){const metrics={};for(const k of ["dps","tps","hps","dtps","death"])if(Number.isFinite(m[k]))metrics[k]=m[k];for(const [k,v] of Object.entries(m.stdev||{}))if(Number.isFinite(v))metrics[k+"Stdev"]=v;batchRows.push({scenario:job.scenario,variant:job.variant,name:job.name,metrics,iterations:n,duration:m.duration});}
     for(const [key,label] of [["dps","DPS"],["tps","TPS"],["hps","HPS"],["dtps","DTPS"]])if(Number.isFinite(m[key]))part.append(node("p",label+" "+m[key].toFixed(2)+(Number.isFinite(m.stdev?.[key])?" ｜ 標準差 "+m.stdev[key].toFixed(2):"")));
     if(m.death!==null)part.append(node("p","死亡機率 "+(m.death*100).toFixed(2)+"%"));
     const targets=raw.encounterMetrics?.targets;
     if(Array.isArray(targets))combatNativeTargetView(part,targets.map((t,i)=>({index:i,health:cfg.health,dps:t?.dtps?.avg})),cfg);
     if(m.logs){const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=m.logs;add(d,node("summary","首次迭代戰鬥紀錄"),pre);part.append(d);}
     add(part,node("p","固定時間原生模擬；不是血量歸零停止的真實擊殺時間。","gt-muted"),button("下載此原生結果",()=>combatDownloadJSON(raw,"tomb-"+id+"-"+job.scenario+"-"+(job.variant??0)+"-result.json")));
+    successful++;
+    if(batch){const metrics={};for(const k of ["dps","tps","hps","dtps","death"])if(Number.isFinite(m[k]))metrics[k]=m[k];for(const [k,v] of Object.entries(m.stdev||{}))if(Number.isFinite(v))metrics[k+"Stdev"]=v;batchRows.push({scenario:job.scenario,variant:job.variant,name:job.name,metrics,iterations:n,duration:m.duration});}
    }catch(err){if(batch)batchRows.push({scenario:job.scenario,variant:job.variant,name:job.name,error:"validation"});part.append(node("p","此遭遇未取得有效指標："+err.message,"gt-muted"));}
    index++;next();
   };
