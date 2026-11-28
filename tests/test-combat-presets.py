@@ -232,5 +232,24 @@ class PresetTests(unittest.TestCase):
         result["encounterMetrics"]["targets"][0]["dtps"]["avg"]=-1
         self.assertEqual(mod.native_target_damage(result,request),[])
 
+    def test_upstream_consumables(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            registry=root/mod.CONSUMABLE_REGISTRY
+            registry.parent.mkdir(parents=True)
+            registry.write_text("export const DenseSharpeningStone = { id: 12404 };\nexport const InstantPoisonVI = { id: 8928 };\nexport const DeadlyPoisonIV = { id: 8985 };\nexport const TestFood = { id: 123 };\n",encoding="utf-8")
+            p=root/"ui/specs/rogue/dps/presets.ts"
+            p.parent.mkdir(parents=True)
+            p.write_text("export const DefaultConsumables = ConsumesSpec.create({\n // comment: ignore\n foodId: Consumables.TestFood.id,\n mhWeaponImbueId: Consumables.InstantPoisonVI.id,\n ohWeaponImbueId: Consumables.DeadlyPoisonIV.id,\n extraIds: [Consumables.TestFood.id,],\n});",encoding="utf-8")
+            c=mod.upstream_consumables(root,"rogue/dps","muti")
+            self.assertEqual(c,{"foodId":123,"mhWeaponImbueId":8928,"ohWeaponImbueId":8985,"extraIds":[123]})
+            w=root/"ui/specs/warrior/dps/presets.ts"
+            w.parent.mkdir(parents=True)
+            w.write_text("export const DefaultConsumables = ConsumesSpec.create({mhImbueId: Consumables.TestFood.id, ohImbueId: Consumables.TestFood.id,});",encoding="utf-8")
+            self.assertEqual(mod.upstream_consumables(root,"warrior/dps","prebis_arms"),{"mhImbueId":12404,"ohImbueId":0})
+            p.write_text("export const DefaultConsumables = ConsumesSpec.create({foodId: Consumables.Unknown.id,});",encoding="utf-8")
+            with self.assertRaises(ValueError):
+                mod.upstream_consumables(root,"rogue/dps","muti")
+
 if __name__=="__main__":
     unittest.main()
