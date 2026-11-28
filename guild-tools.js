@@ -1316,25 +1316,43 @@ function combatEquipmentRows(equipment,mode){
  combatEquipmentSpec(rows,mode);
  return rows.map(x=>({...x,id:String(x.id)}));
 }
-function combatApplyEquipment(request,equipment,id,keepMatching=true){
+function combatEquipmentDiff(before,after){
+ if(!Array.isArray(before?.items)||before.items.length!==17||!Array.isArray(after?.items)||after.items.length!==17)throw Error("比較需要兩套17格裝備");
+ const val=x=>({id:x?.id??0,enchant:x?.enchant??0,randomSuffix:x?.randomSuffix??0});
+ return combatEquipmentNames.flatMap((name,i)=>{const a=val(before.items[i]),b=val(after.items[i]);return Object.keys(a).some(k=>a[k]!==b[k])?[{name,index:i,before:a,after:b}]:[];});
+}
+function combatRequestPlayer(request,id){
  const index=Number(String(id).split("-")[1])-1,field=combatPlayerFields[index];
  if(!combatEngineURL(id)||!field||!request||typeof request!=="object"||request.type!=="SimTypeIndividual"&&request.type!==1)throw Error("請提供對應專精的個人 RaidSimRequest");
- const copy=JSON.parse(JSON.stringify(request)),parties=copy.raid?.parties;
+ const parties=request.raid?.parties;
  if(!Array.isArray(parties)||parties.some(p=>p?.players!=null&&!Array.isArray(p.players)))throw Error("RaidSimRequest 隊伍格式不合法");
- const players=parties.flatMap(p=>p?.players||[]).filter(p=>p&&Object.keys(p).length);
- if(players.length!==1||!players[0][field]||!players[0].rotation||!copy.encounter?.targets?.length||!copy.simOptions)throw Error("引擎請求的職業、技能策略或遭遇不符");
- const p=players[0];
- if(p.enableItemSwap||p.itemSwap?.items?.some(x=>x?.id)||p.itemSwap?.swapSets?.length||p.rotation?.priorityList?.some(x=>x?.action?.itemSwap))throw Error("原請求含換裝；請在引擎停用換裝後再匯入，避免破壞技能策略");
+ const players=parties.flatMap(p=>p?.players||[]).filter(p=>p&&typeof p==="object"&&Object.keys(p).length);
+ if(players.length!==1||!players[0][field]||!players[0].rotation||!Array.isArray(request.encounter?.targets)||!request.encounter.targets.length||!request.simOptions)throw Error("引擎請求的職業、技能策略或遭遇不符");
+ return players[0];
+}
+function combatApplyEquipment(request,equipment,id,keepMatching=true,preserveEmpty=false){
+ const copy=JSON.parse(JSON.stringify(request)),p=combatRequestPlayer(copy,id);
+ if(p.enableItemSwap||p.itemSwap?.items?.some(x=>x?.id)||p.itemSwap?.swapSets?.length||JSON.stringify(p.rotation).includes('"itemSwap":'))throw Error("原請求含換裝；請在引擎停用換裝後再匯入，避免破壞技能策略");
  if(!Array.isArray(equipment?.items)||equipment.items.length!==17)throw Error("須為17格 EquipmentSpec");
  const seen=new Set();
  p.equipment={items:equipment.items.map((x,i)=>{
-  if(!x?.id)return {};
-  if(!Number.isSafeInteger(x.id)||x.id<1||x.id>999999999||seen.has(x.id))throw Error("無效或重複的物品 ID");
-  seen.add(x.id);
   const old=p.equipment?.items?.[i];
-  return keepMatching&&old?.id===x.id?old:{id:x.id};
+  const item=preserveEmpty&&!x?.id?old:x;
+  if(!item?.id)return {};
+  if(!Number.isSafeInteger(item.id)||item.id<1||item.id>999999999||seen.has(item.id))throw Error("無效或重複的物品 ID");
+  seen.add(item.id);
+  return (preserveEmpty&&!x?.id||keepMatching&&old?.id===item.id)?old:{id:item.id};
  })};
  return copy;
+}
+function combatGearTrial(request,equipment,id,mode,keepMatching=true,preserveEmpty=false){
+ const before=combatRequestPlayer(request,id).equipment;
+ if(!Array.isArray(before?.items)||before.items.length!==17)throw Error("原請求沒有完整17格裝備，不能做控制變因比較");
+ const candidate=combatApplyEquipment(request,equipment,id,keepMatching,preserveEmpty);
+ const after=combatRequestPlayer(candidate,id).equipment;
+ if(mode==="two"&&after.items[15]?.id)throw Error("雙手模式仍有副手；請關閉保留空欄原裝備或先清空原副手");
+ const changes=combatEquipmentDiff(before,after);
+ return {baseline:JSON.parse(JSON.stringify(request)),candidate,changes};
 }
 function combatNativeActions(rows,metric="damage"){
  if(!["damage","threat","healing","shielding"].includes(metric)||!Array.isArray(rows))return [];
@@ -1405,14 +1423,26 @@ function combatGearView(parent,id,build){
   }refresh();
  }
  function save(){try{const gear=current();stored={mode:mode.value,slots:Object.fromEntries(all().map(x=>[x.name,x.id])),source:stored.source};localStorage.setItem(key,JSON.stringify(stored));msg.textContent="已儲存本專精／構築的 "+gear.items.filter(x=>x.id).length+" 件選擇。";}catch(e){msg.textContent="儲存失敗："+e.message;}}
- const details=node("details"),keep=node("input");keep.type="checkbox";keep.checked=true;
+ const details=node("details"),keep=node("input"),preserve=node("input");keep.type="checkbox";keep.checked=true;preserve.type="checkbox";
  const imported=node("textarea");imported.rows=3;imported.placeholder="貼上17格 EquipmentSpec JSON";imported.setAttribute("aria-label","匯入配裝 JSON");
  const importMode=select([["one","單手／副手"],["two","雙手武器"]]);importMode.value=mode.value;
  function loadEquipment(){
   try{const gear=combatReadJSON(imported.value),rows=combatEquipmentRows(gear,importMode.value);stored={mode:importMode.value,slots:Object.fromEntries(rows.map(x=>[x.name,x.id])),source:"外部配裝（資格待核）"};if(![...mode.options].some(o=>o.value===stored.mode))mode.add(new Option((stored.mode==="two"?"雙手武器":"單手／副手")+"（匯入，資格待核）",stored.mode));mode.value=stored.mode;draw();msg.textContent="已載入 "+rows.filter(x=>x.id).length+" 件物品 ID；匯入不代表職業、部位、唯一群組或取得資格已驗證，附魔與詞綴不會自動匯入。";}catch(e){msg.textContent="匯入失敗："+e.message;}
  }
  const importBox=node("details");add(importBox,node("summary","匯入外部或整套面板配裝"),field("匯入武器模式",importMode),imported,combatFileInput(imported,msg,"上傳配裝 JSON"),button("載入17格配裝",loadEquipment));
- add(details,node("summary","選擇配裝與匯出（17 格）"),field("武器配置",mode),importBox,button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows)selected.get(x.name).value=x.featured?String(x.featured.id):"";refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；未選欄位會清空原請求對應裝備。同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。未在本站執行引擎。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=combatApplyEquipment(combatReadJSON(request.value),current(),id,keep.checked);combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
+ const preview=node("div");
+ function trial(){return combatGearTrial(combatReadJSON(request.value),current(),id,mode.value,keep.checked,preserve.checked);}
+ function compareGear(){
+  preview.replaceChildren();
+  try{const result=trial();const part=box(preview,"A／B 配裝變更","A 為原始請求；B 只變更裝備。天賦、增益、消耗品、戰鬥時間及迭代設定完全保留。");
+   const fmt=x=>x.id?String(x.id)+(x.enchant?"（附魔 "+x.enchant+"）":"")+(x.randomSuffix?"（詞綴 "+x.randomSuffix+"）":""):"空欄";
+   if(!result.changes.length)part.append(node("p","裝備與附魔沒有變化。","gt-muted"));
+   for(const x of result.changes)part.append(node("p",x.name+" ｜ "+fmt(x.before)+" → "+fmt(x.after)));
+   add(part,button("下載 A 原始請求",()=>combatDownloadJSON(result.baseline,"tomb-"+id+"-A.json")),button("下載 B 替換裝備請求",()=>combatDownloadJSON(result.candidate,"tomb-"+id+"-B.json")));
+   msg.textContent="比較 "+result.changes.length+" 個裝備位置；下載的是同一基準設定的 A／B 請求，並非模擬結果。";
+  }catch(e){msg.textContent="比較失敗："+e.message;}
+ }
+ add(details,node("summary","選擇配裝與匯出（17 格）"),field("武器配置",mode),importBox,button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows)selected.get(x.name).value=x.featured?String(x.featured.id):"";refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；預設未選欄位清空原裝備，也可改為保留。同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。未在本站執行引擎。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),add(node("label",undefined,"gt-check"),preserve,node("span","未選欄位保留原裝備（單件替換模式）")),button("預覽 A／B 配裝變更",compareGear),preview,button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=trial().candidate;combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
  mode.addEventListener("change",()=>{const old=stored.slots||{};stored={...stored,mode:mode.value,slots:{...old,...Object.fromEntries(all().filter(x=>x.name!=="主手武器"&&x.name!=="副手物品"&&x.name!=="雙手武器").map(x=>[x.name,x.id]))}};draw();});c.append(details);draw();if(stored.source){details.open=true;msg.textContent="已帶入："+stored.source+"；請核對裝備與附魔。";}
  return async path=>{
   const valid=combatRequestPath(path,id);if(!valid)throw Error("請求檔案路徑不合法");
