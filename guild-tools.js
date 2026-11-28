@@ -750,28 +750,39 @@ function catalogSetOptions(pools){
  const names=new Map();
  for(const [slot,rows] of pools){const max=catalogArmorGroups.find(g=>g[0]===slot)[1],local=new Map();
   for(const p of rows){const name=catalogSetName(p.item);if(name)local.set(name,(local.get(name)||0)+1);}
-  for(const [name,count] of local)names.set(name,(names.get(name)||0)+Math.min(count,max));
+  for(const [name] of local)names.set(name,(names.get(name)||0)+catalogCompatiblePicks(rows.filter(p=>catalogSetName(p.item)===name),max).length);
  }
  return [...names].filter(([,n])=>n>=2).sort((a,b)=>a[0].localeCompare(b[0]));
 }
+// At most two items share a slot. Keep the best representative per known
+// exclusive group plus the best two ordinary items per set bucket.
+function catalogSlotChoices(rows,slot,capacity,names,exactCoverage=false){
+ const buckets=new Map();
+ for(const row of rows){
+  const i=names.indexOf(catalogSetName(row.item));
+  if(i<0&&!(row.score.total>0))continue;
+  const group=questChoiceGroup(row.item.id),key=i+":"+group;
+  if(!buckets.has(key))buckets.set(key,[]);
+  const list=buckets.get(key);if(!list.some(p=>String(p.item.id)===String(row.item.id)))list.push(row);
+ }
+ const candidates=[...buckets].flatMap(([key,list])=>list.sort((a,b)=>b.score.total-a.score.total||Number(a.item.id)-Number(b.item.id)).slice(0,key.endsWith(":")?capacity:1));
+ const best=new Map();
+ function record(items){
+  if(exactCoverage&&items.length!==capacity)return;
+  const counts=names.map(n=>items.filter(p=>catalogSetName(p.item)===n).length),total=items.reduce((n,p)=>n+p.score.total,0),key=counts.join(","),prior=best.get(key);
+  if(!prior||items.length>prior.picks.length||items.length===prior.picks.length&&total>prior.total)best.set(key,{counts,total,picks:items.map(p=>({...p,slot}))});
+ }
+ record([]);
+ if(capacity>=1)for(const a of candidates)record([a]);
+ if(capacity>=2)for(let i=0;i<candidates.length;i++)for(let j=i+1;j<candidates.length;j++){
+  const a=candidates[i],b=candidates[j];
+  if(String(a.item.id)!==String(b.item.id)&&!questChoiceConflicts(a.item.id,[b.item.id]))record([a,b]);
+ }
+ return [...best.values()];
+}
 function catalogSetAlternative(pools,name,minimum){
  if(!name||!Number.isInteger(minimum)||minimum<2||minimum>14)return null;
- let states=new Map([[0,{total:0,picks:[]}]]);
- for(const [slot,capacity] of catalogArmorGroups){
-  const rows=pools.get(slot)||[],yes=rows.filter(p=>catalogSetName(p.item)===name),no=rows.filter(p=>catalogSetName(p.item)!==name&&p.score.total>0);
-  const next=new Map();
-  for(let count=0;count<=Math.min(capacity,yes.length);count++){
-   const chosenYes=catalogCompatiblePicks(yes,count);if(chosenYes.length!==count)continue;
-   const chosen=[...chosenYes,...catalogCompatiblePicks(no,capacity-count,chosenYes)].map(p=>({...p,slot}));
-   const score=chosen.reduce((sum,p)=>sum+p.score.total,0);
-   for(const [oldCount,prev] of states){const total=prev.total+score,key=oldCount+count,existing=next.get(key);
-    if(!existing||total>existing.total)next.set(key,{total,picks:[...prev.picks,...chosen]});
-   }
-  }
-  states=next;
- }
- const feasible=[...states].filter(([count])=>count>=minimum).sort((a,b)=>b[1].total-a[1].total||b[0]-a[0]);
- return feasible.length?{count:feasible[0][0],...feasible[0][1]}:null;
+ const result=catalogMultiSetAlternative(pools,[{name,minimum}]);return result?{count:result.counts[0],total:result.total,picks:result.picks}:null;
 }
 function catalogMultiSetAlternative(pools,requirements,coverage=null){
  if(!Array.isArray(requirements)||requirements.length<1||requirements.length>2||requirements.some(r=>!r||typeof r.name!=="string"||!r.name||!Number.isInteger(r.minimum)||r.minimum<2||r.minimum>14)||new Set(requirements.map(r=>r.name)).size!==requirements.length||requirements.reduce((n,r)=>n+r.minimum,0)>14)return null;
@@ -779,18 +790,11 @@ function catalogMultiSetAlternative(pools,requirements,coverage=null){
  let states=new Map([[zero.join(","),{counts:zero,total:0,picks:[]}]]);
  for(const [slot,maxCapacity] of catalogArmorGroups){
   const capacity=coverage?coverage.filter(p=>p.slot===slot).length:maxCapacity;if(capacity>maxCapacity)return null;
-  const rows=pools.get(slot)||[],buckets=names.map(name=>rows.filter(p=>catalogSetName(p.item)===name));
-  const other=rows.filter(p=>!names.includes(catalogSetName(p.item))&&p.score.total>0);
-  const choices=[];
-  function choose(index,counts,remaining,selected){
-   if(index===names.length){const picks=[...selected,...catalogCompatiblePicks(other,remaining,selected)].map(p=>({...p,slot}));if(!coverage||picks.length===capacity)choices.push({counts,picks,total:picks.reduce((n,p)=>n+p.score.total,0)});return;}
-   for(let n=0;n<=Math.min(remaining,buckets[index].length);n++){const chosen=catalogCompatiblePicks(buckets[index],n,selected);if(chosen.length===n)choose(index+1,[...counts,n],remaining-n,[...selected,...chosen]);}
-  }
-  choose(0,[],capacity,[]);
+  const choices=catalogSlotChoices(pools.get(slot)||[],slot,capacity,names,!!coverage);
   const next=new Map();
   for(const prev of states.values())for(const c of choices){
    const counts=prev.counts.map((n,i)=>n+c.counts[i]),key=counts.map((n,i)=>Math.min(n,minima[i])).join(","),total=prev.total+c.total;
-   if(!next.has(key)||total>next.get(key).total)next.set(key,{counts,total,picks:[...prev.picks,...c.picks]});
+   const picks=[...prev.picks,...c.picks],prior=next.get(key);if(!prior||picks.length>prior.picks.length||picks.length===prior.picks.length&&total>prior.total)next.set(key,{counts,total,picks});
   }
   states=next;
  }
@@ -806,12 +810,10 @@ function catalogExactSetPlans(pools,name,max,coverage=null){
  let states=new Map([[0,{total:0,picks:[]}]]);
  for(const [slot,maxCapacity] of catalogArmorGroups){
   const capacity=coverage?coverage.filter(p=>p.slot===slot).length:maxCapacity;if(capacity>maxCapacity)return new Map();
-  const rows=pools.get(slot)||[],yes=rows.filter(p=>catalogSetName(p.item)===name),no=rows.filter(p=>catalogSetName(p.item)!==name&&p.score.total>0),next=new Map();
-  for(const [old,prev] of states)for(let n=0;n<=Math.min(max-old,capacity,yes.length);n++){
-   const chosenYes=catalogCompatiblePicks(yes,n);if(chosenYes.length!==n)continue;
-   const picks=[...chosenYes,...catalogCompatiblePicks(no,capacity-n,chosenYes)].map(p=>({...p,slot}));
-   if(coverage&&picks.length!==capacity)continue;
-   const total=prev.total+picks.reduce((sum,p)=>sum+p.score.total,0),k=old+n;
+  const choices=catalogSlotChoices(pools.get(slot)||[],slot,capacity,[name],!!coverage),next=new Map();
+  for(const [old,prev] of states)for(const choice of choices){
+   const n=choice.counts[0],picks=choice.picks,k=old+n;if(k>max)continue;
+   const total=prev.total+choice.total;
    const combined=[...prev.picks,...picks],prior=next.get(k);
    if(!prior||combined.length>prior.picks.length||combined.length===prior.picks.length&&total>prior.total)next.set(k,{total,picks:combined});
   }
