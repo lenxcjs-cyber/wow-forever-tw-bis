@@ -463,9 +463,9 @@ function modelScore(x,weights,hit={}){
  for(const [k,v] of Object.entries(x.stats||{})){if(!Number.isFinite(v))continue;const qty=k==="命中機率"&&cap!==null?Math.min(v,Math.max(0,cap-base)):v;parts[k]=qty*(weights[k]||0);}
  const key=weaponDpsKey(x),specific=["主手DPS","副手DPS","雙手DPS","遠程DPS"].some(k=>(weights[k]||0)>0),weight=key?(specific?(weights[key]||0):(weights["武器DPS"]||0)):0;
  const dps=Object.entries(x.wm||{}).find(([k])=>/每秒傷害|DPS/i.test(k));
- const wd=dps?Number(String(dps[1]).match(/\d+(?:\.\d+)?/)?.[0]):NaN;
- if(key&&weight&&Number.isFinite(wd))parts[specific?key:"武器DPS"]=wd*weight;
- return {total:Object.values(parts).reduce((a,b)=>a+b,0),parts,incomplete:!!weight&&!Number.isFinite(wd)};
+ const rawDps=dps?String(dps[1]).trim():"",parsedDps=rawDps.match(/^(\d+(?:\.\d+)?)\s*(?:DPS)?$/i),wd=parsedDps?Number(parsedDps[1]):NaN;
+ if(key&&weight&&Number.isFinite(wd)&&wd>0)parts[specific?key:"武器DPS"]=wd*weight;
+ return {total:Object.values(parts).reduce((a,b)=>a+b,0),parts,incomplete:!!weight&&(!Number.isFinite(wd)||wd<=0)};
 }
 
 // Pair scoring uses a shared hit budget, not per-slot hit caps.
@@ -484,7 +484,7 @@ function weaponSets(items,eligible,kind){
  if(!["dual","shield","mutilate","backstab","hemo"].includes(kind))for(const x of pools.two)rows.push({items:[x],kind:"雙手武器"});
  if(!["twohand","weaving"].includes(kind))for(const main of pools.main)for(const off of pools.off){
   // Unknown unique-equipped limits: do not recommend two copies of the same ID.
-  if(main.id===off.id)continue;
+  if(String(main.id)===String(off.id))continue;
   if(/盾牌|shield|副手物品|持有|法器|off.hand frill/i.test(off.type||"")&&["dual","mutilate","backstab","hemo"].includes(kind))continue;
   rows.push({items:[main,off],kind:/盾牌|shield/i.test(off.type||"")?"主手＋盾牌":"主手＋副手"});
  }
@@ -1775,11 +1775,11 @@ function combatGuildScenario(request,id,key){
  return result;
 }
 function combatNativeTargetRows(rows,cfg){
- if(!cfg||!Array.isArray(rows)||rows.length!==cfg.count)return [];
+ if(!cfg||!Number.isInteger(cfg.count)||cfg.count<1||cfg.count>8||!Number.isFinite(cfg.health)||cfg.health<=0||!Array.isArray(rows)||rows.length!==cfg.count)return [];
  const seen=new Set(),valid=[];
  for(const x of rows){
   if(!x||!Number.isInteger(x.index)||x.index<0||x.index>=cfg.count||seen.has(x.index)||x.health!==cfg.health||!Number.isFinite(x.dps)||x.dps<0)return [];
-  seen.add(x.index);valid.push({...x,timeEstimate:x.dps>0?x.health/x.dps:null});
+  const timeEstimate=x.dps>0?x.health/x.dps:null;if(timeEstimate!==null&&!Number.isFinite(timeEstimate))return [];seen.add(x.index);valid.push({...x,timeEstimate});
  }
  return valid.sort((a,b)=>a.index-b.index);
 }
@@ -2042,9 +2042,9 @@ function combatGearView(parent,id,build,nativeView){
  }else pendingBox.hidden=true;
  const preview=node("div"),guildPick=select([...Object.entries(guildScenarios).map(([k,v])=>[k,v.label]),["","沿用原遭遇／自訂"]]),durationPick=select([["","沿用原遭遇"],["30","30秒"],["60","60秒"],["120","120秒"],["180","180秒"],["300","300秒"]]),targetPick=select([["","沿用原遭遇"],["1","1個目標"],["3","3個相同目標"],["5","5個相同目標"],["8","8個相同目標"]]),variation=inp("0","number");
  variation.value="0";variation.min="0";variation.max="60";variation.step="1";variation.disabled=true;durationPick.addEventListener("change",()=>{variation.disabled=!durationPick.value;preview.replaceChildren();});
- targetPick.addEventListener("change",()=>preview.replaceChildren());variation.addEventListener("input",()=>preview.replaceChildren());request.addEventListener("input",()=>{requestRevision++;preview.replaceChildren();});keep.addEventListener("change",()=>preview.replaceChildren());preserve.addEventListener("change",()=>preview.replaceChildren());
+ targetPick.addEventListener("change",()=>preview.replaceChildren());variation.addEventListener("input",()=>preview.replaceChildren());request.addEventListener("input",()=>{requestRevision++;preview.replaceChildren();if(batchVariants.length){batchVariants.splice(0);drawBatch();msg.textContent="基準角色已變更，已清空舊批次候選，請重新加入。";}});keep.addEventListener("change",()=>preview.replaceChildren());preserve.addEventListener("change",()=>preview.replaceChildren());
  const scenario=node("details");scenario.open=true;add(scenario,node("summary","A／B 共用戰鬥情境"),field("公會標準目標",guildPick),node("p","標準遭遇：零基礎護甲、零抗性；非坦克背面，坦克正面。首領暫定63級；固定時間而非血量擊殺停止。坦克假設每2秒受到300或首領1000基礎傷害。選擇標準目標時鎖定其時間和目標數；自訂請切換至沿用原遭遇／自訂。","gt-muted"),field("名義戰鬥時間",durationPick),field("時間浮動秒數",variation),field("相同目標數",targetPick),node("p","只在原遭遇為單體且無複雜目標設定時允許複製敵人；兩份請求使用完全相同遭遇。群體目標仍可能需要在引擎確認仇恨與技能策略。","gt-muted"));
- function syncGuild(){targetPick.disabled=!!guildPick.value;if(guildPick.value){durationPick.value="";durationPick.disabled=true;variation.value="0";variation.disabled=true;}else{durationPick.disabled=false;variation.disabled=!durationPick.value;}preview.replaceChildren();}guildPick.addEventListener("change",syncGuild);syncGuild();
+ function syncGuild(){targetPick.disabled=!!guildPick.value;if(guildPick.value){targetPick.value="";durationPick.value="";durationPick.disabled=true;variation.value="0";variation.disabled=true;}else{durationPick.disabled=false;variation.disabled=!durationPick.value;}preview.replaceChildren();}guildPick.addEventListener("change",syncGuild);syncGuild();
  function trial(){const base=combatScenarioRequest(combatReadJSON(request.value),id,{guild:guildPick.value||null,duration:durationPick.value?Number(durationPick.value):null,variation:durationPick.value?Number(variation.value):null,targets:!guildPick.value&&targetPick.value?Number(targetPick.value):null});return combatGearTrial(base,current(),id,mode.value,keep.checked,preserve.checked);}
  const batchVariants=[],batchName=inp("例如：4件套裝＋雙手武器"),batchList=node("div");
  const batchBox=node("details");
@@ -2071,7 +2071,7 @@ function combatGearView(parent,id,build,nativeView){
  return async path=>{
   const valid=combatRequestPath(path,id);if(!valid)throw Error("請求檔案路徑不合法");const token=++requestRevision;
   const response=await fetch(valid,{cache:"no-cache"});if(!response.ok)throw Error("HTTP "+response.status);
-  const content=await response.text();if(!c.isConnected||token!==requestRevision)return;combatReadJSON(content);
+  const content=await response.text();if(!c.isConnected||token!==requestRevision)return;combatRequestPlayer(combatReadJSON(content),id);
   request.value=content;request.dispatchEvent(new Event("input",{bubbles:true}));details.open=true;msg.textContent="已載入原生案例請求；請確認天賦、技能與裝備後再匯出。";request.focus();request.scrollIntoView({block:"nearest"});
  };
 }
@@ -2091,8 +2091,8 @@ function nativeImportGear(gear,meta){
   entries.sort((a,b)=>Number(flexible(a))-Number(flexible(b)));
  }
  for(const [sourceIndex,x] of entries){
-  if(x==null||x?.id===0||x&&typeof x==="object"&&!Object.keys(x).length)continue;
-  if(!x||!positive(x.id)||!Array.isArray(meta.items[x.id]))throw Error("引擎缺少物品 ID "+(x?.id??"未知"));
+  if(x==null)continue;if(x&&typeof x==="object"&&!Array.isArray(x)&&(x.id===0||!Object.keys(x).length)){if([x.enchant,x.randomSuffix,x.random_suffix].some(v=>v!=null&&v!==0))throw Error("空裝備欄不可包含附魔或詞綴");continue;}
+  if(!x||typeof x!=="object"||Array.isArray(x)||!positive(x.id,999999999)||!Array.isArray(meta.items[x.id]))throw Error("引擎缺少物品 ID "+(x?.id??"未知"));
   if(seen.has(x.id))throw Error("同 ID 重複裝備，唯一裝備資格尚未驗證："+x.id);
   if(questChoiceConflicts(x.id,seen))throw Error("黑石塔任務三選一飾品不能同時裝備");
   seen.add(x.id);
