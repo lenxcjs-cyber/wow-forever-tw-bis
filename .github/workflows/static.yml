@@ -120,6 +120,14 @@ jobs:
             curl -fsSL --connect-timeout 8 --max-time 40 "https://wago.tools/db2/$table/csv?build=$build&locale=$locale" -o "$dir/$file.csv" || rm -f "$dir/$file.csv"
           done
           python3 scripts/build-locale.py "$dir" "$build"
+          python3 tests/test-guide-spells.py
+          for table in SkillLineAbility SpellLevels SpellCooldowns; do
+            curl -fsSL --connect-timeout 8 --max-time 40 "https://wago.tools/db2/$table/csv?build=$build" -o "$dir/$table.csv" || rm -f "$dir/$table.csv"
+          done
+          if ! python3 scripts/map-guide-spells.py "$dir" "$build" skill-client.json; then
+            rm -f skill-client.json
+            echo "::warning::Class-matched skill metadata unavailable; authored guides remain available."
+          fi
       - name: Stamp homepage asset versions
         run: python3 scripts/stamp-assets.py
       - name: Install browser test dependency
