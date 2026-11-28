@@ -782,6 +782,13 @@ function loadSetEffects(){
  if(!setEffectsPromise)setEffectsPromise=fetch("set-effects.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("套裝資料未生成");return r.json();}).then(d=>d?.commit===combatPresetCommit&&Array.isArray(d.sets)?d.sets:[]).catch(()=>[]);
  return setEffectsPromise;
 }
+function nativeSetUncertainty(a,b,metric){
+ const n=a?.iterations,m=b?.iterations,x=a?.metrics?.[metric+"Stdev"],y=b?.metrics?.[metric+"Stdev"];
+ if(!Number.isInteger(n)||n<30||!Number.isInteger(m)||m<30||![x,y].every(v=>Number.isFinite(v)&&v>=0))return null;
+ // Conservative normal-approximation bound allowing arbitrary correlation
+ // between paired case means; do not assume independent same-seed runs.
+ return 1.96*(x/Math.sqrt(n)+y/Math.sqrt(m));
+}
 function nativeSetComparison(trial,role){
  if(!trial||!Array.isArray(trial.cases)||!["tank","dps","heal"].includes(role))return null;
  const metric=role==="tank"?"tps":role==="heal"?"hps":"dps";
@@ -791,10 +798,11 @@ function nativeSetComparison(trial,role){
  const rows=trial.cases.filter(c=>valid(c)&&c.pieces>0&&counts.get(c.pieces)===1&&Math.abs(c.duration-baseline.duration)<1e-6).sort((a,b)=>a.pieces-b.pieces).map(c=>{
   const delta=c.metrics[metric]-baseline.metrics[metric];
   const survival=role==="tank"?(["dtps","death"].every(k=>[c.metrics[k],baseline.metrics[k]].every(v=>Number.isFinite(v)&&v>=0&&(k!=="death"||v<=1)))?c.metrics.dtps<=baseline.metrics.dtps+1e-8&&c.metrics.death<=baseline.metrics.death+1e-8:null):true;
-  return {...c,delta,percent:baseline.metrics[metric]>0?100*delta/baseline.metrics[metric]:null,win:delta>1e-8&&survival===true,survival};
+  const uncertainty=nativeSetUncertainty(baseline,c,metric),win=delta>1e-8&&survival===true;
+  return {...c,delta,percent:baseline.metrics[metric]>0?100*delta/baseline.metrics[metric]:null,win,survival,uncertainty,confirmedWin:win&&uncertainty!==null&&delta>uncertainty};
  });
  const expected=Array.isArray(trial.thresholds)?[...new Set(trial.thresholds.filter(n=>Number.isInteger(n)&&n>0&&n<=14))].sort((a,b)=>a-b):[];
- return {metric,baseline,rows,firstWin:rows.find(x=>x.win)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n))};
+ return {metric,baseline,rows,firstWin:rows.find(x=>x.win)?.pieces??null,firstConfirmed:rows.find(x=>x.confirmedWin)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n))};
 }
 let nativeSetTrialsPromise=null;
 function nativeSetTrialView(parent,id){
@@ -817,8 +825,8 @@ function nativeSetTrialView(parent,id){
     const m=result.metric.toUpperCase();
     const line=(x,label)=>{const part=node("p",label+" ｜ "+m+" "+x.metrics[result.metric].toFixed(2)+(role==="tank"&&Number.isFinite(x.metrics.dtps)?" ｜ DTPS "+x.metrics.dtps.toFixed(2):"")+(role==="tank"&&Number.isFinite(x.metrics.death)?" ｜ 死亡 "+(100*x.metrics.death).toFixed(1)+"%":""));d.append(part);const path=combatRequestPath(x.requestFile,id);if(path)d.append(link("下載完整 "+label+" 請求",path));};
     line(result.baseline,"0件散裝對照");
-    for(const x of result.rows){line(x,x.pieces+"件");d.append(node("p","相較0件 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+" "+m+(x.percent!==null?"（"+x.percent.toFixed(2)+"%）":"")+(x.win?"；本組勝出":role==="tank"&&x.delta>0?"；生存未同時勝出或資料不足":"；未勝出"),"gt-muted"));}
-    d.append(node("p",result.firstWin===null?"目前成功的門檻尚未證明勝過0件對照。":"本次已測門檻中，最少 "+result.firstWin+" 件勝過0件對照。不是所有可能散件的全域 BiS。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較結果："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));
+    for(const x of result.rows){line(x,x.pieces+"件");d.append(node("p","相較0件 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+" "+m+(x.percent!==null?"（"+x.percent.toFixed(2)+"%）":"")+(x.uncertainty===null?"；未提供完整波動資料":"；差值保守近似95%範圍 ±"+x.uncertainty.toFixed(2))+(x.confirmedWin?"；超出波動門檻":x.win?"；平均值較高，尚未超出波動門檻":role==="tank"&&x.delta>0?"；生存未同時勝出或資料不足":"；平均值未勝出"),"gt-muted"));}
+    d.append(node("p",result.firstWin===null?"目前成功的門檻平均值未勝過0件對照。":"本次已測門檻中，最少 "+result.firstWin+" 件平均值較高；"+(result.firstConfirmed===null?"尚無足夠波動證據。":"最少 "+result.firstConfirmed+" 件超出保守近似95%差值範圍。")+"不是所有可能散件的全域 BiS。","gt-muted"));d.append(node("p","近似範圍為 1.96 ×（兩組標準誤之和），不假定同種子結果獨立。未修正多重比較；坦克承傷及死亡仍以平均值判定。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較結果："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));
    }
    if(Array.isArray(t.failed)&&t.failed.length)d.append(node("p","未成功："+t.failed.map(x=>x.pieces+"件").join("、"),"gt-muted"));
    c.append(d);
@@ -1500,6 +1508,22 @@ function combatGuildScenario(request,id,key){
  for(const k of Object.keys(result.raid.debuffs||{}))if(/sunder|exposeArmor|faerieFire|curseOfRecklessness|curseOfElements|curseOfShadow|armor|resistance/i.test(k))delete result.raid.debuffs[k];
  return result;
 }
+function combatNativeTargetRows(rows,cfg){
+ if(!cfg||!Array.isArray(rows)||rows.length!==cfg.count)return [];
+ const seen=new Set(),valid=[];
+ for(const x of rows){
+  if(!x||!Number.isInteger(x.index)||x.index<0||x.index>=cfg.count||seen.has(x.index)||x.health!==cfg.health||!Number.isFinite(x.dps)||x.dps<0)return [];
+  seen.add(x.index);valid.push({...x,timeEstimate:x.dps>0?x.health/x.dps:null});
+ }
+ return valid.sort((a,b)=>a.index-b.index);
+}
+function combatNativeTargetView(parent,rows,cfg){
+ const valid=combatNativeTargetRows(rows,cfg);if(!valid.length)return;
+ const d=node("details");add(d,node("summary","逐目標原生平均傷害"),node("p","以固定時間遭遇的目標承受DPS計算。沒有動態轉火或死亡停止；若有未受傷目標，不使用總DPS判定清場時間。","gt-muted"));
+ for(const x of valid)d.append(node("p","目標 "+(x.index+1)+" ｜ 承受 DPS "+x.dps.toFixed(2)+" ｜ 固定速率估算 "+(x.timeEstimate===null?"未造成傷害":x.timeEstimate.toFixed(1)+"s")));
+ d.append(node("p",valid.some(x=>x.timeEstimate===null)?"至少一隻目標未受傷；不能由此分配估算全部擊殺。":"最慢目標固定速率估算 "+Math.max(...valid.map(x=>x.timeEstimate)).toFixed(1)+" 秒（不等於實際清場）。","gt-muted"));
+ parent.append(d);
+}
 function combatGuildKill(raw,key,maxSeconds=600){
  const cfg=guildScenarios[key];if(!cfg||!Number.isFinite(maxSeconds)||maxSeconds<1||maxSeconds>600)throw Error("公會目標或時間上限不合法");
  const data={...raw,targets:cfg.count,duration:maxSeconds};
@@ -1671,7 +1695,7 @@ function combatLab(){
   if(Array.isArray(data.failed)){const failed=data.failed.filter(x=>x?.spec===id&&typeof x.label==="string");if(failed.length){const d=node("details");d.append(node("summary","此專精未產出案例（"+failed.length+"）"));for(const x of failed)d.append(node("p",x.label+" ｜ "+combatFailureLabel(x.reason),"gt-muted"));presets.append(d);}}
   if(!cases.length){const pending=Array.isArray(data.healerPending)?data.healerPending.find(x=>x?.spec===id):null;presets.append(node("p",pending?.reason||"目前此專精沒有已成功匯入的原生引擎案例；請使用上方引擎連結。","gt-muted"));if(pending&&typeof pending.source==="string"&&/^ui\/specs\/[a-z/]+\/presets\.ts$/.test(pending.source))presets.append(link("上游治療專精原始設定","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+pending.source));return;}
   add(presets,node("p","WoWSims v1.0.12 ｜ 固定種子 "+data.seed+" ｜ 上游預設或本站明示的控制變因案例，不代表本站目前構築或最佳 BiS。CLI 未自動加入網頁生成的藥水／魔法物品 APL 行。","gt-muted"));
-  for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));if(guildScenarios[x.scenario]){const cfg=guildScenarios[x.scenario];add(c,node("p",cfg.label+" ｜ 零基礎護甲／抗性 ｜ "+(x.inFrontOfTarget?"正面":"背面")+" ｜ 固定時間","gt-muted"));if(x.dps>0)add(c,node("p","總血量 ÷ 平均DPS："+(cfg.health*cfg.count/x.dps).toFixed(1)+" 秒（粗估；非實際擊殺，不反映逐隻死亡或斬殺階段變化）","gt-muted"));}
+  for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));if(guildScenarios[x.scenario]){const cfg=guildScenarios[x.scenario];add(c,node("p",cfg.label+" ｜ 零基礎護甲／抗性 ｜ "+(x.inFrontOfTarget?"正面":"背面")+" ｜ 固定時間","gt-muted"));if(x.dps>0)add(c,node("p","總血量 ÷ 平均DPS："+(cfg.health*cfg.count/x.dps).toFixed(1)+" 秒（粗估；非實際擊殺，不反映逐隻死亡或斬殺階段變化）","gt-muted"));combatNativeTargetView(c,x.nativeTargets,cfg);}
    if(x.tank&&Number.isFinite(x.tank.tps))add(c,node("p","另一次完整引擎坦克測試：TPS "+x.tank.tps.toFixed(2)+(Number.isFinite(x.tank.dtps)?" ｜ DTPS "+x.tank.dtps.toFixed(2):"")+(Number.isFinite(x.tank.death)?" ｜ 死亡機率 "+(x.tank.death*100).toFixed(1)+"%":"")));
    add(c,link("裝備、天賦與設定來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.settings),link("技能優先序（APL）來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.apl));
    if(typeof x.configuration==="string"&&x.configuration){add(c,node("p",x.configuration,"gt-muted"),link("本站控制變因配置與產生程式","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-combat-presets.py"));}
