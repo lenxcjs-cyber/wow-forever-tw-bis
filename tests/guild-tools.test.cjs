@@ -115,11 +115,21 @@ const restored=new Function("localStorage",section("const rogueProfiles=","funct
 for(const id of ["spec-26","spec-27"]){assert.equal(restored.buildFor(id),"feral_onehand");assert.equal(restored.skillGate(id,{slot:"主手",type:"單手錘"}),"");assert.ok(restored.skillGate(id,{slot:"主手",type:"雙手錘"}));}
 console.log("PASS: feral alternative builds persist after reload");
 
-const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,normalizeGearCatalog,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogPlanSourceAllowed,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,catalogRankableWeights,catalogPositionRankScore,catalogPositionCompare,effectiveGearWeights,omittedFeralWeights,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
+const expansion=new Function(section("const rogueProfiles=","function syncWeaponCards")+section("const expandedGear=","let gearCatalogPromise=")+";return {expandedGear,expandCandidateSlots,gearCatalogEligible,gearCatalogTags,gearClassIndex,gearType,catalogDiff,catalogWeightScore,catalogWeightCoverage,catalogSameSlot,catalogCandidateFilter,catalogSourceRecorded,normalizeGearCatalog,validGearCatalog,catalogSlotCheck,candidateCatalogPosition,catalogHasSpecial,catalogPlanSourceAllowed,catalogArmorPlan,catalogSetPools,catalogSetOptions,catalogSetAlternative,catalogSetCounts,catalogSetTradeoff,catalogPlanText,catalogWeaponPlan,catalogWeaponScore,catalogRankableWeights,catalogPositionRankScore,catalogPositionCompare,effectiveGearWeights,omittedFeralWeights,feralDpsReady,candidateCatalogCheck,acquisitionMatches,allowed,buildChoice};")();
 const cat={id:"spec-26",slots:new Map([["主手 / 單手武器",[]],["雙手武器",[]],["戒指1",[]],["戒指2",[]],["胸部",[]]])};
 const catSlots=expansion.expandCandidateSlots(cat);
 assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19323").wm["每秒傷害"],"56.5");
 assert.ok(catSlots.get("雙手武器").find(x=>x.id==="19323").priority);
+assert.equal(catSlots.get("雙手武器").find(x=>x.id==="19106").wm["每秒傷害"],"53.9");
+const bearNew=expansion.expandCandidateSlots({id:"spec-27",slots:new Map([["雙手武器",[]]])});
+assert.ok(bearNew.get("雙手武器").find(x=>x.id==="18531").priority);
+assert.equal(bearNew.get("雙手武器").find(x=>x.id==="18531").stats["護甲"],240);
+const rogueNew=expansion.expandCandidateSlots({id:"spec-11",slots:new Map([["主手",[]],["副手",[]]])});
+assert.ok(rogueNew.get("副手").some(x=>x.id==="871"));
+assert.ok(rogueNew.get("副手").some(x=>x.id==="18392"));
+assert.equal(rogueNew.get("主手").some(x=>x.id==="18392"),false);
+const hunterNew=expansion.expandCandidateSlots({id:"spec-8",slots:new Map([["遠程",[]]])});
+assert.equal(hunterNew.get("遠程").find(x=>x.id==="18680").stats["敏捷"],11);
 assert.equal(catSlots.get("戒指1").filter(x=>x.id==="19325").length,1);
 assert.equal(catSlots.get("戒指2").filter(x=>x.id==="19325").length,1);
 assert.equal(cat.slots.get("雙手武器").length,0);
@@ -425,7 +435,21 @@ const feralWeapons=[{...weaponForPlan(501,"Two-Hand","Two-Handed Mace",100),agil
 const feralProf={Druid:{armor:{Leather:1},weapons:["Two-Handed Mace"]}};
 assert.equal(expansion.catalogWeaponPlan({id:"spec-26"},feralWeapons,feralProf,feralWeights).melee.picks[0].item.id,501);
 assert.equal(expansion.catalogWeaponPlan({id:"spec-27"},feralWeapons,feralProf,{"武器DPS":1}).melee.picks[0].item.id,501);
+assert.equal(expansion.feralDpsReady("spec-26",{"敏捷":1}),false);
+assert.equal(expansion.feralDpsReady("spec-26",{"主手DPS":1}),false);
+assert.equal(expansion.feralDpsReady("spec-26",{"武器DPS":1}),true);
+assert.equal(expansion.catalogWeaponPlan({id:"spec-26"},feralWeapons,feralProf,{"敏捷":1}).melee,null);
+assert.equal(expansion.catalogPositionRankScore(feralWeapons[0],"雙手武器",{"敏捷":1},"spec-26").rankable,false);
+assert.equal(expansion.catalogPositionRankScore(feralWeapons[0],"雙手武器",{"武器DPS":1},"spec-26").rankable,true);
+assert.equal(expansion.catalogPositionRankScore(feralWeapons[0],"雙手武器",{"敏捷":1},"spec-1").rankable,true);
 console.log("PASS: official Forever form weapon DPS included for cat and bear, no off-hand/ranged damage");
+const reasons=new Function(section("const bisReasons=","const bluePosts=")+section("const bisReviewSources=","function audit(")+";return {bisItemReason,bisReviewSources};")();
+for(let i=1;i<=28;i++){const reason=reasons.bisItemReason("spec-"+i,{id:"999999",stats:{"敏捷":10}});assert.ok(reason.reason.includes("敏捷 10"));assert.ok(reason.status.includes("非單件實測"));}
+assert.ok(reasons.bisItemReason("spec-26",{id:19323}).reason.includes("56.5"));
+assert.equal(reasons.bisItemReason("spec-26",{id:19323}).refs.length,2);
+assert.ok(reasons.bisItemReason("spec-27",{id:18531}).reason.includes("護甲"));
+assert.ok(reasons.bisItemReason("spec-11",{id:871}).reason.includes("觸發"));
+console.log("PASS: recommendation reasons for every spec and cited weapon alternatives");
 
 const sourceItems=[itemForPlan(601,"Head","Plate",50,{required_reputation:"Frostwolf - Exalted",source_summary:"Vendor"}),itemForPlan(602,"Head","Leather",20,{bonding:"Binds when equipped"}),itemForPlan(603,"Head","Plate",30,{bonding:"Binds when picked up"})];
 assert.equal(expansion.catalogArmorPlan({id:"spec-2"},sourceItems,planProf,{"敏捷":1}).total,50);
