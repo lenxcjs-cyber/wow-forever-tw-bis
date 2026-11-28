@@ -547,14 +547,24 @@ def main(cli,root,output):
     scenario_grid=guild_schedule(first_direct,extra_direct,siml_first,siml_extra)
     # Publish usable request templates independently of long simulation success/budget.
     templates=[];template_failures=[];seen_templates=set()
+    # Retain audited committed fallbacks when a CLI parse fails or the job times out.
+    dest=output.parent/"combat-templates.json"
+    try:
+        existing=json.loads(dest.read_text(encoding="utf-8"))
+        if existing.get("commit")==COMMIT:
+            templates=[r for r in existing.get("templates",[]) if isinstance(r,dict) and re.fullmatch(r"combat-requests/spec-(?:[1-9]|1[0-9]|2[0-8])-[a-f0-9]{16}\.json",str(r.get("requestFile",""))) and (output.parent/r["requestFile"]).is_file()]
+    except (OSError,ValueError,TypeError):pass
+    template_start=time.monotonic()
     for job,key in scenario_grid:
+        if time.monotonic()-template_start>180:break
         if key!="guild-50k" or (job[0],job[1]) in seen_templates:continue
         seen_templates.add((job[0],job[1]))
         try:
             data,_,_,_,config=direct_settings(root,cli,job)
             request=guild_scenario(direct_request(data),job[0],"guild-50k")
             if len(request["raid"]["parties"][0]["players"][0].get("equipment",{}).get("items",[]))!=17:raise ValueError("Template gear must have 17 positions")
-            templates.append({"spec":job[0],"label":job[1],"requestFile":write_request_file(output.parent,job[0],request),"configuration":config})
+            row={"spec":job[0],"label":job[1],"requestFile":write_request_file(output.parent,job[0],request),"configuration":config}
+            templates=[t for t in templates if (t.get("spec"),t.get("label"))!=(job[0],job[1])]+[row]
         except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
             template_failures.append({"spec":job[0],"label":job[1],"reason":failure_kind(e)})
         dest=output.parent/"combat-templates.json";tmp=dest.with_suffix(".tmp")
