@@ -251,6 +251,8 @@ const server=http.createServer((req,res)=>{
   await originalIcon.waitFor({state:"visible"});
   assert.ok((await originalIcon.getAttribute("src")).startsWith("https://render-classic-us.worldofwarcraft.com/icons/56/"));
   assert.ok(await originalIcon.evaluate(img=>img.complete&&img.naturalWidth>0));
+  assert.ok(await talentFrame.locator("#iconCoverage").isVisible());
+  assert.match(await talentFrame.locator("#iconCoverage").textContent(),/原始圖示：已顯示 [1-9]\d*／/);
   console.log("PASS: original talent texture rendering using an isolated CDN response fixture");
   assert.equal(await talentFrame.locator("#overview details").first().getAttribute("open"),null);
   await talentFrame.locator("#treeJump button").last().click();
@@ -426,6 +428,8 @@ const server=http.createServer((req,res)=>{
   assert.equal((await gearDownload).suggestedFilename(),"tomb-spec-26-request.json");
   assert.ok(await lab.getByRole("heading",{name:"公會標準實戰目標",exact:true}).isVisible());
   assert.equal(await lab.getByLabel("公會標準目標").inputValue(),"guild-50k");
+  assert.equal(await lab.getByLabel("名義戰鬥時間").isDisabled(),true);
+  assert.equal(await lab.getByLabel("時間浮動秒數").isDisabled(),true);
   await lab.getByLabel("公會標準目標").selectOption("guild-5x50k");
   assert.ok(await lab.getByLabel("相同目標數").isDisabled());
   await lab.getByLabel("公會標準目標").selectOption("guild-boss");
@@ -435,6 +439,11 @@ const server=http.createServer((req,res)=>{
   assert.equal(await lab.getByLabel("相同目標數").isDisabled(),false);
   await lab.getByLabel("名義戰鬥時間").selectOption("60");
   await lab.getByLabel("相同目標數").selectOption("3");
+  await lab.getByLabel("公會標準目標").selectOption("guild-50k");
+  assert.equal(await lab.getByLabel("名義戰鬥時間").inputValue(),"");
+  assert.equal(await lab.getByLabel("名義戰鬥時間").isDisabled(),true);
+  await lab.getByLabel("公會標準目標").selectOption("");
+  await lab.getByLabel("名義戰鬥時間").selectOption("60");
   await lab.getByRole("button",{name:"預覽 A／B 配裝變更"}).click();
   assert.ok(await lab.getByRole("heading",{name:"A／B 配裝變更",exact:true}).isVisible());
   const scenarioDownload=page.waitForEvent("download");
@@ -447,7 +456,7 @@ const server=http.createServer((req,res)=>{
   const batchDownload=page.waitForEvent("download");
   await lab.getByRole("button",{name:"下載三遭遇批次 JSON",exact:true}).click();
   assert.equal((await batchDownload).suggestedFilename(),"tomb-spec-26-guild-batch.json");
-  const result={format:"tomb-guild-results/1",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",spec:"spec-26",finished:true,cases:[{scenario:"guild-50k",variant:0,name:"原始配裝",iterations:1000,duration:60,metrics:{dps:100,dpsStdev:10}},{scenario:"guild-50k",variant:1,name:"測試候選",iterations:1000,duration:60,metrics:{dps:150,dpsStdev:10}}]};
+  const result={format:"tomb-guild-results/1",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",spec:"spec-26",scenarios:["guild-50k"],expectedCases:2,finished:true,cases:[{scenario:"guild-50k",variant:0,name:"原始配裝",iterations:1000,duration:60,metrics:{dps:100,dpsStdev:10}},{scenario:"guild-50k",variant:1,name:"測試候選",iterations:1000,duration:60,metrics:{dps:150,dpsStdev:10}}]};
   await lab.getByRole("textbox",{name:"三遭遇批次結果 JSON"}).fill(JSON.stringify(result));
   await lab.getByRole("button",{name:"比較三遭遇批次結果",exact:true}).click();
   assert.ok(await lab.getByText("本次候選中具勝出證據的最高平均值：測試候選",{exact:true}).isVisible());
