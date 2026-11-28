@@ -833,7 +833,7 @@ function catalogSetTierComparison(pools,name,max,bonuses=[],thresholdsKnown=Arra
   const comparable=catalogSameCoverage(base.picks,plan.picks);
   rows.push({...plan,comparable,loss:comparable?base.total-plan.total:null,active,bonus:value,net:value===null||!comparable?null:plan.total+value-base.total});
  }
- return {base,rows,firstWin:rows.find(x=>x.net!==null&&x.net>1e-8)?.count??null};
+ return {base,rows,firstWin:rows.find(x=>x.net!==null&&x.net>1e-8)?.count??null,firstActiveWin:rows.find(x=>x.active.length>0&&x.net!==null&&x.net>1e-8)?.count??null};
 }
 // An additive shortlist is a screening tool, not a simulation or a claim of set effectiveness.
 function catalogSetShortlist(pools,effects,baseline){
@@ -887,7 +887,7 @@ function nativeSetComparison(trial,role){
   const previous=row.pieces===1?baseline:rows.find(x=>x.pieces===row.pieces-1);
   row.previousDelta=previous?row.metrics[metric]-previous.metrics[metric]:null;
  }
- return {metric,baseline,rows,best,bestConfirmed,firstWin:rows.find(x=>x.win)?.pieces??null,firstConfirmed:rows.find(x=>x.confirmedWin)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n)),missingAdjacent:adjacent.filter(n=>!rows.some(x=>x.pieces===n))};
+ return {metric,baseline,rows,best,bestConfirmed,firstWin:rows.find(x=>x.win)?.pieces??null,firstConfirmed:rows.find(x=>x.confirmedWin)?.pieces??null,firstActivationWin:rows.find(x=>x.activation&&x.win)?.pieces??null,firstActivationConfirmed:rows.find(x=>x.activation&&x.confirmedWin)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n)),missingAdjacent:adjacent.filter(n=>!rows.some(x=>x.pieces===n))};
 }
 let nativeSetTrialsPromise=null;
 function nativeSetTrialView(parent,id){
@@ -913,7 +913,7 @@ function nativeSetTrialView(parent,id){
     const line=(x,label)=>{const part=node("p",label+" ｜ "+m+" "+x.metrics[result.metric].toFixed(2)+(role==="tank"&&Number.isFinite(x.metrics.dtps)?" ｜ DTPS "+x.metrics.dtps.toFixed(2):"")+(role==="tank"&&Number.isFinite(x.metrics.death)?" ｜ 死亡 "+(100*x.metrics.death).toFixed(1)+"%":""));d.append(part);const path=combatRequestPath(x.requestFile,id);if(path)d.append(link("下載完整 "+label+" 請求",path));};
     line(result.baseline,"0件散裝對照");
     for(const x of result.rows){line(x,x.pieces+"件"+(x.activation?"（套裝效果門檻）":"（件數對照）"));if(x.previousDelta!==null)d.append(node("p","相較少1件 "+(x.previousDelta>=0?"+":"")+x.previousDelta.toFixed(2)+" "+m+"（包含換裝本身差異，非純套裝效果）","gt-muted"));d.append(node("p","相較0件 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+" "+m+(x.percent!==null?"（"+x.percent.toFixed(2)+"%）":"")+(x.uncertainty===null?"；未提供完整波動資料":"；差值保守近似95%範圍 ±"+x.uncertainty.toFixed(2))+(x.confirmedWin?"；超出波動門檻":x.win?"；平均值較高，尚未超出波動門檻":role==="tank"&&x.delta>0?"；生存未同時勝出或資料不足":"；平均值未勝出"),"gt-muted"));}
-    d.append(node("p",result.firstWin===null?"目前成功的門檻平均值未勝過0件對照。":"本次已測件數中，最少 "+result.firstWin+" 件平均值較高；"+(result.firstConfirmed===null?"尚無足夠波動證據。":"最少 "+result.firstConfirmed+" 件超出保守近似95%差值範圍。")+"不是所有可能散件的全域 BiS。","gt-muted"));if(result.best)d.append(node("p","本次最高平均值："+result.best.pieces+" 件；"+(result.bestConfirmed?"有勝出證據的最高平均值："+result.bestConfirmed.pieces+" 件。":"尚無超出波動門檻的候選。"),"gt-muted"));d.append(node("p","近似範圍為 1.96 ×（兩組標準誤之和），不假定同種子結果獨立。未修正多重比較；坦克承傷及死亡仍以平均值判定。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較效果門檻："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));if(result.missingAdjacent.length)d.append(node("p","門檻前一件對照尚缺："+result.missingAdjacent.join("／")+" 件。","gt-muted"));
+    d.append(node("p",result.firstWin===null?"目前成功的門檻平均值未勝過0件對照。":"本次已測件數中，最少 "+result.firstWin+" 件平均值較高；"+(result.firstConfirmed===null?"尚無足夠波動證據。":"最少 "+result.firstConfirmed+" 件超出保守近似95%差值範圍。")+"不是所有可能散件的全域 BiS。","gt-muted"));if(result.firstActivationWin!==null)d.append(node("p","已登錄效果啟動門檻中，最少 "+result.firstActivationWin+" 件平均值較高；"+(result.firstActivationConfirmed===null?"尚未超出波動門檻。":"最少 "+result.firstActivationConfirmed+" 件超出波動門檻。")+" 此差值包含裝備面板及效果。","gt-muted"));if(result.best)d.append(node("p","本次最高平均值："+result.best.pieces+" 件；"+(result.bestConfirmed?"有勝出證據的最高平均值："+result.bestConfirmed.pieces+" 件。":"尚無超出波動門檻的候選。"),"gt-muted"));d.append(node("p","近似範圍為 1.96 ×（兩組標準誤之和），不假定同種子結果獨立。未修正多重比較；坦克承傷及死亡仍以平均值判定。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較效果門檻："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));if(result.missingAdjacent.length)d.append(node("p","門檻前一件對照尚缺："+result.missingAdjacent.join("／")+" 件。","gt-muted"));
    }
    if(Array.isArray(t.failed)&&t.failed.length)d.append(node("p","未成功："+t.failed.map(x=>x.pieces+"件").join("、"),"gt-muted"));
    c.append(d);
@@ -1085,7 +1085,7 @@ function catalogArmorPlanView(spec,displayMode=()=> "auto"){
       const study=catalogSetTierComparison(pools,name,max,bonuses,knownThresholds);if(!study)return;
       add(tiers,node("h4","指定套裝逐件損益（相對完全不穿此套裝）"),node("p","基準：0 件指定套裝，面板分 "+study.base.total.toFixed(2)+"。其他套裝與觸發未計入；表中收益為手動輸入的額外面板等價分數，不是 DPS。","gt-muted"));
       for(const x of study.rows){const activated=x.active.map(b=>b.pieces+"件").join("＋")||(knownThresholds?"尚未啟動已登錄效果":"未取得完整門檻");const line=node("div",undefined,"gt-card");add(line,node("p",x.count+" 件 ｜ 啟動 "+activated+" ｜ 面板 "+x.total.toFixed(2)+" ｜ "+(x.comparable?"相對0件 "+(-x.loss).toFixed(2):"裝備欄覆蓋不一致")),node("p",!x.comparable?"散件與套裝的已填裝備欄不同，不判定勝負。":x.net===null?"需額外淨收益超過 "+Math.max(0,x.loss).toFixed(2)+" 分；效果未核算。":"計入已填效果後差額 "+x.net.toFixed(2)+" 分"+(x.net>0?"（勝過0件）":"")));line.append(button("匯出 "+x.count+" 件方案",()=>exportPlan(x.picks,name+" "+x.count+" 件",x.total)));tiers.append(line);}
-      tiers.append(node("p",study.firstWin===null?"尚無已填收益證明哪個件數勝過0件。":"依已填收益，最少 "+study.firstWin+" 件勝過0件（仍需原生驗證）。","gt-muted"));
+      tiers.append(node("p",study.firstWin===null?"尚無已填收益證明哪個件數勝過0件。":"依已填收益，最少 "+study.firstWin+" 件勝過0件（仍需原生驗證）。","gt-muted"));tiers.append(node("p",study.firstActiveWin===null?"尚未找到已啟動效果且勝過0件的可計分方案。":"有已填套裝效果的方案中，最少 "+study.firstActiveWin+" 件勝過0件；仍包含裝備本身差異。","gt-muted"));
       tiers.append(button("匯出0件對照組",()=>exportPlan(study.base.picks,name+" 0 件對照",study.base.total)));
      }
      function setupTiers(){
