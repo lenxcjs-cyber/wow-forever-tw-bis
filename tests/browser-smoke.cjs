@@ -24,7 +24,7 @@ const server=http.createServer((req,res)=>{
   await page.route("**/*",route=>route.request().url().startsWith(origin+"/")?route.continue():route.abort());
   // Isolate UI behavior from actual external icon availability with explicit test fixtures.
   await page.route("**/skill-client.json",route=>route.fulfill({json:{build:"1.60.1.71139",classes:{druid:{Shred:{name:"撕碎（測試名稱）",records:[{id:5221,name:"撕碎（測試名稱）",level:22,cooldownMs:6000,categoryCooldownMs:0}]}}}}}));
-  await page.route("**/combat-presets.json",route=>route.fulfill({json:{format:1,release:"v1.0.12",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",seed:1,cases:[{spec:"spec-26",label:"測試引擎案例",dps:123.45,duration:180,iterations:1000,timeline:[{timeMs:-1500,label:"Fixture prepull"},{timeMs:0,label:"Fixture attack"}],settings:"ui/specs/druid/feralcat/gear_sets/pre_raid.gear.siml",apl:"ui/specs/druid/feralcat/apls/adaptive.apl.siml",configuration:"測試設定"}]}}));
+  await page.route("**/combat-presets.json",route=>route.fulfill({json:{format:1,release:"v1.0.12",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",seed:1,cases:[{spec:"spec-26",label:"測試引擎案例",dps:123.45,duration:180,iterations:1000,timeline:[{timeMs:-1500,label:"Fixture prepull"},{timeMs:0,label:"Fixture attack"},{timeMs:12000,label:"Fixture second burst"},{timeMs:35000,label:"Fixture late attack"}],sources:[{path:"ui/specs/druid/feralcat/gt_test.siml",text:"siml 1\n# fixture"}],settings:"ui/specs/druid/feralcat/gear_sets/pre_raid.gear.siml",apl:"ui/specs/druid/feralcat/apls/adaptive.apl.siml",configuration:"測試設定"}]}}));
   await page.route("**/item-icons.json",route=>route.fulfill({json:{build:"1.60.1.71139",items:{"19323":"fixture_mace","252484":"fixture_missing"}}}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_mace.jpg",route=>route.fulfill({contentType:"image/svg+xml",body:'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="green"/></svg>'}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_missing.jpg",route=>route.abort());
@@ -342,12 +342,27 @@ const server=http.createServer((req,res)=>{
   assert.equal(await lab.getByRole("link",{name:"開啟對應職業模擬器"}).getAttribute("href"),"https://www.wowsims.com/forever/druid/feralcat/");
   await lab.locator(".gt-combat-presets").getByText("DPS 123.45",{exact:true}).waitFor({state:"visible"});
   await lab.locator(".gt-combat-presets").getByText("第一輪技能時間軸（最多400個事件）",{exact:true}).click();
-  assert.ok((await lab.locator(".gt-combat-presets .gt-combat-log").textContent()).includes("-1.500s"));
+  const nativeCard=lab.locator(".gt-combat-presets");
+  const nativeLog=nativeCard.locator(".gt-combat-log").first();
+  assert.ok((await nativeLog.textContent()).includes("-1.500s"));
+  await nativeCard.getByLabel("戰鬥區段").selectOption("open");
+  assert.ok((await nativeLog.textContent()).includes("Fixture attack"));
+  assert.ok(!(await nativeLog.textContent()).includes("Fixture prepull"));
+  await nativeCard.getByLabel("戰鬥區段").selectOption("all");
+  await nativeCard.getByLabel("技能／紀錄搜尋").fill("second burst");
+  assert.ok((await nativeLog.textContent()).includes("12.000s"));
+  assert.ok(!(await nativeLog.textContent()).includes("35.000s"));
+  await nativeCard.getByText("實際配裝與技能優先序設定檔（原文）",{exact:true}).click();
+  await nativeCard.getByText("ui/specs/druid/feralcat/gt_test.siml",{exact:true}).click();
+  assert.ok((await nativeCard.locator(".gt-combat-log").last().textContent()).includes("siml 1"));
   await lab.getByRole("button",{name:"載入純教學範例（非遊戲數值）"}).click();
   await lab.getByRole("button",{name:"執行 A／B 優先序試算"}).click();
   assert.ok(await lab.getByRole("heading",{name:"A：原優先序",exact:true}).isVisible());
   await lab.getByText("逐次施放時間軸",{exact:true}).first().click();
   assert.ok((await lab.locator(".gt-card").filter({has:lab.getByRole("heading",{name:"A：原優先序",exact:true})}).locator(".gt-combat-log").last().textContent()).includes("0.00s"));
+  const localCard=lab.locator(".gt-card").filter({has:lab.getByRole("heading",{name:"A：原優先序",exact:true})}).last();
+  await localCard.getByText("分段輸出／仇恨與資源效率",{exact:true}).click();
+  assert.ok(await localCard.getByText(/資源溢出/).isVisible());
   await lab.getByRole("button",{name:"搜尋最佳固定優先序（最多5技能）"}).click();
   assert.ok(await lab.getByRole("heading",{name:"假設模型最佳固定優先序"}).isVisible());
   await lab.getByRole("textbox",{name:"模擬結果 A"}).fill(JSON.stringify({iterationsDone:1000,avgIterationDuration:180,raidMetrics:{parties:[{players:[{dps:{avg:500},threat:{avg:700}}]}]}}));
