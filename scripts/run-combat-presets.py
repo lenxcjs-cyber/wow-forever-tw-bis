@@ -236,6 +236,11 @@ def direct_settings(root,cli,job):
             data["encounter"]=common_encounter(root)
         return data,path,path,[path],"上游完整 JSON 構築。"+("原始檔無遭遇；本站使用增強薩預設63級單體遭遇。" if fallback else "保留原始遭遇。")
     if kind=="siml":
+        if path.startswith("__LOCAL__:"):
+            actual=path.split(":",1)[1]
+            source,apl,config=row
+            data=invoke(cli,root,["siml","parse","-json",actual])
+            return data,source,apl,[actual,apl],re.sub(r"\d+±\d+秒","原始戰鬥",config)+" 使用相同完整 SIML 設定，僅調整遭遇時間。"
         data=invoke(cli,root,["siml","parse","-json",path])
         return data,path,path,[path],"上游完整 SIML 構築，保留原始遭遇與 APL。"
     _,_,folder,gear,apl,talents,field=row
@@ -329,7 +334,13 @@ def main(cli,root,output):
     failed=[]
     first_direct,extra_direct=direct_jobs()
     # Prioritize one baseline for every supported spec, then variants for all specs.
-    planned=len(cases_to_run)+len(feral_extra)+len(first_direct)*2+len(extra_direct)
+    siml_first=[]
+    siml_extra=[]
+    seen=set()
+    for entry in cases_to_run:
+        (siml_extra if entry[0] in seen else siml_first).append(entry)
+        seen.add(entry[0])
+    planned=len(cases_to_run)+len(feral_extra)+len(first_direct)*2+len(extra_direct)+len(siml_first)
     start=time.monotonic()
     def publish():
         payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":planned,"failed":failed,"healerPending":[{"spec":spec,"source":"ui/specs/"+folder+"/presets.ts","reason":"尚缺可驗證的治療遭遇、完整技能策略及有效治療基準；不以 DPS 代替 HPS。"} for spec,folder in HEALERS.items()],"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
@@ -361,17 +372,26 @@ def main(cli,root,output):
             json.dumps(d,ensure_ascii=False,allow_nan=False)
             cases.append(d);print("Native engine preset:",spec,"iterations",d["iterations"],"timeline",len(d["timeline"]))
             publish()
-        except (OSError,ValueError,subprocess.SubprocessError) as e:
+        except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
             print("Preset unavailable:",spec,str(e)[:400])
             failed.append({"spec":spec,"label":label})
             publish()
     # Execute baseline for every class first, before optional variants.
-    for job in first_direct:run_direct(job)
-    for entry in cases_to_run:run_siml_case(entry)
-    # Bounded second pass: all supported direct specs get a 60s variant before extra builds.
+    # Interleave the two execution formats so neither class group starves.
+    for index in range(max(len(first_direct),len(siml_first))):
+        if index<len(first_direct):run_direct(first_direct[index])
+        if index<len(siml_first):run_siml_case(siml_first[index])
+    # Bounded second pass: every DPS/tank spec gets a short encounter trial before optional builds.
     for job in first_direct:
         if time.monotonic()-start>1200:break
         run_direct(job,60)
+    for spec,label,settings,apl,source,configuration in siml_first:
+        if time.monotonic()-start>1200:break
+        # Parse the complete settings into a raw RaidSimRequest, retaining its APL.
+        run_direct((spec,label,"siml","__LOCAL__:"+settings,(source,apl,configuration)),60)
+    for entry in siml_extra:
+        if time.monotonic()-start>1200:break
+        run_siml_case(entry)
     for job in extra_direct:
         if time.monotonic()-start>1200:break
         run_direct(job)
