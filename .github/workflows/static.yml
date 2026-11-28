@@ -152,6 +152,17 @@ jobs:
           test "$(git -C "$work/source" rev-parse HEAD)" = "3b9c125a9b1387cd53ce2bb12969e0c6b54b813e"
           python3 scripts/build-set-effects.py "$work/source" set-effects.json 3b9c125a9b1387cd53ce2bb12969e0c6b54b813e || echo "::warning::Set activation snapshot unavailable"
           python3 scripts/run-combat-presets.py "$cli" "$work/source" combat-presets.json
+      - name: Run native guild set-versus-scatter threshold trials
+        continue-on-error: true
+        timeout-minutes: 14
+        run: |
+          work="$RUNNER_TEMP/wowsims-presets"
+          cli="$(find "$work/bin" -type f -name 'wowsimcli*' -print -quit)"
+          if test -n "$cli" && test -s combat-presets.json && test -s set-effects.json && test -s gear-catalog.json; then
+            python3 scripts/run-set-trials.py "$cli" "$work/source" .
+          else
+            echo "::warning::Required native or item-set data unavailable; no simulated set rankings."
+          fi
       - name: Stamp homepage asset versions
         run: python3 scripts/stamp-assets.py
       - name: Install browser test dependency
