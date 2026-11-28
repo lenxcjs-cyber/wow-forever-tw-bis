@@ -285,6 +285,9 @@ const questWeaponBad={...questWeapon,id:508,dps:100,dps_approx:1};
 const qrWeapons=questReview({id:"spec-10"},[questWeapon,questWeaponBad],rogue,{"武器DPS":1});
 assert.equal(qrWeapons.total,2);
 for(const hand of ["主手","副手"]){const g=qrWeapons.groups.find(x=>x.position===hand);assert.equal(g.ranked[0].item.id,507);assert.equal(g.unranked[0].id,508);}
+const mutuallyExclusive=[itemForPlan(13965,"Trinket","Miscellaneous",20,{source_summary:"Quest reward"}),itemForPlan(13966,"Trinket","Miscellaneous",19,{source_summary:"Quest reward"}),itemForPlan(13968,"Trinket","Miscellaneous",18,{source_summary:"Quest reward"}),itemForPlan(509,"Trinket","Miscellaneous",10)];
+assert.deepEqual(expansion.catalogArmorPlan({id:"spec-2"},mutuallyExclusive,planProf,{"敏捷":1}).groups.find(g=>g.slot==="飾品").picks.map(x=>x.item.id),[13965,509]);
+assert.equal(expansion.catalogArmorPlan({id:"spec-2"},mutuallyExclusive,planProf,{"敏捷":1},{questOnly:true}).filled,1);
 console.log("PASS: quest source overlap, low-quality BiS contenders, all-source position ranks, unknown effects and weapon hand gates");
 
 console.log("PASS: catalog armor plan honors cross-armor, distinct ring IDs, quality, source evidence and score limitations");
@@ -340,7 +343,7 @@ const exportText=expansion.catalogPlanText({spec:"狂暴",build:"dual",version:"
 assert.ok(exportText.includes("非實戰BiS"));assert.ok(exportText.includes("頭部｜測試 頭盔｜ID 302｜20.00｜World drop"));assert.ok(exportText.includes("未計權重：命中機率"));
 console.log("PASS: net set benefit comparison and shareable gear plan export");
 
-const auditHelpers=new Function(section("function auditSlotOrder(","function audit(")+";return {auditSlotOrder,auditMatches};")();
+const auditHelpers=new Function(section("function questChoiceGroup(","function questSourceText(")+section("function auditSlotOrder(","function audit(")+";return {auditSlotOrder,auditMatches};")();
 assert.deepEqual(["遠程武器","頭部","副手","主手","戒指"].sort((a,b)=>auditHelpers.auditSlotOrder(a)-auditHelpers.auditSlotOrder(b)),["頭部","戒指","主手","副手","遠程武器"]);
 assert.equal(auditHelpers.auditMatches({name:"Example",id:123,stats:{"敏捷":20},wm:{"武器DPS":10}},"主手",["敏捷","123"]),true);
 assert.equal(auditHelpers.auditMatches({name:"Example",stats:{"敏捷":20}},"主手",["智力"]),false);
@@ -393,7 +396,7 @@ assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Reputation vend
 assert.equal(expansion.catalogPlanSourceAllowed({source_summary:"Drop",bonding:"Binds when picked up"},{boeOnly:true}),false);
 console.log("PASS: source constraints for reputation and BoE equipment plans");
 
-const weaponDisplay=new Function(section("function auditSlotOrder(","function audit(")+";return {auditWeaponGroups,auditWeaponVisible,auditWeaponPreference,auditOtherWeaponMatches,auditEquipmentSlots,auditEquipmentChoices};")();
+const weaponDisplay=new Function(section("function questChoiceGroup(","function questSourceText(")+section("function auditSlotOrder(","function audit(")+";return {auditWeaponGroups,auditWeaponVisible,auditWeaponPreference,auditOtherWeaponMatches,auditEquipmentSlots,auditEquipmentChoices};")();
 const mixedSlots=[{name:"頭部",items:[{id:1,type:"布甲"}]},{name:"主手",items:[{id:2,type:"法杖"},{id:3,type:"單手錘"}]},{name:"雙手武器",items:[{id:2,type:"法杖"}]},{name:"副手物品",items:[{id:4,type:"持有型副手"}]},{name:"遠程武器",items:[{id:5,type:"魔杖"}]}];
 const partition=weaponDisplay.auditWeaponGroups(mixedSlots);
 assert.deepEqual(partition.modes,["two","one"]);
@@ -439,12 +442,16 @@ assert.deepEqual(picks.filter(x=>x.group==="戒指").map(x=>x.featured.id),[6,7]
 assert.deepEqual(picks.filter(x=>x.group==="飾品").map(x=>x.featured?.id||null),[9,null]);
 assert.equal(new Set(picks.filter(x=>x.featured).map(x=>x.featured.id)).size,picks.filter(x=>x.featured).length);
 assert.equal(weaponDisplay.auditEquipmentChoices(paperTwo,x=>x.id===6).filter(x=>x.featured).length,1);
+const questTrinkets=[{id:13965},{id:13966},{id:13968},{id:509}];
+const questFeatured=weaponDisplay.auditEquipmentChoices([{name:"飾品1",items:questTrinkets},{name:"飾品2",items:questTrinkets}]);
+assert.deepEqual(questFeatured.map(x=>x.featured.id),[13965,509]);
+
 assert.equal(coverage(paperTwo.map(x=>x.items),{"6":true,"7":true,"9":true}).have,3);
 const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"飾品",item:{id,name:"測試"},score:{total:5}})));
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel,combatGuildScenario,combatGuildKill,combatNativeTargetRows,combatGuildBatch,combatGuildCoverage};")();
+const combat=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff,combatScenarioRequest,combatResultPlayers,combatResultDelta,combatSnapshotValid,combatFailureLabel,combatGuildScenario,combatGuildKill,combatNativeTargetRows,combatGuildBatch,combatGuildCoverage};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -651,7 +658,7 @@ assert.throws(()=>combat.combatApplyEquipment(nestedSwap,gearExport,"spec-1"));
 console.log("PASS: catalog-to-combat gear bridge, explicit enchant/affix, A/B partial swap and weapon-mode guard");
 
 // Exact simultaneous minimum-piece constraints across disjoint sets, including two ring slots.
-const multiSet=new Function(section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogMultiSetAlternative,catalogSetAlternative};")();
+const multiSet=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogMultiSetAlternative,catalogSetAlternative};")();
 const mkSet=(id,item_set,total)=>({item:{id,item_set},score:{total}});
 const dualPools=new Map([["頭部",[mkSet(1,"A",10),mkSet(2,"B",9)]],["頸部",[mkSet(3,"A",8),mkSet(4,"B",7)]],["戒指",[mkSet(8,"",20),mkSet(5,"A",6),mkSet(6,"B",5),mkSet(7,"B",4)]]]);
 const dualSet=multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2},{name:"B",minimum:2}]);
@@ -723,13 +730,13 @@ assert.equal(guildTank.raid.parties[0].players[0].inFrontOfTarget,true);
 assert.deepEqual(guildTank.raid.tanks,[{type:"Player",index:0}]);
 assert.ok(guildTank.encounter.targets.every(x=>x.tankIndex===0&&x.minBaseDamage===300));
 assert.equal(combat.combatScenarioRequest(gearRequest,"spec-1",{guild:"guild-boss",duration:120,variation:0}).encounter.duration,120);
-const tierLogic=new Function(section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSet,catalogSetTierComparison,nativeSetComparison};")();
+const tierLogic=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSet,catalogSetTierComparison,nativeSetComparison};")();
 const tierItem=(id,name,total)=>({item:{id,item_set:name},score:{total}});
 const tierPools=new Map([["頭部",[tierItem(1,"",10),tierItem(2,"A",8)]],["頸部",[tierItem(3,"",10),tierItem(4,"A",8)]],["肩部",[tierItem(5,"",10),tierItem(6,"A",8)]]]);
 const tierStudy=tierLogic.catalogSetTierComparison(tierPools,"A",3,[{pieces:2,value:5},{pieces:3,value:null}]);
 assert.equal(tierStudy.base.total,30);assert.equal(tierStudy.rows[1].loss,4);assert.equal(tierStudy.rows[1].net,1);assert.equal(tierStudy.rows[2].net,null);assert.equal(tierStudy.firstWin,2);
 assert.equal(tierLogic.catalogExactSet(tierPools,"A",4),null);
-const setScreen=new Function(section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSetPlans,catalogSetTierComparison,catalogSetShortlist};")();
+const setScreen=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogExactSetPlans,catalogSetTierComparison,catalogSetShortlist};")();
 const screenPools=new Map([["頭部",[tierItem(21,"A",12),tierItem(22,"",10),tierItem(23,"B",7)]],["肩部",[tierItem(24,"",10),tierItem(25,"B",9),tierItem(26,"A",8)]]]);
 const exactPlans=setScreen.catalogExactSetPlans(screenPools,"A",2);
 assert.deepEqual([...exactPlans.keys()].sort(),[0,1,2]);
@@ -796,7 +803,7 @@ assert.equal(perTarget[0].timeEstimate,500);
 assert.equal(combat.combatNativeTargetRows([{index:0,health:50000,dps:0}],{count:1,health:50000})[0].timeEstimate,null);
 assert.deepEqual(combat.combatNativeTargetRows([{index:0,health:50000,dps:100},{index:0,health:50000,dps:100}],{count:2,health:50000}),[]);
 assert.deepEqual(combat.combatNativeTargetRows([{index:0,health:300000,dps:100}],{count:1,health:50000}),[]);
-const confidence=new Function(section("const catalogArmorGroups=","function catalogPlanText(")+";return {nativeSetComparison,nativeSetUncertainty};")();
+const confidence=new Function(section("function questChoiceGroup(","function questSourceText(")+section("const catalogArmorGroups=","function catalogPlanText(")+";return {nativeSetComparison,nativeSetUncertainty};")();
 const cRow=(pieces,dps)=>({pieces,duration:60,iterations:1000,metrics:{dps,dpsStdev:100}});
 const cStudy=confidence.nativeSetComparison({cases:[cRow(0,1000),cRow(2,1001),cRow(4,1020)]},"dps");
 assert.equal(cStudy.firstWin,2);assert.equal(cStudy.firstConfirmed,4);
@@ -818,7 +825,7 @@ assert.equal(batch.cases[1].request.raid.parties[0].players[0].equipment.items[0
 assert.equal(JSON.stringify(batchSource),batchBefore);
 assert.throws(()=>combat.combatGuildBatch(batchSource,"spec-1",[]));
 assert.throws(()=>combat.combatGuildBatch(batchSource,"spec-1",[{name:"原始配裝",mode:"one",equipment:batchGear}]));
-const batchImport=new Function(section("function nativeSetUncertainty(","function nativeSetComparison(")+section("const combatPaths=","function combatLab(")+";return {combatGuildBatchResults};")();
+const batchImport=new Function(section("function nativeSetUncertainty(","function nativeSetComparison(")+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function combatLab(")+";return {combatGuildBatchResults};")();
 const batchOut=(cases,spec="spec-1")=>({format:"tomb-guild-results/1",commit:combat.combatPresetCommit,spec,cases});
 const batchMetric=(variant,name,dps,scenario="guild-50k")=>({scenario,variant,name,iterations:1000,duration:scenario==="guild-boss"?180:60,metrics:{dps,dpsStdev:50}});
 const batchRows=[batchMetric(0,"原始配裝",100),batchMetric(1,"方案A",101),batchMetric(2,"方案B",120),batchMetric(1,"方案A",999,"guild-boss")];
@@ -868,7 +875,7 @@ console.log("PASS: equal-slot coverage for set wins, duplicate bonus rejection, 
 
 // Forever addon exports can be compact and carry signed random_suffix IDs.
 // Use the pinned native item types rather than guessing positional slots.
-const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,combatEquipmentSpec};")();
+const nativeImport=new Function("const gearClassIndex=id=>Math.min(8,Math.floor((Number(id.split('-')[1])-1)/3));"+section("function questChoiceGroup(","function questSourceText(")+section("const combatPaths=","function nativeBrowserView(")+";return {nativeImportGear,nativeCharacterRequest,nativeBrowserRequest,nativeBrowserResult,nativeBrowserBatchJobs,combatEquipmentSpec};")();
 const metadata={items:{1:[1,0,0,4],2:[11,0,0,0],3:[11,0,0,0],4:[12,0,0,0],5:[12,0,0,0],6:[13,4,9,0],7:[14,0,0,0],8:[13,3,7,0],9:[13,2,9,0]},enchants:{99:true},suffixes:{"-15":true}};
 const compactGear={items:[{id:1,random_suffix:-15},{id:2},{id:3},{id:4},{id:5},{id:6,enchant:99},{id:7}]};
 const nativeGear=nativeImport.nativeImportGear(compactGear,metadata);
@@ -883,6 +890,10 @@ assert.throws(()=>nativeImport.nativeImportGear({items:[{id:6},{id:8}]},metadata
 assert.throws(()=>nativeImport.nativeImportGear({items:[{id:888}]},metadata));
 assert.throws(()=>nativeImport.nativeImportGear({items:[{id:1,random_suffix:-99}]},metadata));
 assert.equal(nativeImport.combatEquipmentSpec([{name:"頭部",id:1,randomSuffix:-15}],"one").items[0].randomSuffix,-15);
+assert.throws(()=>nativeImport.combatEquipmentSpec([{name:"飾品 1",id:13965},{name:"飾品 2",id:13968}],"one"),/三選一/);
+const exclusiveMeta={...metadata,items:{...metadata.items,13965:[12,0,0,0],13966:[12,0,0,0]}};
+assert.throws(()=>nativeImport.nativeImportGear({items:[{id:13965},{id:13966}]},exclusiveMeta),/三選一/);
+
 const addon={class:"warrior",flavor:"forever",level:60,name:"測試",spec:"arms",race:"Orc",talents:"3-2-1",professions:[{name:"Engineering",level:300}],gear:compactGear};
 const imported=nativeImport.nativeCharacterRequest(addon,gearRequest,"spec-1",metadata);
 const importedPlayer=imported.request.raid.parties[0].players[0];
