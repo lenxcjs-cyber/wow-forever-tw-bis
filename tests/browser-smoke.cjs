@@ -33,9 +33,25 @@ const server=http.createServer((req,res)=>{
   await page.route("**/item-icons.json",route=>route.fulfill({json:{build:"1.60.1.71139",items:{"19323":"fixture_mace","252484":"fixture_missing"}}}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_mace.jpg",route=>route.fulfill({contentType:"image/svg+xml",body:'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="green"/></svg>'}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_missing.jpg",route=>route.abort());
+  // A local image fixture proves rendering, not availability of the external CDN.
+  await page.route("https://render-classic-us.worldofwarcraft.com/icons/56/*.jpg",route=>route.fulfill({contentType:"image/svg+xml",body:'<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56"><rect width="56" height="56" fill="gold"/></svg>'}));
   await page.goto(origin+"/index.html");
   await page.locator("#gt-mode-class").waitFor({state:"visible"});
   await page.locator("#class-select").waitFor({state:"visible"});
+  // Wide mode uses available desktop width and preserves its preference.
+  const widthToggle=page.getByRole("button",{name:"寬版版面"});
+  assert.equal(await widthToggle.getAttribute("aria-pressed"),"true");
+  await page.setViewportSize({width:1920,height:1000});
+  assert.ok((await page.locator("main#top").boundingBox()).width>1800);
+  await widthToggle.click();
+  assert.equal(await widthToggle.getAttribute("aria-pressed"),"false");
+  assert.ok((await page.locator("main#top").boundingBox()).width<=1240);
+  await page.reload();await widthToggle.waitFor({state:"visible"});
+  assert.equal(await widthToggle.getAttribute("aria-pressed"),"false");
+  await widthToggle.click();
+  assert.equal(await widthToggle.getAttribute("aria-pressed"),"true");
+  await page.setViewportSize({width:1366,height:900});
+  console.log("PASS: wide desktop layout, standard mode and persistent width preference");
   const history=page.locator(".gt-legacy-history");
   assert.equal(await history.count(),1,"legacy homepage version notes should be archived");
   assert.equal(await history.getAttribute("open"),null);
@@ -231,6 +247,11 @@ const server=http.createServer((req,res)=>{
   assert.equal(await density.isVisible(),false);
   assert.ok(await pane.locator(".gt-bis-slot").count()>0);
   assert.ok((await talentFrame.locator("#treeJump button").count())>=4);
+  const originalIcon=talentFrame.locator('#treeArea .talent-symbol[data-icon-state="loaded"] img').first();
+  await originalIcon.waitFor({state:"visible"});
+  assert.ok((await originalIcon.getAttribute("src")).startsWith("https://render-classic-us.worldofwarcraft.com/icons/56/"));
+  assert.ok(await originalIcon.evaluate(img=>img.complete&&img.naturalWidth>0));
+  console.log("PASS: original talent texture rendering using an isolated CDN response fixture");
   assert.equal(await talentFrame.locator("#overview details").first().getAttribute("open"),null);
   await talentFrame.locator("#treeJump button").last().click();
   assert.ok(await talentFrame.locator("#detail").isVisible());
