@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric,combatEquipmentSpec,combatApplyEquipment,combatRequestPath,combatReadJSON,combatNativeActions,combatEquipmentRows,combatPlanEquipment,combatGearTrial,combatEquipmentDiff};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -591,3 +591,42 @@ assert.deepEqual(combat.combatNativeActions(actionRows,"threat").map(x=>x.id),[7
 assert.equal(combat.combatNativeActions(actionRows,"healing").length,0);
 assert.equal(combat.combatNativeActions(actionRows,"bad").length,0);
 console.log("PASS: native action contribution filtering and role-specific ranking");
+
+
+// Whole-catalog plans retain protocol order and modifier IDs; single-item swaps preserve baseline.
+const wholePlan=combat.combatPlanEquipment([{slot:"戒指",item:{id:101}},{slot:"戒指",item:{id:102}},{slot:"飾品",item:{id:103}},{slot:"飾品",item:{id:104}}],[{position:"雙手武器",item:{id:105}},{position:"聖物",item:{id:106}}]);
+assert.equal(wholePlan.mode,"two");
+assert.deepEqual(wholePlan.equipment,gearExport);
+assert.equal(combat.combatEquipmentRows(wholePlan.equipment,"two").length,16);
+assert.throws(()=>combat.combatPlanEquipment([],[{position:"遠程",item:{id:1}},{position:"聖物",item:{id:2}}]));
+const explicitEnchant=combat.combatEquipmentSpec([{name:"戒指 1",id:"101",enchant:"0",randomSuffix:"11"}],"one");
+assert.deepEqual(explicitEnchant.items[10],{id:101,enchant:0,randomSuffix:11});
+assert.equal(combat.combatEquipmentRows(explicitEnchant,"one")[10].randomSuffix,"11");
+assert.throws(()=>combat.combatEquipmentSpec([{name:"頭部",id:"1",enchant:"-3"}],"one"));
+const controlled=combat.combatGearTrial(gearRequest,explicitEnchant,"spec-1","one",true,true);
+assert.equal(controlled.changes.length,1);
+assert.equal(controlled.changes[0].name,"戒指 1");
+assert.deepEqual(controlled.candidate.raid.parties[0].players[0].equipment.items[10],{id:101,randomSuffix:11});
+assert.deepEqual(controlled.candidate.raid.parties[0].players[0].equipment.items[14],{id:333,enchant:77});
+assert.deepEqual(controlled.baseline,gearRequest);
+assert.deepEqual(gearRequest.raid.parties[0].players[0].equipment.items[10],{id:101,enchant:88,randomSuffix:9});
+const offhandTrial=JSON.parse(JSON.stringify(gearRequest));offhandTrial.raid.parties[0].players[0].equipment.items[15]={id:777};
+assert.throws(()=>combat.combatGearTrial(offhandTrial,gearExport,"spec-1","two",true,true));
+const twoCleared=combat.combatGearTrial(offhandTrial,gearExport,"spec-1","two",true,false);
+assert.deepEqual(twoCleared.candidate.raid.parties[0].players[0].equipment.items[15],{});
+const nestedSwap=JSON.parse(JSON.stringify(gearRequest));nestedSwap.raid.parties[0].players[0].rotation.groups=[{actions:[{itemSwap:{}}]}];
+assert.throws(()=>combat.combatApplyEquipment(nestedSwap,gearExport,"spec-1"));
+console.log("PASS: catalog-to-combat gear bridge, explicit enchant/affix, A/B partial swap and weapon-mode guard");
+
+// Exact simultaneous minimum-piece constraints across disjoint sets, including two ring slots.
+const multiSet=new Function(section("const catalogArmorGroups=","function catalogPlanText(")+";return {catalogMultiSetAlternative,catalogSetAlternative};")();
+const mkSet=(id,item_set,total)=>({item:{id,item_set},score:{total}});
+const dualPools=new Map([["頭部",[mkSet(1,"A",10),mkSet(2,"B",9)]],["頸部",[mkSet(3,"A",8),mkSet(4,"B",7)]],["戒指",[mkSet(8,"",20),mkSet(5,"A",6),mkSet(6,"B",5),mkSet(7,"B",4)]]]);
+const dualSet=multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2},{name:"B",minimum:2}]);
+assert.equal(dualSet.total,28);
+assert.deepEqual(dualSet.counts,[2,2]);
+assert.equal(new Set(dualSet.picks.map(x=>x.item.id)).size,4);
+assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2}]).total,multiSet.catalogSetAlternative(dualPools,"A",2).total);
+assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:3},{name:"B",minimum:2}]),null);
+assert.equal(multiSet.catalogMultiSetAlternative(dualPools,[{name:"A",minimum:2},{name:"A",minimum:2}]),null);
+console.log("PASS: simultaneous two-set piece constraints and infeasible combination rejection");
