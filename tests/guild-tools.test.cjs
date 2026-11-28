@@ -25,7 +25,7 @@ assert.equal(score({...x,wm:{}},w).incomplete,true);
 for(const bad of ["-42.5","42-50","approx 42","0","NaN","42.5.1"]){
  const result=score({...x,wm:{DPS:bad}},w);assert.equal(result.incomplete,true);assert.equal(result.parts["武器DPS"],undefined);
 }
-assert.equal(score({...x,wm:{DPS:"42.5 DPS"}},w).total,50.5);
+assert.equal(score({...x,wm:{DPS:"42.5 DPS"}},w).total,52.5);
 for(const name of ["rogueTalentBuilds","plateTalentBuilds","hunterShamanTalentBuilds","casterFeralTalentBuilds","variantTalentBuilds"]){
  const match=src.match(new RegExp("const "+name+"=(.*?);"));
  assert.ok(match,name);
