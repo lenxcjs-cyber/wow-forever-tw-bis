@@ -239,9 +239,17 @@ const server=http.createServer((req,res)=>{
   await build.selectOption("general");
 
   const skillsPane=talentFrame.locator("#skillGuide");
-  await skillsPane.getByText("野性貓 · 8 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
-  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),8);
+  await skillsPane.getByText("野性貓 · 9 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),9);
   await talentFrame.getByRole("button",{name:"技能使用指南",exact:true}).click();
+  await skillsPane.getByRole("combobox",{name:"技能用途分類"}).selectOption("回能");
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),1);
+  assert.ok((await skillsPane.locator(":scope > .skill-list").innerText()).includes("Shifting Power"));
+  await skillsPane.getByRole("combobox",{name:"技能用途分類"}).selectOption("全部用途");
+  await skillsPane.getByRole("combobox",{name:"技能取得條件"}).selectOption("talent");
+  assert.ok((await skillsPane.locator(":scope > .skill-list").innerText()).includes("Shifting Power"));
+  await skillsPane.getByRole("combobox",{name:"技能取得條件"}).selectOption("all");
+
   await skillsPane.getByRole("searchbox").fill("Shred");
   assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),1);
   assert.ok((await skillsPane.locator(":scope > .skill-list").innerText()).includes("撕碎"));
