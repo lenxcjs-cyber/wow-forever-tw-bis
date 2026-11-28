@@ -1553,6 +1553,25 @@ function combatScenarioRequest(request,id,options={}){
  }
  return result;
 }
+function combatGuildBatch(request,id,variants){
+ if(!Array.isArray(variants)||variants.length<1||variants.length>5)throw Error("批次比較需1–5組候選配裝");
+ combatRequestPlayer(request,id);
+ const names=new Set(["原始配裝"]);
+ for(const v of variants){
+  if(!v||typeof v.name!=="string"||!v.name.trim()||v.name.length>80||names.has(v.name)||!["one","two"].includes(v.mode))throw Error("方案名稱不得重複，且需合法武器模式");
+  names.add(v.name);combatEquipmentRows(v.equipment,v.mode);
+ }
+ const cases=[];
+ for(const key of Object.keys(guildScenarios)){
+  const base=combatGuildScenario(request,id,key);
+  cases.push({scenario:key,variant:0,name:"原始配裝",request:base});
+  for(const [i,v] of variants.entries()){
+   const trial=combatGearTrial(base,v.equipment,id,v.mode,v.keepMatching!==false,v.preserveEmpty===true);
+   cases.push({scenario:key,variant:i+1,name:v.name,request:trial.candidate});
+  }
+ }
+ return {format:"tomb-guild-batch/1",commit:combatPresetCommit,spec:id,cases};
+}
 function combatGearTrial(request,equipment,id,mode,keepMatching=true,preserveEmpty=false){
  if(!["one","two"].includes(mode))throw Error("武器模式不合法");
  combatEquipmentRows(equipment,mode);
@@ -1657,6 +1676,15 @@ function combatGearView(parent,id,build){
  const scenario=node("details");scenario.open=true;add(scenario,node("summary","A／B 共用戰鬥情境"),field("公會標準目標",guildPick),node("p","標準遭遇：零基礎護甲、零抗性；非坦克背面，坦克正面。首領暫定63級；固定時間而非血量擊殺停止。坦克假設每2秒受到300或首領1000基礎傷害。","gt-muted"),field("名義戰鬥時間",durationPick),field("時間浮動秒數",variation),field("相同目標數",targetPick),node("p","只在原遭遇為單體且無複雜目標設定時允許複製敵人；兩份請求使用完全相同遭遇。群體目標仍可能需要在引擎確認仇恨與技能策略。","gt-muted"));
  function syncGuild(){targetPick.disabled=!!guildPick.value;preview.replaceChildren();}guildPick.addEventListener("change",syncGuild);syncGuild();
  function trial(){const base=combatScenarioRequest(combatReadJSON(request.value),id,{guild:guildPick.value||null,duration:durationPick.value?Number(durationPick.value):null,variation:durationPick.value?Number(variation.value):null,targets:!guildPick.value&&targetPick.value?Number(targetPick.value):null});return combatGearTrial(base,current(),id,mode.value,keep.checked,preserve.checked);}
+ const batchVariants=[],batchName=inp("例如：4件套裝＋雙手武器"),batchList=node("div");
+ const batchBox=node("details");
+ function drawBatch(){
+  batchList.replaceChildren();
+  for(const [i,v] of batchVariants.entries()){const line=node("div");add(line,node("p",(i+1)+"｜"+v.name+"｜"+v.equipment.items.filter(x=>x.id).length+" 件明確選取"+(v.preserveEmpty?"｜保留未選原裝":"")),button("移除此方案",()=>{batchVariants.splice(i,1);drawBatch();}));batchList.append(line);}
+  if(!batchVariants.length)batchList.append(node("p","目前尚未加入方案。","gt-muted"));
+ }
+ add(batchBox,node("summary","三種公會遭遇 × 多套配裝批次"),node("p","每次加入會保存當時的裝備、附魔、詞綴及空欄保留設定。最多5組候選，另加原始配裝。三種標準遭遇各自固定其他設定，輸出最多18個請求。","gt-muted"),field("批次方案名稱",batchName),button("加入目前配裝至批次",()=>{try{const name=batchName.value.trim();if(!name||name.length>80||name==="原始配裝"||batchVariants.some(v=>v.name===name)||batchVariants.length>=5)throw Error("請填不重複的方案名稱，最多5組");batchVariants.push({name,mode:mode.value,equipment:current(),keepMatching:keep.checked,preserveEmpty:preserve.checked});batchName.value="";drawBatch();msg.textContent="已加入配裝方案；尚未執行模擬。";}catch(e){msg.textContent=e.message;}}),batchList,button("下載三遭遇批次 JSON",()=>{try{const data=combatGuildBatch(combatReadJSON(request.value),id,batchVariants);const json=JSON.stringify(data);if(json.length>8000000)throw Error("批次過大，請減少方案");combatDownloadJSON(data,"tomb-"+id+"-guild-batch.json");msg.textContent="已匯出 "+data.cases.length+" 個原生請求，請用批次工具實跑。";}catch(e){msg.textContent="批次匯出失敗："+e.message;}}),link("原生批次工具與操作說明","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-guild-batch.py"));
+ drawBatch();
  function compareGear(){
   preview.replaceChildren();
   try{const result=trial();const part=box(preview,"A／B 配裝變更","A 為原始裝備與本次共用遭遇；B 只變更裝備。兩份請求的天賦、增益、消耗品、戰鬥時間及迭代設定完全相同。");
@@ -1667,7 +1695,7 @@ function combatGearView(parent,id,build){
    msg.textContent="比較 "+result.changes.length+" 個裝備位置；下載的是同一基準設定的 A／B 請求，並非模擬結果。";
   }catch(e){msg.textContent="比較失敗："+e.message;}
  }
- add(details,node("summary","選擇配裝與匯出（17 格）"),field("武器配置",mode),importBox,button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows){selected.get(x.name).value=x.featured?String(x.featured.id):"";modifiers.get(x.name).enchant.value="";modifiers.get(x.name).randomSuffix.value="";}refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；預設未選欄位清空原裝備，也可改為保留。同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。未在本站執行引擎。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),scenario,add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),add(node("label",undefined,"gt-check"),preserve,node("span","未選欄位保留原裝備（單件替換模式）")),button("預覽 A／B 配裝變更",compareGear),preview,button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=trial().candidate;combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
+ add(details,node("summary","選擇配裝與匯出（17 格）"),field("武器配置",mode),importBox,button("載入本站首列候選（非已驗證 BiS）",()=>{const rows=auditEquipmentChoices(auditEquipmentSlots(partition,mode.value,compare));for(const x of rows){selected.get(x.name).value=x.featured?String(x.featured.id):"";modifiers.get(x.name).enchant.value="";modifiers.get(x.name).randomSuffix.value="";}refresh();}),editor,button("儲存此構築配裝",save),output,button("下載 EquipmentSpec JSON",()=>{try{combatDownloadJSON(current(),"tomb-"+id+"-equipment.json");}catch(e){msg.textContent=e.message;}}),node("h4","套用至原生個人模擬請求"),node("p","匯入成功案例的完整請求或自行準備的請求。保留請求中的天賦、技能策略、消耗品與遭遇；預設未選欄位清空原裝備，也可改為保留。同職業不同專精可能共用引擎欄位，請手動核對天賦與武器。未在本站執行引擎。","gt-muted"),request,combatFileInput(request,msg,"上傳原生模擬請求 JSON"),scenario,add(node("label",undefined,"gt-check"),keep,node("span","保留同欄同 ID 原有附魔及詞綴")),add(node("label",undefined,"gt-check"),preserve,node("span","未選欄位保留原裝備（單件替換模式）")),button("預覽 A／B 配裝變更",compareGear),preview,batchBox,button("下載替換配裝後的 RaidSimRequest",()=>{try{const data=trial().candidate;combatDownloadJSON(data,"tomb-"+id+"-request.json");msg.textContent="已產生請求；請核對構築、附魔、空欄及 APL 再用原生 CLI 執行。";}catch(e){msg.textContent="無法產生請求："+e.message;}}),msg);
  mode.addEventListener("change",()=>{const old=stored.slots||{},rows=all();stored={...stored,mode:mode.value,slots:{...old,...Object.fromEntries(rows.map(x=>[x.name,x.id]))},mods:{...stored.mods,...Object.fromEntries(rows.map(x=>[x.name,{enchant:x.enchant,randomSuffix:x.randomSuffix}]))}};draw();});c.append(details);draw();if(stored.source){details.open=true;msg.textContent="已帶入："+stored.source+"；請核對裝備與附魔。";}
  return async path=>{
   const valid=combatRequestPath(path,id);if(!valid)throw Error("請求檔案路徑不合法");
