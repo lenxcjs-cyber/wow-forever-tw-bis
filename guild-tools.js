@@ -381,6 +381,21 @@ function material(){
  add(panel,specLabel(),summary,msg,field("配方／材料搜尋",q),field("專業",prof),field("檢視範圍",mode),out);drawSummary();draw();
 }
 function statScore(stats,weights,currentHit,hitTarget){let total=0;for(const [k,v] of Object.entries(stats)){let qty=v;if(k==="命中機率"&&hitTarget!==null)qty=Math.min(v,Math.max(0,hitTarget-currentHit));total+=qty*(weights[k]||0);}return total;}
+function epProfilesFor(data,id){
+ if(data?.commit!==combatPresetCommit||!Array.isArray(data.profiles))return [];
+ const seen=new Set(),labels=new Set(Object.values(catalogWeightFields));
+ return data.profiles.filter(x=>{
+  if(!x||x.spec!==id||typeof x.label!=="string"||!x.label.trim()||typeof x.variant!=="string"||seen.has(x.variant)||typeof x.source!=="string"||!/^ui\/specs\/[a-zA-Z0-9_/]+\.ts$/.test(x.source)||typeof x.declaration!=="string"||!/^\w+$/.test(x.declaration)||!x.panelWeights||typeof x.panelWeights!=="object"||Array.isArray(x.panelWeights))return false;
+  const entries=Object.entries(x.panelWeights);
+  if(!entries.length||!entries.every(([k,v])=>labels.has(k)&&Number.isFinite(v)&&v>0))return false;
+  seen.add(x.variant);return true;
+ });
+}
+let epProfilesPromise=null;
+function loadEpProfiles(){
+ if(!epProfilesPromise)epProfilesPromise=fetch("ep-presets.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json();}).catch(()=>null);
+ return epProfilesPromise;
+}
 function optimizer(){
  title("配裝試算","使用選定構築的武器資格及可匯入的模擬屬性權重。預設為舊版估算，不代表最新實測；不同構築、角色與目標不可混用權重。");
  const id=getSpec(),baseSpec=bySpec.get(id);if(!baseSpec)return;const s={...baseSpec,slots:expandCandidateSlots(baseSpec)};
@@ -403,7 +418,26 @@ function optimizer(){
  const saveBtn=button("儲存此專精與構築權重",()=>{if(!source.value.trim()){message.textContent="請填寫資料來源或計算假設。";return;}if(!Object.values(effectiveGearWeights(id,weights)).some(v=>v>0)){message.textContent="至少需有一項適用於此構築的非零權重，才可儲存配裝模型。";return;}try{localStorage.setItem(storageKey,JSON.stringify({weights,source:source.value.trim(),hitBySlot:{...(saved?.hitBySlot||{}),[slot.value]:{base:Math.max(0,Number(current.value)||0),cap:target.value===""?null:Math.max(0,Number(target.value)||0),talent:Math.max(0,Number(talentHit.value)||0)}}}));saved=savedModel(id);provenance=source.value.trim()+"（使用者提供，未驗證）";indicator.textContent=provenance;message.textContent="已儲存於本瀏覽器。";}catch(e){message.textContent="無法儲存。";}});
  const resetBtn=button(hasLegacy?"恢復舊版估算":"清除本構築權重",()=>{for(const k of keys)weights[k]=defaults[k]||0;provenance=hasLegacy?"舊版估算／未驗證":"此構築無權重，請匯入專屬模擬資料";source.value="";saved=null;current.value="0";target.value="";talentHit.value="0";try{localStorage.removeItem(storageKey);}catch(e){}refresh();});
  const exportBtn=button("輸出目前權重 JSON",()=>{raw.value=JSON.stringify(weights,null,2);raw.focus();raw.select();message.textContent="已填入目前權重，可複製分享；不包含天賦、命中設定及來源，請一併告知接收者。";});
- add(weightBox,grid,field("模擬來源與假設",source),field("JSON 權重（以本頁繁中屬性名稱為鍵）",raw),importBtn,exportBtn,saveBtn,resetBtn,message);
+ const epBox=node("div",undefined,"gt-card");epBox.append(node("p","讀取上游固定版本參考權重…","gt-muted"));
+ loadEpProfiles().then(data=>{
+  if(!epBox.isConnected)return;
+  const rows=epProfilesFor(data,id);
+  epBox.replaceChildren(node("h4","上游原始 EP 權重參考"));
+  if(!rows.length){epBox.append(node("p","此專精尚無可核對的上游數字權重；保留自行匯入功能。","gt-muted"));return;}
+  const pick=select(rows.map(x=>[x.variant,x.label])),detail=node("div");
+  function showEp(){
+   const x=rows.find(v=>v.variant===pick.value);detail.replaceChildren();
+   if(!x)return;
+   add(detail,node("p",Object.entries(x.panelWeights).map(([k,v])=>k+" "+v.toFixed(3)).join(" ｜ ")),node("p","未採用的上游欄位："+(Array.isArray(x.omitted)?x.omitted.join("、"):"未知")+"。評分只用可映射的正數面板權重；不包含觸發、套裝、命中門檻與真實戰鬥環境。","gt-muted"),link("查看上游原始權重","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.source));
+  }
+  pick.addEventListener("change",showEp);add(epBox,field("參考構築（須核對目前天賦）",pick),detail,button("載入此參考權重（部分欄位）",()=>{
+   const x=rows.find(v=>v.variant===pick.value);if(!x)return;
+   for(const k of keys)weights[k]=x.panelWeights[k]||0;
+   source.value="WoWSims "+combatPresetCommit.slice(0,7)+" "+x.label+" / "+x.declaration+"（部分面板權重）";
+   provenance="固定版本上游參考，非本站實跑；須核對構築";message.textContent="已載入部分權重，未自動儲存。請確認適用天賦、遭遇及缺少欄位，再儲存。";refresh();
+  }));showEp();
+ });
+ add(weightBox,epBox,grid,field("模擬來源與假設",source),field("JSON 權重（以本頁繁中屬性名稱為鍵）",raw),importBtn,exportBtn,saveBtn,resetBtn,message);
  function draw(){result.replaceChildren();const effective=effectiveGearWeights(id,weights);if(!Object.values(effective).some(v=>v>0)){result.append(node("p","此構築尚無非零權重；不產生排名，請匯入專屬模擬資料。"));return;}const rows=(s.slots.get(slot.value)||[]).filter(x=>allowed(id,x));const base=Math.max(0,Number(current.value)||0),cap=target.value===""?null:Math.max(0,Number(target.value)||0);
  const sorted=rows.map(x=>{const m=modelScore(x,effective,{base,cap,talent:Math.max(0,Number(talentHit.value)||0)});return {...x,calc:m.total,parts:m.parts,missingDps:m.incomplete};}).sort((a,b)=>Number(!!a.review)-Number(!!b.review)||Number(a.missingDps)-Number(b.missingDps)||b.calc-a.calc);
  if(!sorted.length){result.append(node("p","本站沒有符合此構築的候選裝備，請查證外部資料。"));return;}
@@ -807,6 +841,7 @@ function nativeSetComparison(trial,role){
   const uncertainty=nativeSetUncertainty(baseline,c,metric),win=delta>1e-8&&survival===true;
   return {...c,delta,percent:baseline.metrics[metric]>0?100*delta/baseline.metrics[metric]:null,win,survival,uncertainty,confirmedWin:win&&uncertainty!==null&&delta>uncertainty};
  });
+ const best=rows.filter(x=>x.win).sort((a,b)=>b.metrics[metric]-a.metrics[metric]||a.pieces-b.pieces)[0]||null,bestConfirmed=rows.filter(x=>x.confirmedWin).sort((a,b)=>b.metrics[metric]-a.metrics[metric]||a.pieces-b.pieces)[0]||null;
  const expected=Array.isArray(trial.thresholds)?[...new Set(trial.thresholds.filter(n=>Number.isInteger(n)&&n>0&&n<=14))].sort((a,b)=>a-b):[];
  const adjacent=Array.isArray(trial.adjacentCounts)?[...new Set(trial.adjacentCounts.filter(n=>Number.isInteger(n)&&n>0&&n<=14&&!expected.includes(n)))]:[];
  for(const row of rows){
@@ -814,7 +849,7 @@ function nativeSetComparison(trial,role){
   const previous=row.pieces===1?baseline:rows.find(x=>x.pieces===row.pieces-1);
   row.previousDelta=previous?row.metrics[metric]-previous.metrics[metric]:null;
  }
- return {metric,baseline,rows,firstWin:rows.find(x=>x.win)?.pieces??null,firstConfirmed:rows.find(x=>x.confirmedWin)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n)),missingAdjacent:adjacent.filter(n=>!rows.some(x=>x.pieces===n))};
+ return {metric,baseline,rows,best,bestConfirmed,firstWin:rows.find(x=>x.win)?.pieces??null,firstConfirmed:rows.find(x=>x.confirmedWin)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n)),missingAdjacent:adjacent.filter(n=>!rows.some(x=>x.pieces===n))};
 }
 let nativeSetTrialsPromise=null;
 function nativeSetTrialView(parent,id){
@@ -828,17 +863,18 @@ function nativeSetTrialView(parent,id){
   for(const t of trials){
    const d=node("details");d.append(node("summary",zhDisplay(t.setName||"未知套裝")+" ｜ "+(guildScenarios[t.scenario]?.label||t.scenario)));
    const result=nativeSetComparison(t,role);
-   add(d,node("p","引擎登錄件數："+(Array.isArray(t.thresholds)?t.thresholds.join("／"):"未知")+" ｜ 基準："+(t.baseLabel||"")+"。散件與套裝候選以同部位、同護甲類型及接近物品等級選取；換裝位置的附魔均清除，非全目錄最優。","gt-muted"));
+   add(d,node("p","引擎登錄件數："+(Array.isArray(t.thresholds)?t.thresholds.join("／"):"未知")+" ｜ 基準："+(t.baseLabel||"")+"。"+(t.epProfile?"散件依上游部分EP權重挑選；":"散件以接近物品等級選取；")+"同部位、同護甲類型；換裝位置的附魔均清除，非全目錄最優。","gt-muted"));
+   if(t.epProfile){d.append(node("p","參考權重："+t.epProfile.label+" ｜ "+Object.entries(t.epProfile.catalogWeights||{}).map(([k,v])=>(catalogWeightFields[k]||k)+" "+v).join("、")+"；未納入："+(t.epProfile.omitted||[]).join("、"),"gt-muted"));}
    if(typeof t.source==="string"&&/^sim\/[a-zA-Z0-9_/.]+\.go$/.test(t.source)&&!t.source.includes(".."))d.append(link("套裝原生效果實作","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+t.source));
    if(Array.isArray(t.registeredThresholds)){const unplanned=t.registeredThresholds.filter(n=>Number.isInteger(n)&&!t.thresholds?.includes(n));if(unplanned.length)d.append(node("p","尚無合資格候選可測的登錄門檻："+unplanned.join("／")+" 件","gt-muted"));}
-   if(Array.isArray(t.items)&&t.items.length){const gear=node("details");gear.append(node("summary","實際套裝與散件替換部位"));for(const x of t.items.slice(0,14)){if(!x||!Number.isSafeInteger(x.setId)||x.setId<=0||!Number.isSafeInteger(x.scatterId)||x.scatterId<=0)continue;const line=node("p");add(line,node("span",(gearSlotNames[x.slot]||x.slot)+"："),link("套裝 "+x.setId,"https://www.wowhead.com/forever/tw/item="+x.setId),node("span"," ／ "),link("散裝 "+x.scatterId,"https://www.wowhead.com/forever/tw/item="+x.scatterId));gear.append(line);}d.append(gear);}
+   if(Array.isArray(t.items)&&t.items.length){const gear=node("details");gear.append(node("summary","實際套裝與散件替換部位"));for(const x of t.items.slice(0,14)){if(!x||!Number.isSafeInteger(x.setId)||x.setId<=0||!Number.isSafeInteger(x.scatterId)||x.scatterId<=0)continue;const line=node("p");add(line,node("span",(gearSlotNames[x.slot]||x.slot)+"："),link("套裝 "+x.setId,"https://www.wowhead.com/forever/tw/item="+x.setId),node("span"," ／ "),link("散裝 "+x.scatterId,"https://www.wowhead.com/forever/tw/item="+x.scatterId));if(Number.isFinite(x.setScore)&&Number.isFinite(x.scatterScore))line.append(node("span"," ｜ 部分EP "+x.setScore.toFixed(2)+"／"+x.scatterScore.toFixed(2)));gear.append(line);}d.append(gear);}
    if(!result)d.append(node("p","0件基準尚未成功，不能判定勝負。","gt-muted"));
    else{
     const m=result.metric.toUpperCase();
     const line=(x,label)=>{const part=node("p",label+" ｜ "+m+" "+x.metrics[result.metric].toFixed(2)+(role==="tank"&&Number.isFinite(x.metrics.dtps)?" ｜ DTPS "+x.metrics.dtps.toFixed(2):"")+(role==="tank"&&Number.isFinite(x.metrics.death)?" ｜ 死亡 "+(100*x.metrics.death).toFixed(1)+"%":""));d.append(part);const path=combatRequestPath(x.requestFile,id);if(path)d.append(link("下載完整 "+label+" 請求",path));};
     line(result.baseline,"0件散裝對照");
     for(const x of result.rows){line(x,x.pieces+"件"+(x.activation?"（套裝效果門檻）":"（件數對照）"));if(x.previousDelta!==null)d.append(node("p","相較少1件 "+(x.previousDelta>=0?"+":"")+x.previousDelta.toFixed(2)+" "+m+"（包含換裝本身差異，非純套裝效果）","gt-muted"));d.append(node("p","相較0件 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+" "+m+(x.percent!==null?"（"+x.percent.toFixed(2)+"%）":"")+(x.uncertainty===null?"；未提供完整波動資料":"；差值保守近似95%範圍 ±"+x.uncertainty.toFixed(2))+(x.confirmedWin?"；超出波動門檻":x.win?"；平均值較高，尚未超出波動門檻":role==="tank"&&x.delta>0?"；生存未同時勝出或資料不足":"；平均值未勝出"),"gt-muted"));}
-    d.append(node("p",result.firstWin===null?"目前成功的門檻平均值未勝過0件對照。":"本次已測件數中，最少 "+result.firstWin+" 件平均值較高；"+(result.firstConfirmed===null?"尚無足夠波動證據。":"最少 "+result.firstConfirmed+" 件超出保守近似95%差值範圍。")+"不是所有可能散件的全域 BiS。","gt-muted"));d.append(node("p","近似範圍為 1.96 ×（兩組標準誤之和），不假定同種子結果獨立。未修正多重比較；坦克承傷及死亡仍以平均值判定。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較效果門檻："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));if(result.missingAdjacent.length)d.append(node("p","門檻前一件對照尚缺："+result.missingAdjacent.join("／")+" 件。","gt-muted"));
+    d.append(node("p",result.firstWin===null?"目前成功的門檻平均值未勝過0件對照。":"本次已測件數中，最少 "+result.firstWin+" 件平均值較高；"+(result.firstConfirmed===null?"尚無足夠波動證據。":"最少 "+result.firstConfirmed+" 件超出保守近似95%差值範圍。")+"不是所有可能散件的全域 BiS。","gt-muted"));if(result.best)d.append(node("p","本次最高平均值："+result.best.pieces+" 件；"+(result.bestConfirmed?"有勝出證據的最高平均值："+result.bestConfirmed.pieces+" 件。":"尚無超出波動門檻的候選。"),"gt-muted"));d.append(node("p","近似範圍為 1.96 ×（兩組標準誤之和），不假定同種子結果獨立。未修正多重比較；坦克承傷及死亡仍以平均值判定。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較效果門檻："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));if(result.missingAdjacent.length)d.append(node("p","門檻前一件對照尚缺："+result.missingAdjacent.join("／")+" 件。","gt-muted"));
    }
    if(Array.isArray(t.failed)&&t.failed.length)d.append(node("p","未成功："+t.failed.map(x=>x.pieces+"件").join("、"),"gt-muted"));
    c.append(d);
