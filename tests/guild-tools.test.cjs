@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups,combatTargetSweep,combatObjective,combatCoverage,combatRole,combatMetric};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -521,3 +521,35 @@ assert.equal(combat.combatBestPriority(targetCompare,"threat","weakest").order[0
 assert.deepEqual(combat.combatTargetSweep(aoeBase,"threat","weakest").map(x=>x.targets),[1,2,3,5,8]);
 for(const invalid of [{targets:0},{targets:21},{targets:1.5},{buffs:[{name:"bad",start:0,duration:1,damage:4}]},{skills:[{...aoeSkill,targetCap:0}]},{skills:[{...aoeSkill,group:"g"}]}])assert.throws(()=>combat.simulatePriority({...aoeBase,...invalid}));
 console.log("PASS: multi-target caps, per-target threat, minimum-target optimization, timed buffs, shared cooldown and invalid input");
+
+
+// All roles are represented and raw native JSON cases need not have SIML timelines.
+const nativeJson={spec:"spec-1",label:"fixture",dps:10,nativeMetrics:{dps:10},duration:180,iterations:1000,timeline:[],settings:"ui/specs/warrior/dps/gear_sets/prebis_arms.gear.json",apl:"ui/specs/warrior/dps/apls/arms.apl.json"};
+const allCoverage=combat.combatCoverage({...native,cases:[nativeJson,null]});
+assert.equal(allCoverage.length,28);
+assert.equal(allCoverage.filter(x=>x.role==="dps").length,20);
+assert.equal(allCoverage.filter(x=>x.role==="tank").length,3);
+assert.equal(allCoverage.filter(x=>x.role==="heal").length,5);
+assert.equal(allCoverage[0].count,1);
+assert.equal(combat.combatMetric("spec-4"),"healing");
+assert.equal(combat.combatMetric("spec-3"),"threat");
+assert.equal(combat.combatMetric("spec-19"),"damage");
+assert.equal(combat.combatPresetCases({...native,cases:[{...nativeJson,nativeMetrics:{dps:5}}]},"spec-1").length,0);
+assert.equal(combat.combatPresetCases({...native,cases:[{...nativeJson,settings:"ui/specs/../private.json"}]},"spec-1").length,0);
+const healSkill={name:"heal",cost:0,gain:0,cd:0,cast:0,damage:0,threat:0,healing:10};
+const healBase={duration:3,gcd:1,cap:100,initial:100,regen:0,healingDemand:{initial:5,rate:2,bursts:[{time:1,amount:8}]},skills:[healSkill]};
+const healed=combat.simulatePriority(healBase);
+assert.equal(healed.healingDemand.effective,17);
+assert.equal(healed.healingDemand.overheal,13);
+assert.equal(healed.healingDemand.deficit,2);
+assert.equal(healed.healingDemand.incoming,19);
+assert.equal(healed.healingDemand.effective+healed.healingDemand.deficit,healed.healingDemand.incoming);
+assert.equal(healed.healingDemand.effective+healed.healingDemand.overheal,healed.totals.healing);
+const waitingHeal=combat.simulatePriority({...healBase,healingDemand:{rate:2},skills:[{...healSkill,healMin:3}]});
+assert.equal(waitingHeal.events[0].time,1.5);
+const burstHeal=combat.simulatePriority({...healBase,healingDemand:{bursts:[{time:1.2,amount:6}]},skills:[{...healSkill,healMin:4}]});
+assert.equal(burstHeal.events[0].time,1.2);
+assert.equal(combat.combatBestPriority({...healBase,skills:[healSkill,{...healSkill,name:"small",healing:2}]},"effective").order[0],"heal");
+assert.throws(()=>combat.simulatePriority({...healBase,healingDemand:{rate:-1}}));
+assert.throws(()=>combat.simulatePriority({...healBase,healingDemand:undefined,skills:[{...healSkill,healMin:4}]}));
+console.log("PASS: all-spec coverage, role objective defaults, raw native JSON validation and effective healing conservation");
