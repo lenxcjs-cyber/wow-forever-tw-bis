@@ -1781,7 +1781,7 @@ function combatGearView(parent,id,build,nativeView){
   for(const [i,v] of batchVariants.entries()){const line=node("div");add(line,node("p",(i+1)+"｜"+v.name+"｜"+v.equipment.items.filter(x=>x.id).length+" 件明確選取"+(v.preserveEmpty?"｜保留未選原裝":"")),button("移除此方案",()=>{batchVariants.splice(i,1);drawBatch();}));batchList.append(line);}
   if(!batchVariants.length)batchList.append(node("p","目前尚未加入方案。","gt-muted"));
  }
- add(batchBox,node("summary","三種公會遭遇 × 多套配裝批次"),node("p","每次加入會保存當時的裝備、附魔、詞綴及空欄保留設定。最多5組候選，另加原始配裝。三種標準遭遇各自固定其他設定，輸出最多18個請求。","gt-muted"),field("批次方案名稱",batchName),button("加入目前配裝至批次",()=>{try{const name=batchName.value.trim();if(!name||name.length>80||name==="原始配裝"||batchVariants.some(v=>v.name===name)||batchVariants.length>=5)throw Error("請填不重複的方案名稱，最多5組");batchVariants.push({name,mode:mode.value,equipment:current(),keepMatching:keep.checked,preserveEmpty:preserve.checked});batchName.value="";drawBatch();msg.textContent="已加入配裝方案；尚未執行模擬。";}catch(e){msg.textContent=e.message;}}),batchList,button("下載三遭遇批次 JSON",()=>{try{const data=combatGuildBatch(combatReadJSON(request.value),id,batchVariants);const json=JSON.stringify(data);if(json.length>8000000)throw Error("批次過大，請減少方案");combatDownloadJSON(data,"tomb-"+id+"-guild-batch.json");msg.textContent="已匯出 "+data.cases.length+" 個原生請求，請用批次工具實跑。";}catch(e){msg.textContent="批次匯出失敗："+e.message;}}),link("原生批次工具與操作說明","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-guild-batch.py"));
+ add(batchBox,node("summary","三種公會遭遇 × 多套配裝批次"),node("p","每次加入會保存當時的裝備、附魔、詞綴及空欄保留設定。最多5組候選，另加原始配裝。三種標準遭遇各自固定其他設定，輸出最多18個請求。","gt-muted"),field("批次方案名稱",batchName),button("加入目前配裝至批次",()=>{try{const name=batchName.value.trim();if(!name||name.length>80||name==="原始配裝"||batchVariants.some(v=>v.name===name)||batchVariants.length>=5)throw Error("請填不重複的方案名稱，最多5組");batchVariants.push({name,mode:mode.value,equipment:current(),keepMatching:keep.checked,preserveEmpty:preserve.checked});batchName.value="";drawBatch();msg.textContent="已加入配裝方案；尚未執行模擬。";}catch(e){msg.textContent=e.message;}}),batchList,button("下載三遭遇批次 JSON",()=>{try{const data=combatGuildBatch(combatReadJSON(request.value),id,batchVariants);const json=JSON.stringify(data);if(json.length>8000000)throw Error("批次過大，請減少方案");combatDownloadJSON(data,"tomb-"+id+"-guild-batch.json");msg.textContent="已匯出 "+data.cases.length+" 個原生請求，請用批次工具實跑。";}catch(e){msg.textContent="批次匯出失敗："+e.message;}}),button("在本站執行三遭遇多套比較",()=>{try{if(!nativeView)throw Error("站內引擎介面未載入");const data=combatGuildBatch(combatReadJSON(request.value),id,batchVariants);nativeView.runBatch(data);}catch(e){msg.textContent=e.message;}}),link("選用：原生批次工具與操作說明","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-guild-batch.py"));
  drawBatch();
  function compareGear(){
   preview.replaceChildren();
@@ -1898,6 +1898,23 @@ function nativeBrowserResult(raw,id,iterations){
  if(!(result[metric]>0))throw Error("未取得正數 "+metric.toUpperCase()+"；可能是技能策略、裝備或遭遇不適用");
  return result;
 }
+function nativeBrowserBatchJobs(batch,id,meta,n){
+ if(batch?.format!=="tomb-guild-batch/1"||batch.commit!==combatPresetCommit||batch.spec!==id||!Array.isArray(batch.cases)||![6,9,12,15,18].includes(batch.cases.length))throw Error("無效配裝批次");
+ const expected=batch.cases.length/3,seen=new Set(),jobs=[];
+ for(const x of batch.cases){
+  if(!guildScenarios[x.scenario]||!Number.isInteger(x.variant)||x.variant<0||x.variant>=expected||typeof x.name!=="string"||!x.name.trim()||seen.has(x.scenario+":"+x.variant))throw Error("無效或重複配裝案例");
+  seen.add(x.scenario+":"+x.variant);
+  const request=nativeBrowserRequest(x.request,id,x.scenario,n),p=combatRequestPlayer(request,id);
+  p.equipment=nativeImportGear(p.equipment,meta);
+  jobs.push({scenario:x.scenario,variant:x.variant,name:x.name,request});
+ }
+ const signature=req=>{const r=JSON.parse(JSON.stringify(req));delete combatRequestPlayer(r,id).equipment;return JSON.stringify(r);};
+ for(const k of Object.keys(guildScenarios)){
+  const rows=jobs.filter(x=>x.scenario===k),base=rows.find(x=>x.variant===0);
+  if(rows.length!==expected||base?.name!=="原始配裝"||rows.some(x=>signature(x.request)!==signature(base.request)))throw Error("批次比較條件不一致");
+ }
+ return jobs;
+}
 function nativeBrowserView(parent,id){
  const c=box(parent,"站內原生實戰模擬","本機瀏覽器 WebAssembly 運算；角色 JSON 不傳送外部模擬服務。引擎載入及運算會消耗記憶體與 CPU。");
  const status=node("p","檢查站內引擎與固定版本裝備資料…","gt-muted"),templatePick=select([["","尚未載入範本"]]),area=node("textarea"),readyText=node("p","","gt-muted"),preview=node("div"),results=node("div"),scenario=select([["all","全部三種公會遭遇"],...Object.entries(guildScenarios).map(([k,v])=>[k,v.label])]),iterations=select([["50","50次快速測試"],["200","200次初步比較"],["1000","1000次正式比較"]]);
@@ -1927,17 +1944,32 @@ function nativeBrowserView(parent,id){
    status.textContent="已匯入，請確認構築、裝備與戰鬥設定。";
   }catch(e){status.textContent="匯入失敗："+e.message;character=null;}sync();
  }
- async function run(){
-  if(!ready||!character||worker)return;
+ async function run(batch=null){
+  if(!ready||worker||(!batch&&!character)){if(!ready)status.textContent="站內原生引擎尚未可用。";return;}
   const token=++active,n=Number(iterations.value),keys=scenario.value==="all"?Object.keys(guildScenarios):[scenario.value];
   results.replaceChildren();
-  let requests;try{requests=keys.map(k=>nativeBrowserRequest(character.request,id,k,n));}catch(e){status.textContent=e.message;return;}
+  let jobs;try{jobs=batch?nativeBrowserBatchJobs(batch,id,metadata,n):keys.map(k=>({scenario:k,name:"匯入角色",request:nativeBrowserRequest(character.request,id,k,n)}));}catch(e){status.textContent=e.message;return;}
+  const batchRows=[];
+  function reportBatch(){
+   if(!batch)return;
+   const payload={format:"tomb-guild-results/1",commit:combatPresetCommit,spec:id,cases:batchRows,finished:batchRows.length===jobs.length};
+   const part=box(results,"三遭遇原生配裝比較","各遭遇獨立排名；同一迭代數、天賦、消耗品及 APL。");
+   const summary=combatGuildBatchResults(payload,id);
+   for(const group of summary.groups){
+    part.append(node("h5",group.cfg.label));
+    if(!group.base){part.append(node("p","缺少成功基準，不排名。","gt-muted"));continue;}
+    const m=summary.metric.toUpperCase();part.append(node("p","原始配裝 "+m+" "+group.base.metrics[summary.metric].toFixed(2)));
+    for(const x of group.comparisons)part.append(node("p",x.name+" ｜ "+m+" "+x.metrics[summary.metric].toFixed(2)+" ｜ "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+(x.confirmed?" ｜ 超出波動門檻":!x.tankOK?" ｜ 生存不符":" ｜ 未證實勝出")));
+    part.append(node("p",group.best?"本次最高已證實候選："+group.best.name:"未確認候選勝出。","gt-muted"));
+   }
+   part.append(button("下載批次比較結果",()=>combatDownloadJSON(payload,"tomb-"+id+"-guild-results.json")));
+  }
   status.textContent="載入同站引擎中…";
   let index=0,timer=null;
   try{worker=new Worker("native-engine/worker.js?v="+combatPresetCommit.slice(0,8));}catch(e){status.textContent="無法啟動 Worker："+e.message;worker=null;sync();return;}
   const w=worker;sync();
   const resetTimer=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(active===token)stop("模擬超過時間限制；請減少迭代數或改為單一遭遇。");},180000);};
-  const next=()=>{if(token!==active||!c.isConnected){clearTimeout(timer);w.terminate();return;}if(index>=requests.length){clearTimeout(timer);stop("全部所選遭遇完成。");return;}status.textContent="原生運算 "+(index+1)+"／"+requests.length+"："+guildScenarios[keys[index]].label+"（"+n+"次）";resetTimer();w.postMessage({type:"run",request:JSON.stringify(requests[index])});};
+  const next=()=>{if(token!==active||!c.isConnected){clearTimeout(timer);w.terminate();return;}if(index>=jobs.length){clearTimeout(timer);reportBatch();stop("全部所選遭遇完成。");return;}const job=jobs[index];status.textContent="原生運算 "+(index+1)+"／"+jobs.length+"："+guildScenarios[job.scenario].label+"／"+job.name+"（"+n+"次）";resetTimer();w.postMessage({type:"run",request:JSON.stringify(job.request)});};
   w.onmessage=e=>{
    if(token!==active||worker!==w)return;
    if(!c.isConnected){clearTimeout(timer);stop("頁面已切換，停止模擬。");return;}
@@ -1945,17 +1977,17 @@ function nativeBrowserView(parent,id){
    if(e.data?.type==="error"){clearTimeout(timer);stop("原生引擎失敗："+e.data.message);return;}
    if(e.data?.type!=="result")return;
    clearTimeout(timer);
-   const cfg=guildScenarios[keys[index]],part=box(results,cfg.label,n+"次原生迭代");
+   const job=jobs[index],cfg=guildScenarios[job.scenario],part=box(results,cfg.label+"｜"+job.name,n+"次原生迭代");
    try{
     const raw=e.data.result,m=nativeBrowserResult(raw,id,n);
+    if(batch){const metrics={};for(const k of ["dps","tps","hps","dtps","death"])if(Number.isFinite(m[k]))metrics[k]=m[k];for(const [k,v] of Object.entries(m.stdev||{}))if(Number.isFinite(v))metrics[k+"Stdev"]=v;batchRows.push({scenario:job.scenario,variant:job.variant,name:job.name,metrics,iterations:n,duration:m.duration});}
     for(const [key,label] of [["dps","DPS"],["tps","TPS"],["hps","HPS"],["dtps","DTPS"]])if(Number.isFinite(m[key]))part.append(node("p",label+" "+m[key].toFixed(2)+(Number.isFinite(m.stdev?.[key])?" ｜ 標準差 "+m.stdev[key].toFixed(2):"")));
     if(m.death!==null)part.append(node("p","死亡機率 "+(m.death*100).toFixed(2)+"%"));
     const targets=raw.encounterMetrics?.targets;
     if(Array.isArray(targets))combatNativeTargetView(part,targets.map((t,i)=>({index:i,health:cfg.health,dps:t?.dtps?.avg})),cfg);
     if(m.logs){const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=m.logs;add(d,node("summary","首次迭代戰鬥紀錄"),pre);part.append(d);}
-    add(part,node("p","固定時間原生模擬；不是血量歸零停止的真實擊殺時間。","gt-muted"),button("下載此原生結果",()=>combatDownloadJSON(raw,"tomb-"+id+"-"+keys[indexForResult]+"-result.json")));
-    const indexForResult=index;
-   }catch(err){part.append(node("p","此遭遇未取得有效指標："+err.message,"gt-muted"));}
+    add(part,node("p","固定時間原生模擬；不是血量歸零停止的真實擊殺時間。","gt-muted"),button("下載此原生結果",()=>combatDownloadJSON(raw,"tomb-"+id+"-"+job.scenario+"-"+(job.variant??0)+"-result.json")));
+   }catch(err){if(batch)batchRows.push({scenario:job.scenario,variant:job.variant,name:job.name,error:"validation"});part.append(node("p","此遭遇未取得有效指標："+err.message,"gt-muted"));}
    index++;next();
   };
   w.onerror=e=>{clearTimeout(timer);if(active===token)stop("Worker 啟動或運算失敗："+(e.message||"未知錯誤"));};
@@ -1975,7 +2007,7 @@ function nativeBrowserView(parent,id){
  }).catch(e=>{if(!c.isConnected)return;readyText.textContent="站內原生引擎尚未發布或載入失敗："+e.message+"。不以自訂模型冒充原生模擬。";status.textContent="目前無法在本站執行原生引擎。";sync();});
  // Stop CPU work if the user navigates away from the combat view.
  const watch=new MutationObserver(()=>{if(!c.isConnected){watch.disconnect();if(worker)stop("頁面切換，已停止。");}});watch.observe(parent,{childList:true});
- return {load:raw=>{area.value=JSON.stringify(raw,null,2);clear();return importCharacter(false);}};
+ return {load:raw=>{if(worker){status.textContent="請先停止目前運算。";return;}area.value=JSON.stringify(raw,null,2);clear();c.scrollIntoView({block:"start"});return importCharacter(false);},runBatch:batch=>{if(worker){status.textContent="請先停止目前運算。";return;}c.scrollIntoView({block:"start"});return run(batch);}};
 }
 function combatLab(){
  title("實戰模擬","站內原生引擎、角色匯入與三種公會遭遇；另保留獨立自訂簡化模型。");
