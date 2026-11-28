@@ -89,19 +89,31 @@ function renderSkillGuide(profile){
  if(!guide||guide.class!==classSel.value){host.append(el("p","逐項技能指南尚未取得；請參考遊戲技能書。","muted"));return;}
  const entries=(list)=>Array.isArray(list)?list.filter(x=>Array.isArray(x)&&x.length===4&&x.every(v=>typeof v==="string"&&v.trim())):[];
  const core=entries(guide.skills),common=entries(data.common?.[guide.class]).filter(x=>!core.some(y=>y[1]===x[1]));
- const talentNames=new Set((catalog?.profiles||[]).filter(p=>p.className===profile.className).flatMap(p=>(p.talents||[]).flatMap(t=>Object.keys(t))));
+ const talentNames=new Set([...(catalog?.profiles||[]).filter(p=>p.cls===profile.cls).flatMap(p=>(p.talents||[]).flatMap(t=>Object.keys(t))),...(getClass()?.talents||[]).map(t=>t.name)]);
  const learned=new Set((profile.talents||[]).flatMap(t=>Object.entries(t).filter(([,n])=>n>0).map(([k])=>k)));
+ const unlocks=data.unlocks?.[guide.class]||{};
+ function acquisition(en){
+  const type=unlocks[en];
+  if(type==="trainer")return {kind:"trainer",text:"職業習得技能；等級、訓練與任務條件以遊戲內為準。"};
+  if(type==="talent"||type==="passive"){
+   const prefix=type==="passive"?"被動天賦，不是獨立施放技能。":"需對應天賦解鎖。";
+   return {kind:!profile.talents?"unknown":learned.has(en)?"talent":"unlisted",text:prefix+(!profile.talents?" 此構築無逐項配點；習得狀態待查。":learned.has(en)?" 參考配點已列同名天賦；仍須確認實際習得。":" 參考配點未列同名天賦；請勿假定可用。")};
+  }
+  if(talentNames.has(en))return {kind:"unknown",text:"技能與天賦同名；實際取得方式及是否習得仍待核對。"};
+  return {kind:"unknown",text:"取得條件尚未逐項核對。"};
+ }
  add(host,el("h3",guide.title+" · "+core.length+" 項核心／情境技能"),el("p",guide.priority),el("p","以下為專精共通滿等 PvE 操作參考；不是固定循環。部分技能需天賦、武器、形態、種族或任務解鎖。","muted"));
  if(!profile.talents)host.append(el("p","此構築未收錄逐項配點：不假定已習得天賦技能。","warn"));
  const search=el("input");search.type="search";search.placeholder="搜尋技能、用途或英文原名";search.setAttribute("aria-label","搜尋專精技能");const list=el("div",undefined,"skill-list"),commonBox=el("details",undefined,"skill-common"),commonRows=el("div",undefined,"skill-list"),count=el("p",undefined,"muted");
- add(host,search,count,list,commonBox);
+ const filters=el("div",undefined,"skill-filters"),category=el("select"),acq=el("select");category.setAttribute("aria-label","技能用途分類");acq.setAttribute("aria-label","技能取得條件");for(const value of ["全部用途",...new Set([...core,...common].map(x=>x[2]))])category.append(new Option(value,value));for(const [value,label] of [["all","全部取得狀態"],["trainer","已標記職業習得"],["talent","參考配點已列天賦"],["unlisted","參考配點未列天賦"],["unknown","取得條件待查"]])acq.append(new Option(label,value));add(filters,category,acq);add(host,search,filters,count,list,commonBox);
  function card(row){const [name,en,kind,use]=row,c=el("article",undefined,"skill-card");add(c,add(el("div",undefined,"skill-name"),el("strong",name),el("small",kind,"skill-kind")),el("small",en,"muted"),el("p",use));
-  if(talentNames.has(en))c.append(el("p",profile.talents?(learned.has(en)?"參考配點已列此天賦；以遊戲內實際習得為準。":"目前參考配點未列此天賦；未習得請略過。"):"天賦取得條件待查；未習得請略過。","skill-condition"));
+  const condition=acquisition(en);c.dataset.acquisition=condition.kind;c.append(el("p",condition.text,"skill-condition"));
   return c;
  }
- function draw(){const terms=search.value.trim().toLowerCase().split(/\s+/).filter(Boolean),matches=x=>terms.every(t=>x.join(" ").toLowerCase().includes(t)),a=core.filter(matches),b=common.filter(matches);list.replaceChildren(...a.map(card));commonRows.replaceChildren(...b.map(card));commonBox.replaceChildren(el("summary","職業共通技能（"+b.length+"）"),commonRows);commonBox.hidden=!b.length;if(terms.length)commonBox.open=true;count.textContent="顯示 "+(a.length+b.length)+" / "+(core.length+common.length)+" 項已整理技能";if(!a.length&&!b.length)list.append(el("p","沒有符合條件的已整理技能。","muted"));}
- search.addEventListener("input",draw);draw();
- const refs=el("details");add(refs,el("summary","資料來源與涵蓋限制"),el("p",data.scope,"muted"),el("p","整理日期："+data.reviewed,"muted"),link("完整職業技能資料與效果（ForeverDB）","https://foreverdb.net/class/"+guide.class),link("Method 職業攻略","https://www.method.gg/wow-forever/class-guides"),link("Icy Veins 職業攻略","https://www.icy-veins.com/wow-forever/class-guides"));
+ function draw(){const terms=search.value.trim().toLowerCase().split(/\s+/).filter(Boolean),matches=x=>(category.value==="全部用途"||category.value===x[2])&&(acq.value==="all"||acq.value===acquisition(x[1]).kind)&&terms.every(t=>x.join(" ").toLowerCase().includes(t)),a=core.filter(matches),b=common.filter(matches);list.replaceChildren(...a.map(card));commonRows.replaceChildren(...b.map(card));commonBox.replaceChildren(el("summary","職業共通技能（"+b.length+"）"),commonRows);commonBox.hidden=!b.length;if(terms.length||category.value!=="全部用途"||acq.value!=="all")commonBox.open=true;count.textContent="顯示 "+(a.length+b.length)+" / "+(core.length+common.length)+" 項已整理技能";if(!a.length&&!b.length)list.append(el("p","沒有符合條件的已整理技能。","muted"));}
+ search.addEventListener("input",draw);category.addEventListener("change",draw);acq.addEventListener("change",draw);draw();
+ const refs=el("details");add(refs,el("summary","資料來源與涵蓋限制"),el("p",data.scope,"muted"),el("p","整理日期："+data.reviewed,"muted"),link("職業技能書、階級與資源消耗（The Forever Era；版本可能較舊）","https://theforeverera.com/en/spells/"+guide.class+"/"),link("ForeverDB 技能資料","https://foreverdb.net/spells?cls="+[1,2,3,4,5,7,8,9,11][CLASSES.indexOf(guide.class)]),link("Method 職業攻略","https://www.method.gg/wow-forever/class-guides"),link("Icy Veins 職業攻略","https://www.icy-veins.com/wow-forever/class-guides"));
+ if(profile.id==="spec-26")add(refs,link("Method 11/27 貓德輸出手法","https://www.method.gg/wow-forever/class-guides/feral-dps-druid/rotation-and-playstyle"),link("Wowhead 貓德輸出手法","https://www.wowhead.com/forever/guide/classes/druid/feral/rotation-cooldowns-pve-dps"));
  if(profile.id==="spec-26"||profile.id==="spec-27")refs.append(link("11/27 野性德實戰參考","https://mobalytics.gg/wow-forever/classes/"+(profile.id==="spec-26"?"feral-druid-guide":"feral-druid-tank-guide")));
  host.append(refs);
 }
