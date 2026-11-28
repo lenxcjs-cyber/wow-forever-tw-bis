@@ -1803,6 +1803,98 @@ function combatGearView(parent,id,build){
   request.value=content;request.dispatchEvent(new Event("input",{bubbles:true}));details.open=true;msg.textContent="已載入原生案例請求；請確認天賦、技能與裝備後再匯出。";request.focus();request.scrollIntoView({block:"nearest"});
  };
 }
+const nativeClassNames=["warrior","paladin","hunter","rogue","priest","shaman","mage","warlock","druid"];
+const nativeRaceNames={bloodelf:"RaceBloodElf",dwarf:"RaceDwarf",gnome:"RaceGnome",human:"RaceHuman",nightelf:"RaceNightElf",orc:"RaceOrc",tauren:"RaceTauren",troll:"RaceTroll",undead:"RaceUndead",highorderskyborne:"RaceHighOrderSkyborne",windshaperskyborne:"RaceWindshaperSkyborne"};
+const nativeProfessionNames=["Alchemy","Blacksmithing","Enchanting","Engineering","Herbalism","Inscription","Leatherworking","Mining","Skinning","Tailoring"];
+function nativeImportGear(gear,meta){
+ if(!Array.isArray(gear?.items)||gear.items.length>17||!meta?.items)throw Error("缺少有效裝備清單或引擎物品索引");
+ const items=Array.from({length:17},()=>({})),seen=new Set(),uniqueSlots={1:0,2:1,3:2,4:3,5:4,6:5,7:6,8:7,9:8,10:9,14:16};
+ let two=false;
+ const positive=(v,max=2147483647)=>Number.isInteger(v)&&v>0&&v<=max;
+ for(const [sourceIndex,x] of gear.items.entries()){
+  if(x==null||x?.id===0||x&&typeof x==="object"&&!Object.keys(x).length)continue;
+  if(!x||!positive(x.id)||!Array.isArray(meta.items[x.id]))throw Error("引擎缺少物品 ID "+(x?.id??"未知"));
+  if(seen.has(x.id))throw Error("同 ID 重複裝備，唯一裝備資格尚未驗證："+x.id);
+  seen.add(x.id);
+  const [type,hand,weapon]=meta.items[x.id];let slot=uniqueSlots[type];
+  if(type===11)slot=items[10].id?11:10;
+  if(type===12)slot=items[12].id?13:12;
+  if(type===13){
+   if(hand===4){slot=14;two=true;}
+   else if(hand===3||weapon===5||weapon===7)slot=15;
+   else if(hand===1)slot=14;
+   else if(hand===2)slot=items[14].id?15:14;
+   else throw Error("無法辨識武器手位："+x.id);
+  }
+  if(!Number.isInteger(slot)||items[slot].id)throw Error("部位不明或有重複裝備："+x.id);
+  if(gear.items.length===17&&sourceIndex!==slot&&!(type===11&&[10,11].includes(sourceIndex))&&!(type===12&&[12,13].includes(sourceIndex)))throw Error("17格資料的原始位置與物品類型不符："+x.id);
+  if(gear.items.length===17&&[11,12].includes(type)&&[10,11,12,13].includes(sourceIndex))slot=sourceIndex;
+  if(items[slot].id)throw Error("重複裝備位置");
+  const item={id:x.id},enchant=x.enchant??0,suffix=x.randomSuffix??x.random_suffix??0;
+  if(x.randomSuffix!=null&&x.random_suffix!=null&&x.randomSuffix!==x.random_suffix)throw Error("詞綴欄位互相矛盾");
+  if(enchant!==0){if(!positive(enchant)||!meta.enchants?.[enchant])throw Error("引擎缺少附魔效果 ID "+enchant);item.enchant=enchant;}
+  if(suffix!==0){if(!Number.isInteger(suffix)||Math.abs(suffix)>2147483647||!meta.suffixes?.[suffix])throw Error("引擎缺少隨機詞綴 ID "+suffix);item.randomSuffix=suffix;}
+  items[slot]=item;
+ }
+ if(two&&items[15].id)throw Error("雙手武器不可同時裝副手");
+ if(!items.some(x=>x.id))throw Error("角色沒有可辨識裝備");
+ return {items};
+}
+function nativeCharacterRequest(raw,template,id,meta){
+ if(!raw||typeof raw!=="object"||Array.isArray(raw))throw Error("角色資料必須是 JSON 物件");
+ if(raw.raid&&raw.encounter){const r=JSON.parse(JSON.stringify(raw)),p=combatRequestPlayer(r,id);p.equipment=nativeImportGear(p.equipment,meta);return {request:r,notes:["完整原生請求；請核對技能策略與目前專精。"]};}
+ if(!template)throw Error("請先選擇本站對應專精的原生範本");
+ const r=JSON.parse(JSON.stringify(template)),p=combatRequestPlayer(r,id),notes=[];
+ if(raw.player&&raw.encounter){
+  const q=raw.player;if(!q||typeof q!=="object")throw Error("個人設定缺少角色");
+  r.raid.parties[0].players[0]=JSON.parse(JSON.stringify(q));combatRequestPlayer(r,id);
+  r.encounter=JSON.parse(JSON.stringify(raw.encounter));r.raid.buffs=raw.raidBuffs||{};r.raid.debuffs=raw.debuffs||{};r.raid.parties[0].buffs=raw.partyBuffs||{};r.raid.tanks=raw.tanks||[];r.raid.targetDummies=raw.targetDummies||0;
+  r.raid.parties[0].players[0].equipment=nativeImportGear(q.equipment,meta);
+  return {request:r,notes:["完整個人設定；使用本站迭代設定。"]};
+ }
+ const isAddon=typeof raw.class==="string",gear=isAddon?raw.gear:raw.items?raw:raw.equipment;
+ if(isAddon){
+  if(raw.flavor!=="forever")throw Error("請使用永恆版 WoWSims Exporter 匯出，不能混用其他版本");
+  if(raw.level!==60)throw Error("本站原生引擎目前限60級角色");
+  if(raw.class.toLowerCase()!==nativeClassNames[gearClassIndex(id)])throw Error("角色職業與本站選擇不符");
+  const specNames=["arms","fury","protection","holy","protection","retribution","beast_mastery","marksman","survival","assassination","combat","subtlety","holy_disc","holy_disc","shadow","elemental","enhancement","restoration","arcane","fire","frost","affliction","demonology","destruction","balance","feral","feral","restoration"];
+  if(typeof raw.spec==="string"&&raw.spec&&raw.spec!==specNames[Number(id.split("-")[1])-1])throw Error("角色專精與本站選擇不符，請先切換專精");
+  if(raw.race!=null){const race=nativeRaceNames[String(raw.race).replace(/[\s_-]/g,"").toLowerCase()];if(!race)throw Error("無法辨識種族");p.race=race;}else notes.push("未匯出種族，沿用範本。");
+  if(typeof raw.name==="string"&&raw.name.trim())p.name=raw.name.trim().slice(0,80);
+  if(typeof raw.talents==="string"&&/^[0-5]+(?:-[0-5]*){2}$|^[0-5]*(?:-[0-5]*){2}$/.test(raw.talents)&&raw.talents.replace(/-/g,"").length){p.talentsString=raw.talents;}else notes.push("未取得可用永恆天賦碼，沿用範本。");
+  if(raw.professions!=null){
+   if(!Array.isArray(raw.professions)||raw.professions.length>2)throw Error("專業資料格式不符");
+   for(let i=0;i<2;i++){const x=raw.professions[i],name=x&&nativeProfessionNames.find(v=>v.toLowerCase()===String(x.name).toLowerCase());if(x&&!name)throw Error("未知專業："+x.name);p["profession"+(i+1)]=name||"ProfessionUnknown";const rank=x?.level;if(x&&(!Number.isInteger(rank)||rank<1||rank>300))throw Error("專業技能等級不合法");p["prof"+(i+1)+"Rank"]=rank||0;}
+  }else notes.push("未匯出專業，沿用範本。");
+  if(raw.rotation!=null){if(typeof raw.rotation!=="object"||Array.isArray(raw.rotation))throw Error("技能策略格式不合法");p.rotation=JSON.parse(JSON.stringify(raw.rotation));}
+  else notes.push("遊戲匯出不含技能策略，沿用本站選擇的構築 APL。");
+ }else notes.push("只匯入裝備：種族、天賦與專業沿用範本。");
+ if(!gear)throw Error("角色匯出缺少 gear.items");
+ p.equipment=nativeImportGear(gear,meta);
+ notes.push("消耗品、團隊增減益、寵物及其他戰鬥設定沿用範本；請核對。");
+ if(p.enableItemSwap||p.itemSwap?.items?.some(x=>x?.id)||p.itemSwap?.swapSets?.length)notes.push("範本含換裝設定，請核對額外武器與技能策略。");
+ return {request:r,notes};
+}
+function nativeBrowserRequest(request,id,scenario,iterations,seed=1){
+ if(!Number.isInteger(iterations)||iterations<1||iterations>1000||!Number.isSafeInteger(seed)||seed<1)throw Error("迭代數須為1–1000，種子須為正整數");
+ const result=combatGuildScenario(request,id,scenario),p=combatRequestPlayer(result,id);
+ if(p.database)throw Error("本站不接受匯入自訂引擎資料庫");
+ if(!Array.isArray(p.equipment?.items)||p.equipment.items.length!==17)throw Error("缺少完整17格原生裝備");
+ if(!p.rotation||typeof p.rotation!=="object")throw Error("缺少技能優先序");
+ if(!Number.isInteger(result.raid.targetDummies??0)||(result.raid.targetDummies??0)<0||(result.raid.targetDummies??0)>25)throw Error("治療假人數量不合法");
+ result.simOptions={iterations,randomSeed:String(seed),debugFirstIteration:true};
+ delete result.requestId;
+ if(JSON.stringify(result).length>8000000)throw Error("請求超過8MB");
+ return result;
+}
+function nativeBrowserResult(raw,id,iterations){
+ if(raw?.iterationsDone!==iterations)throw Error("引擎未完成指定迭代");
+ const players=combatResultPlayers(raw).filter(x=>!x.dummy);
+ if(players.length!==1)throw Error("無法辨識唯一角色結果");
+ const result=combatResult(raw,players[0].key),metric=combatRole(id)==="tank"?"tps":combatRole(id)==="heal"?"hps":"dps";
+ if(!(result[metric]>0))throw Error("未取得正數 "+metric.toUpperCase()+"；可能是技能策略、裝備或遭遇不適用");
+ return result;
+}
 function combatLab(){
  title("實戰模擬","正式數值使用 WoWSims Forever；站內試算為自訂參數的簡化時間軸，不等於遊戲傷害公式。");
  const id=getSpec(),build=buildFor(id),url=combatEngineURL(id);
