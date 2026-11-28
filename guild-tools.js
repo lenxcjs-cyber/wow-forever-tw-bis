@@ -802,7 +802,13 @@ function nativeSetComparison(trial,role){
   return {...c,delta,percent:baseline.metrics[metric]>0?100*delta/baseline.metrics[metric]:null,win,survival,uncertainty,confirmedWin:win&&uncertainty!==null&&delta>uncertainty};
  });
  const expected=Array.isArray(trial.thresholds)?[...new Set(trial.thresholds.filter(n=>Number.isInteger(n)&&n>0&&n<=14))].sort((a,b)=>a-b):[];
- return {metric,baseline,rows,firstWin:rows.find(x=>x.win)?.pieces??null,firstConfirmed:rows.find(x=>x.confirmedWin)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n))};
+ const adjacent=Array.isArray(trial.adjacentCounts)?[...new Set(trial.adjacentCounts.filter(n=>Number.isInteger(n)&&n>0&&n<=14&&!expected.includes(n)))]:[];
+ for(const row of rows){
+  row.activation=expected.includes(row.pieces);
+  const previous=row.pieces===1?baseline:rows.find(x=>x.pieces===row.pieces-1);
+  row.previousDelta=previous?row.metrics[metric]-previous.metrics[metric]:null;
+ }
+ return {metric,baseline,rows,firstWin:rows.find(x=>x.win)?.pieces??null,firstConfirmed:rows.find(x=>x.confirmedWin)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n)),missingAdjacent:adjacent.filter(n=>!rows.some(x=>x.pieces===n))};
 }
 let nativeSetTrialsPromise=null;
 function nativeSetTrialView(parent,id){
@@ -825,8 +831,8 @@ function nativeSetTrialView(parent,id){
     const m=result.metric.toUpperCase();
     const line=(x,label)=>{const part=node("p",label+" ｜ "+m+" "+x.metrics[result.metric].toFixed(2)+(role==="tank"&&Number.isFinite(x.metrics.dtps)?" ｜ DTPS "+x.metrics.dtps.toFixed(2):"")+(role==="tank"&&Number.isFinite(x.metrics.death)?" ｜ 死亡 "+(100*x.metrics.death).toFixed(1)+"%":""));d.append(part);const path=combatRequestPath(x.requestFile,id);if(path)d.append(link("下載完整 "+label+" 請求",path));};
     line(result.baseline,"0件散裝對照");
-    for(const x of result.rows){line(x,x.pieces+"件");d.append(node("p","相較0件 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+" "+m+(x.percent!==null?"（"+x.percent.toFixed(2)+"%）":"")+(x.uncertainty===null?"；未提供完整波動資料":"；差值保守近似95%範圍 ±"+x.uncertainty.toFixed(2))+(x.confirmedWin?"；超出波動門檻":x.win?"；平均值較高，尚未超出波動門檻":role==="tank"&&x.delta>0?"；生存未同時勝出或資料不足":"；平均值未勝出"),"gt-muted"));}
-    d.append(node("p",result.firstWin===null?"目前成功的門檻平均值未勝過0件對照。":"本次已測門檻中，最少 "+result.firstWin+" 件平均值較高；"+(result.firstConfirmed===null?"尚無足夠波動證據。":"最少 "+result.firstConfirmed+" 件超出保守近似95%差值範圍。")+"不是所有可能散件的全域 BiS。","gt-muted"));d.append(node("p","近似範圍為 1.96 ×（兩組標準誤之和），不假定同種子結果獨立。未修正多重比較；坦克承傷及死亡仍以平均值判定。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較結果："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));
+    for(const x of result.rows){line(x,x.pieces+"件"+(x.activation?"（套裝效果門檻）":"（件數對照）"));if(x.previousDelta!==null)d.append(node("p","相較少1件 "+(x.previousDelta>=0?"+":"")+x.previousDelta.toFixed(2)+" "+m+"（包含換裝本身差異，非純套裝效果）","gt-muted"));d.append(node("p","相較0件 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+" "+m+(x.percent!==null?"（"+x.percent.toFixed(2)+"%）":"")+(x.uncertainty===null?"；未提供完整波動資料":"；差值保守近似95%範圍 ±"+x.uncertainty.toFixed(2))+(x.confirmedWin?"；超出波動門檻":x.win?"；平均值較高，尚未超出波動門檻":role==="tank"&&x.delta>0?"；生存未同時勝出或資料不足":"；平均值未勝出"),"gt-muted"));}
+    d.append(node("p",result.firstWin===null?"目前成功的門檻平均值未勝過0件對照。":"本次已測件數中，最少 "+result.firstWin+" 件平均值較高；"+(result.firstConfirmed===null?"尚無足夠波動證據。":"最少 "+result.firstConfirmed+" 件超出保守近似95%差值範圍。")+"不是所有可能散件的全域 BiS。","gt-muted"));d.append(node("p","近似範圍為 1.96 ×（兩組標準誤之和），不假定同種子結果獨立。未修正多重比較；坦克承傷及死亡仍以平均值判定。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較效果門檻："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));if(result.missingAdjacent.length)d.append(node("p","門檻前一件對照尚缺："+result.missingAdjacent.join("／")+" 件。","gt-muted"));
    }
    if(Array.isArray(t.failed)&&t.failed.length)d.append(node("p","未成功："+t.failed.map(x=>x.pieces+"件").join("、"),"gt-muted"));
    c.append(d);
