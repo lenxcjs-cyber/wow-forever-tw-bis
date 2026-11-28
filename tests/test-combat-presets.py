@@ -82,6 +82,18 @@ class PresetTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mod.direct_request({"player":{},"encounter":{}})
 
+    def test_direct_comparison_groups(self):
+        source={"player":{"rotation":{"type":"TypeAPL"},"talentsString":"A","buffs":{"greaterBlessingOfKings":True}},
+                "encounter":{"duration":180,"durationVariation":5,"targets":[{"id":31146}]},
+                "raidBuffs":{"arcaneIntellect":True}}
+        original=mod.direct_request(source)
+        modified=mod.direct_request({**source,"player":{**source["player"],"talentsString":"B"}})
+        self.assertEqual(mod.direct_comparison_group(original),mod.direct_comparison_group(modified))
+        short=mod.direct_request(source,60)
+        self.assertNotEqual(mod.direct_comparison_group(original),mod.direct_comparison_group(short))
+        changed_buff=mod.direct_request({**source,"raidBuffs":{"arcaneIntellect":False}})
+        self.assertNotEqual(mod.direct_comparison_group(original),mod.direct_comparison_group(changed_buff))
+
     def test_direct_metrics(self):
         valid={"iterationsDone":mod.ITERATIONS,"avgIterationDuration":180,
                "raidMetrics":{"parties":[{"players":[{"dps":{"avg":321},"threat":{"avg":456},"dtps":{"avg":-5},"hps":{"avg":0},"chanceOfDeath":0.1}]}]},"logs":"fixture"}
