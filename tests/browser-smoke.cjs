@@ -23,6 +23,7 @@ const server=http.createServer((req,res)=>{
   const errors=[];page.on("pageerror",e=>{errors.push(e.message);console.error("Browser page error:",e.message);});
   await page.route("**/*",route=>route.request().url().startsWith(origin+"/")?route.continue():route.abort());
   // Isolate UI behavior from actual external icon availability with explicit test fixtures.
+  await page.route("**/skill-client.json",route=>route.fulfill({json:{build:"1.60.1.71139",classes:{druid:{Shred:{name:"撕碎（測試名稱）",records:[{id:5221,name:"撕碎（測試名稱）",level:22,cooldownMs:6000,categoryCooldownMs:0}]}}}}}));
   await page.route("**/item-icons.json",route=>route.fulfill({json:{build:"1.60.1.71139",items:{"19323":"fixture_mace","252484":"fixture_missing"}}}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_mace.jpg",route=>route.fulfill({contentType:"image/svg+xml",body:'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="green"/></svg>'}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_missing.jpg",route=>route.abort());
@@ -277,6 +278,13 @@ const server=http.createServer((req,res)=>{
   await skillsPane.getByRole("searchbox").fill("Shred");
   assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),1);
   assert.ok((await skillsPane.locator(":scope > .skill-list").innerText()).includes("撕碎"));
+  await skillsPane.getByRole("searchbox").fill("測試名稱");
+  const rawSpell=skillsPane.locator('[data-skill="Shred"] .skill-client-records');
+  await rawSpell.locator("summary").click();
+  assert.ok((await rawSpell.innerText()).includes("技能等級欄位 22"));
+  assert.ok((await rawSpell.innerText()).includes("基礎冷卻 6 秒"));
+  assert.equal(await rawSpell.getByRole("link",{name:"技能 ID 5221"}).getAttribute("href"),"https://www.wowhead.com/forever/spell=5221");
+  console.log("PASS: fixture class-matched localized spell search and cooldown display");
   await skillsPane.getByRole("searchbox").fill("Rebirth");
   assert.ok((await skillsPane.locator(".skill-common").innerText()).includes("復生"));
   await skillsPane.getByRole("searchbox").fill("");
