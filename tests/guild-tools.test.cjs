@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -441,3 +441,29 @@ assert.equal(combat.combatPresetCases(native,"spec-7").length,1);
 assert.equal(combat.combatPresetCases(native,"spec-8").length,0);
 assert.equal(combat.combatPresetCases({...native,commit:"old"},"spec-7").length,0);
 console.log("PASS: all 28 engine routes, bounded priority scheduling, resource exhaustion, objective optimization and real result format validation");
+
+
+// Time-limited skill usage and pooling, exact encounter end, and phase conservation.
+const timedSkill={name:"Timed",cost:20,gain:0,cd:0,cast:1,damage:100,threat:150};
+const timedBase={duration:10,gcd:1,cap:100,initial:100,regen:0,skills:[timedSkill]};
+const pooled=combat.simulatePriority({...timedBase,skills:[{...timedSkill,earliest:2,latest:4,reserve:60}]});
+assert.equal(pooled.events.length,2);
+assert.ok(pooled.events[0].time>=2-1e-8);
+assert.equal(pooled.events[1].after,60);
+assert.throws(()=>combat.simulatePriority({...timedBase,skills:[{...timedSkill,earliest:5,latest:2}]}));
+assert.throws(()=>combat.simulatePriority({...timedBase,skills:[{...timedSkill,reserve:101}]}));
+const onBoundary=combat.simulatePriority({...timedBase,duration:1});
+assert.equal(onBoundary.events.length,1);
+assert.equal(onBoundary.events[0].finish,1);
+const phaseRun=combat.simulatePriority({...timedBase,duration:40,regen:100});
+const phases=combat.combatPhaseMetrics(phaseRun);
+assert.equal(phases.length,3);
+assert.equal(phases.reduce((a,p)=>a+p.count,0),phaseRun.events.length);
+for(const metric of ["damage","threat","healing"])assert.ok(Math.abs(phases.reduce((a,p)=>a+p[metric]*(p.end-p.start),0)-phaseRun.totals[metric])<1e-6);
+assert.ok(phaseRun.wasted>0);
+const invalidMetrics={iterationsDone:20,raidMetrics:{parties:[{players:[{dps:{avg:10},threat:{avg:-5},chanceOfDeath:4}]}]}};
+const sanitized=combat.combatResult(invalidMetrics);
+assert.equal(sanitized.dps,10);assert.equal(sanitized.tps,null);assert.equal(sanitized.death,null);
+assert.throws(()=>combat.combatResult({...invalidMetrics,error:{type:"Error"}}));
+assert.throws(()=>combat.combatResult({...invalidMetrics,raidMetrics:{parties:{}}}));
+console.log("PASS: timed priorities, resource pooling, encounter boundary, phase conservation, overcap and invalid metric handling");
