@@ -1214,11 +1214,13 @@ function fitEmbedded(frame){
 // Local deterministic scheduling model. No inferred game coefficients or gear-to-DPS conversion.
 const combatPaths=["warrior/dps","warrior/dps","warrior/protection","paladin/holy","paladin/protection","paladin/retribution","hunter/dps","hunter/dps","hunter/dps","rogue/dps","rogue/dps","rogue/dps","priest/healer","priest/healer","priest/dps","shaman/elemental","shaman/enhancement","shaman/restoration","mage/dps","mage/dps","mage/dps","warlock/dps","warlock/dps","warlock/dps","druid/balance","druid/feralcat","druid/feralbear","druid/restoration"];
 function combatEngineURL(id){const p=/^spec-(?:[1-9]|1[0-9]|2[0-8])$/.test(String(id))?combatPaths[Number(String(id).split("-")[1])-1]:null;return p?"https://www.wowsims.com/forever/"+p+"/":null;}
-function simulatePriority(raw,reverse=false){
+function simulatePriority(raw,reverse=false,killHealth=null){
  const finite=(v,min,max)=>typeof v==="number"&&Number.isFinite(v)&&v>=min&&v<=max;
  if(!raw||!finite(raw.duration,1,600)||!finite(raw.gcd,.1,10)||!finite(raw.cap,1,1000000)||!finite(raw.initial,0,raw.cap)||!finite(raw.regen,0,100000)||!Array.isArray(raw.skills)||raw.skills.length<1||raw.skills.length>30)throw Error("戰鬥時間、資源、共用冷卻或技能數量不合法");
  const targets=raw.targets??1;
  if(!Number.isInteger(targets)||targets<1||targets>20)throw Error("目標數必須為 1–20 的整數");
+ if(killHealth!==null&&!finite(killHealth,1,1e9))throw Error("每個目標血量不合法");
+ const remaining=killHealth===null?null:Array(targets).fill(killHealth),deathTimes=Array(targets).fill(null);let overkill=0;
  const metrics=["damage","threat","healing"];
  const demand=raw.healingDemand;
  if(demand!=null&&(typeof demand!=="object"||Array.isArray(demand)||!finite(demand.initial??0,0,1e9)||!finite(demand.rate??0,0,1e7)||demand.bursts!=null&&(!Array.isArray(demand.bursts)||demand.bursts.length>30||demand.bursts.some(b=>!b||!finite(b.time,0,600)||!finite(b.amount,0,1e9)))))throw Error("治療需求參數不合法");
@@ -1255,7 +1257,7 @@ function simulatePriority(raw,reverse=false){
   for(let i=burstIndex;i<incoming.length;i++){const b=incoming[i],dt=b.time-at;if(rate>0&&missing<=rate*dt)return at+missing/rate;missing-=rate*dt+b.amount;at=b.time;if(missing<=1e-8)return at;}
   return rate>0?at+missing/rate:Infinity;
  };
- while(t<raw.duration-1e-8){
+ while(t<raw.duration-1e-8&&(!remaining||remaining.some(v=>v>0))){
   const skill=skills.find(x=>t+1e-8>=x.earliest&&t<=x.latest+1e-8&&(ready.get(x.name)||0)<=t+1e-8&&groupReady(x)<=t+1e-8&&x.cost+x.reserve<=resource+1e-8&&x.healMin<=deficit+1e-8&&t+x.cast<=raw.duration+1e-8);
   if(!skill){
    // Jump to the next real eligibility boundary rather than polling every 100 ms.
@@ -1271,18 +1273,19 @@ function simulatePriority(raw,reverse=false){
   const start=t,before=resource;resource=Math.max(0,resource-skill.cost);advance(Math.min(raw.duration,t+skill.cast));wasted+=Math.max(0,resource+skill.gain-raw.cap);resource=Math.min(raw.cap,resource+skill.gain);
   ready.set(skill.name,t+skill.cd);
   if(skill.group)groups.set(skill.group,t+skill.groupCd);
-  const hits=Math.min(targets,skill.targetCap),buffs=buffsAt(t);
+  const hitIds=Array.from({length:targets},(_,i)=>i).filter(i=>!remaining||remaining[i]>0).slice(0,skill.targetCap),hits=hitIds.length,buffs=buffsAt(t);
   const multiplier=k=>buffs.reduce((n,b)=>n*b[k],1);
   const perDamage=skill.damage*multiplier("damage"),perThreat=skill.threat*multiplier("threat");
-  const delta={damage:perDamage*hits,threat:perThreat*hits,healing:skill.healing*multiplier("healing")};
+  let applied=0,excess=0;for(const i of hitIds){const amount=remaining?Math.min(remaining[i],perDamage):perDamage;applied+=amount;excess+=perDamage-amount;targetThreat[i]+=perThreat;targetDamage[i]+=amount;if(remaining){remaining[i]=Math.max(0,remaining[i]-amount);if(remaining[i]===0)deathTimes[i]=t;}}overkill+=excess;
+  const delta={damage:applied,threat:perThreat*hits,healing:skill.healing*multiplier("healing")};
   for(const k of metrics)totals[k]+=delta[k];
   const healed=demand?Math.min(deficit,delta.healing):0;if(demand){deficit-=healed;effective+=healed;overheal+=delta.healing-healed;}
-  for(let i=0;i<hits;i++){targetThreat[i]+=perThreat;targetDamage[i]+=perDamage;}
-  events.push({time:start,finish:t,name:skill.name,before,after:resource,...totals,delta,hits,buffs:buffs.map(b=>b.name),effective:healed,deficit:demand?deficit:null});
+  events.push({time:start,finish:t,name:skill.name,before,after:resource,...totals,delta,hits,buffs:buffs.map(b=>b.name),effective:healed,deficit:demand?deficit:null,...(remaining?{hitIds,overkill:excess,remaining:[...remaining]}:{})});
   if(skill.buff)active.set(skill.buff.name,{...skill.buff,end:t+skill.buff.duration});
+  if(remaining&&remaining.every(v=>v===0))break;
   advance(Math.min(raw.duration,Math.max(t,start+raw.gcd)));
  }
- return {duration:raw.duration,targets,targetThreat,targetDamage,events,totals,idle,wasted,healingDemand:demand?{incoming:incomingTotal,effective,overheal,deficit,peakDeficit}:null,rate:{...Object.fromEntries(Object.entries(totals).map(([k,v])=>[k,v/raw.duration])),...(demand?{effective:effective/raw.duration}:{})}};
+ return {duration:raw.duration,targets,targetThreat,targetDamage,events,totals,idle,wasted,...(remaining?{kill:{health:killHealth,remaining,deathTimes,overkill,elapsed:t,cleared:remaining.every(v=>v===0),killTime:remaining.every(v=>v===0)?t:null}}:{}),healingDemand:demand?{incoming:incomingTotal,effective,overheal,deficit,peakDeficit}:null,rate:{...Object.fromEntries(Object.entries(totals).map(([k,v])=>[k,v/raw.duration])),...(demand?{effective:effective/raw.duration}:{})}};
 }
 function combatBestPriority(raw,metric,mode="total"){
  if(!["damage","threat","healing","effective"].includes(metric)||metric==="effective"&&!raw?.healingDemand||!["total","weakest"].includes(mode))throw Error("未知最佳化目標");
@@ -1496,6 +1499,18 @@ function combatGuildScenario(request,id,key){
  result.encounter={apiVersion:result.encounter.apiVersion??2,duration:cfg.duration,durationVariation:0,executeProportion20:.2,executeProportion35:.35,targets:Array.from({length:cfg.count},(_,i)=>({name:cfg.label+" "+(i+1),level:cfg.level,mobType:"MobTypeUnknown",stats:[...stats],minBaseDamage:cfg.level===63?1000:300,damageSpread:0,swingSpeed:2,tankIndex:tank?0:-1,canCrush:cfg.level===63,parryHaste:false}))};
  for(const k of Object.keys(result.raid.debuffs||{}))if(/sunder|exposeArmor|faerieFire|curseOfRecklessness|curseOfElements|curseOfShadow|armor|resistance/i.test(k))delete result.raid.debuffs[k];
  return result;
+}
+function combatGuildKill(raw,key,maxSeconds=600){
+ const cfg=guildScenarios[key];if(!cfg||!Number.isFinite(maxSeconds)||maxSeconds<1||maxSeconds>600)throw Error("公會目標或時間上限不合法");
+ const data={...raw,targets:cfg.count,duration:maxSeconds};
+ const original=simulatePriority(data,false,cfg.health),reverse=simulatePriority(data,true,cfg.health);
+ const better=(a,b)=>Number(b.kill.cleared)-Number(a.kill.cleared)||(a.kill.cleared?a.kill.killTime-b.kill.killTime:b.totals.damage-a.totals.damage)||a.kill.overkill-b.kill.overkill;
+ let best=null,count=0;
+ if(Array.isArray(data.skills)&&data.skills.length<=5){
+  const visit=(prefix,left)=>{if(!left.length){const r=simulatePriority({...data,skills:prefix},false,cfg.health);count++;if(!best||better(r,best.result)<0)best={result:r,order:prefix.map(x=>x.name)};return;}for(let i=0;i<left.length;i++)visit([...prefix,left[i]],left.filter((_,j)=>j!==i));};
+  visit([],data.skills);best.count=count;
+ }
+ return {original,reverse,best,scenario:cfg};
 }
 function combatScenarioRequest(request,id,options={}){
  const result=options.guild?combatGuildScenario(request,id,options.guild):JSON.parse(JSON.stringify(request));combatRequestPlayer(result,id);
@@ -1762,6 +1777,16 @@ function combatLab(){
   for(const [label,r] of rows){const h=r.healingDemand,part=box(c,label,"有效 HPS "+r.rate.effective.toFixed(2)+" ｜ 原始 HPS "+r.rate.healing.toFixed(2)+" ｜ 最終缺口 "+h.deficit.toFixed(1));combatPhaseView(part,r);const d=node("details"),p=node("pre");p.className="gt-combat-log";p.textContent=r.events.map(e=>e.time.toFixed(2)+"s → "+e.finish.toFixed(2)+"s ｜ "+e.name+" ｜ 有效補量 "+e.effective.toFixed(1)+" ｜ 缺口 "+e.deficit.toFixed(1)+" ｜ 資源 "+e.after.toFixed(1)).join("\n");add(d,node("summary","治療施放時間軸"),p);part.append(d);}
   status.textContent="完成治療策略比較；不代表實際首領治療量或最佳裝備。";
  }catch(e){status.textContent="試算失敗："+e.message;}});
+ const killPick=select(Object.entries(guildScenarios).map(([k,v])=>[k,v.label])),killLimit=select([["60","60秒"],["120","120秒"],["180","180秒"],["300","300秒"],["600","600秒"]]);killLimit.value="600";
+ const killRun=button("比較公會目標擊殺時間（自訂模型）",()=>{modelResult.replaceChildren();try{
+  const result=combatGuildKill(combatReadJSON(raw.value),killPick.value,Number(killLimit.value)),c=box(modelResult,"目標血量與轉火比較","自訂每次命中傷害；扣血至0後移除目標、順序轉火、全部死亡立即停止。未模擬真實遊戲命中、斬殺、DoT、護甲或抗性；不代表原生實測。");
+  for(const [label,r] of [["A：原優先序",result.original],["B：反轉優先序",result.reverse],...(result.best?[["本模型最佳："+result.best.order.join(" → "),result.best.result]]:[])]){
+   const k=r.kill,part=box(c,label,k.cleared?"全部擊殺："+k.killTime.toFixed(2)+" 秒":"未擊殺全部 ｜ 上限 "+k.elapsed.toFixed(2)+" 秒");
+   add(part,node("p","有效傷害 "+r.totals.damage.toFixed(0)+" ｜ 溢出傷害 "+k.overkill.toFixed(0)+" ｜ 剩餘血量 "+k.remaining.reduce((a,b)=>a+b,0).toFixed(0)));
+   for(let i=0;i<k.remaining.length;i++)part.append(node("p","目標 "+(i+1)+" ｜ "+(k.deathTimes[i]===null?"剩餘 "+k.remaining[i].toFixed(0)+" HP":"擊殺 "+k.deathTimes[i].toFixed(2)+"s")));
+   const log=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=r.events.map(e=>e.finish.toFixed(2)+"s ｜ "+e.name+" ｜ 命中 "+e.hitIds.map(i=>i+1).join("、")+" ｜ 剩餘 "+e.remaining.map(v=>v.toFixed(0)).join(" / ")).join("\n");add(log,node("summary","擊殺與轉火時間軸"),pre);part.append(log);
+  }status.textContent="假設模型："+(result.best?"已比較 "+result.best.count+" 種固定優先序。":"超過5技能，僅比較A/B。");
+ }catch(e){status.textContent="試算失敗："+e.message;}});
  const timingSkill=inp("完整技能名稱；留空則使用第一個技能");
  const objectiveLabel=()=>({damage:"DPS",threat:"TPS",healing:"HPS"})[objective.value];
  const durationSweep=button("比較 30／60／120／180 秒",()=>{modelResult.replaceChildren();try{
@@ -1781,7 +1806,7 @@ function combatLab(){
   const d=node("details"),pre=node("pre");pre.className="gt-combat-log";pre.textContent=t.best.result.events.map(e=>e.time.toFixed(2)+"s → "+e.finish.toFixed(2)+"s ｜ "+e.name+" ｜ 資源 "+e.before.toFixed(1)+" → "+e.after.toFixed(1)).join("\n");add(d,node("summary","本組最佳施放時間軸"),pre);c.append(d);
   status.textContent="只測試列出的延後秒數；不代表全域最優，增益僅使用自行輸入的假設倍率。";
  }catch(e){status.textContent="試算失敗："+e.message;}});
- add(local,button("載入純教學範例（非遊戲數值）",()=>{raw.value=JSON.stringify(demo,null,2);modelResult.replaceChildren();status.textContent="這是假設數值，請勿視為目前專精的實際數據。";}),button("載入群體／增益教學範例（非遊戲數值）",()=>{raw.value=JSON.stringify(advancedDemo,null,2);modelResult.replaceChildren();status.textContent="假設的目標數及增益倍率，不代表實際職業技能。";}),button("載入治療教學範例（非遊戲數值）",()=>{raw.value=JSON.stringify(healingDemo,null,2);modelResult.replaceChildren();status.textContent="合併缺口與補量皆是假設數值，可自行修改。";}),raw,run,field("最佳化目標",objective),optimize,durationSweep,healingRun,field("多目標比較指標",targetMode),targetSweep,field("延後測試技能",timingSkill),timingSweep,status,modelResult);
+ add(local,button("載入純教學範例（非遊戲數值）",()=>{raw.value=JSON.stringify(demo,null,2);modelResult.replaceChildren();status.textContent="這是假設數值，請勿視為目前專精的實際數據。";}),button("載入群體／增益教學範例（非遊戲數值）",()=>{raw.value=JSON.stringify(advancedDemo,null,2);modelResult.replaceChildren();status.textContent="假設的目標數及增益倍率，不代表實際職業技能。";}),button("載入治療教學範例（非遊戲數值）",()=>{raw.value=JSON.stringify(healingDemo,null,2);modelResult.replaceChildren();status.textContent="合併缺口與補量皆是假設數值，可自行修改。";}),raw,run,field("最佳化目標",objective),optimize,durationSweep,healingRun,field("多目標比較指標",targetMode),targetSweep,field("公會擊殺目標",killPick),field("擊殺測試時間上限",killLimit),killRun,field("延後測試技能",timingSkill),timingSweep,status,modelResult);
 }
 function talentHub(){
  title("天賦流派與野外練等","使用首頁的職業、專精與玩法選單，直接查看天賦及練等。");
