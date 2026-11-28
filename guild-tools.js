@@ -634,10 +634,12 @@ function gearArmorEligible(cls,subclass,p){
 }
 function gearCrossArmor(cls,x){return x.item_class==="Armor"&&Object.hasOwn(gearArmorTier,x.subclass)&&gearArmorTier[x.subclass]<gearArmorMax[cls]&&!["Back"].includes(x.slot);}
 function gearCatalogEligible(spec,x,prof,position=""){
+ if(!x||typeof x!=="object"||Array.isArray(x))return false;
  if(String(x.id)==="2915"&&(x.slot!=="Two-Hand"||x.subclass!=="Two-Handed Mace"))return false;
- const index=gearClassIndex(spec.id);if(index<0)return false;const cls=gearCatalogClasses[index],bit=1<<(gearClassBits[index]-1),p=prof[cls]||prof[cls?.toLowerCase()];
- if(!p||!gearSlotNames[x.slot]||Number(x.required_level||0)>60||!["Weapon","Armor"].includes(x.item_class))return false;
- const mask=Number(x.class_mask??-1);if(mask!==-1&&mask!==0&&!(mask&bit))return false;
+ const index=gearClassIndex(spec?.id);if(index<0)return false;const cls=gearCatalogClasses[index],bit=1<<(gearClassBits[index]-1),p=prof?.[cls]||prof?.[cls?.toLowerCase()];
+ const required=Number(x.required_level??0),mask=Number(x.class_mask??-1);
+ if(!p||!gearSlotNames[x.slot]||!Number.isInteger(required)||required<0||required>60||!["Weapon","Armor"].includes(x.item_class))return false;
+ if(!Number.isSafeInteger(mask)||mask< -1||mask>4294967295||mask!==-1&&mask!==0&&!(mask&bit))return false;
  // The API's proficiency list is explicitly Classic-era; Forever added rogue axes and druid polearms.
  if(x.item_class==="Weapon"&&!p.weapons?.includes(x.subclass)&&!(cls==="Druid"&&x.subclass==="Polearm")&&!(cls==="Rogue"&&x.subclass==="One-Handed Axe"))return false;
  if(x.item_class==="Weapon"&&x.slot==="Off Hand"&&!["Warrior","Hunter","Rogue"].includes(cls))return false;
@@ -651,15 +653,15 @@ function gearCatalogEligible(spec,x,prof,position=""){
  return main||off;
 }
 function catalogSourceTypes(x){
- const raw=x?.source_types,values=Array.isArray(raw)?raw:typeof raw==="string"?raw.split(/[,;|\s]+/):[];
- return new Set(values.filter(v=>typeof v==="string").map(v=>v.trim().toLowerCase()).filter(Boolean));
+ const raw=x?.source_types,values=Array.isArray(raw)?raw:typeof raw==="string"?raw.replace(/\bworld\s+drop\b/gi,"world_drop").split(/[,;|\s]+/):[];
+ return new Set(values.filter(v=>typeof v==="string").map(v=>v.trim().toLowerCase().replace(/^world\s+drop$/,"world_drop")).filter(Boolean));
 }
 function gearCatalogTags(x){
  const src=String(x.source_summary||""),rep=String(x.required_reputation||""),bond=String(x.bonding||""),types=catalogSourceTypes(x),tags=[];
  if(/world.drop|世界掉落/i.test(src)||types.has("world_drop")||types.has("world-drop"))tags.push("世界掉落");
  if(/binds when equipped|\bboe\b|裝備(?:後)?綁定|装绑/i.test(bond))tags.push("裝綁");
  if(/craft|製作|制作/i.test(src)||types.has("crafted"))tags.push("製作");
- if(rep&&rep!=="0"&&rep!=="[]"||/reputation|exalted|revered|honored|聲望|崇拜|崇敬/i.test(src)||types.has("reputation"))tags.push("聲望");
+ if(catalogHasEffect(x.required_reputation)||/reputation|exalted|revered|honored|聲望|崇拜|崇敬/i.test(src)||types.has("reputation"))tags.push("聲望");
  if(questSourceText(src)||types.has("quest"))tags.push("任務");
  if(/vendor|商人|購買|兌換/i.test(src)||types.has("vendor"))tags.push("商人");
  if((/drop|掉落/i.test(src)||types.has("drop"))&&!tags.includes("世界掉落"))tags.push("掉落");
@@ -679,18 +681,19 @@ function catalogWeightCoverage(weights){
  return Object.entries(weights||{}).filter(([k,v])=>Number.isFinite(v)&&v>0&&!labels.has(k)).map(([k])=>k);
 }
 function catalogWeightScore(x,weights){
- let total=0,used=0;const parts=[];
+ let total=0,used=0,incomplete=false;const parts=[];
  for(const [field,label] of Object.entries(catalogWeightFields)){
   const weight=weights?.[label];if(!Number.isFinite(weight)||weight<=0)continue;
-  const value=Number(x[field]??0);if(!Number.isFinite(value))continue;
+  const raw=x[field],value=Number(raw??0);
+  if(raw!=null&&!(typeof raw==="number"||typeof raw==="string"&&raw.trim()!==""&&/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw.trim()))||!Number.isFinite(value)||!Number.isFinite(value*weight)){incomplete=true;continue;}
   used++;total+=value*weight; if(value)parts.push({label,value,weight});
  }
- return {total,used,parts};
+ return {total,used,parts,incomplete:incomplete||!Number.isFinite(total)};
 }
 function catalogSameSlot(a,b){return !!a&&!!b&&!!gearSlotNames[a.slot]&&gearSlotNames[a.slot]===gearSlotNames[b.slot];}
 function catalogCandidateIds(spec){return new Set([...expandCandidateSlots(spec).values()].flat().filter(x=>allowed(spec.id,x)).map(x=>String(x.id)));}
 function catalogCandidateFilter(x,knownIds,mode){return mode==="new"?!knownIds.has(String(x.id)):mode==="known"?knownIds.has(String(x.id)):true;}
-function catalogSourceRecorded(x){return !!x&&!x.catalogConflict&&!Number(x.estimated)&&(typeof x.source_summary==="string"&&!!x.source_summary.trim()||[...catalogSourceTypes(x)].some(k=>["quest","drop","vendor","object","crafted","container","world_drop","world-drop","reputation"].includes(k)));}
+function catalogSourceRecorded(x){return !!x&&!x.catalogConflict&&!Number(x.estimated)&&(typeof x.source_summary==="string"&&catalogHasEffect(x.source_summary)||[...catalogSourceTypes(x)].some(k=>["quest","drop","vendor","object","crafted","container","world_drop","world-drop","reputation"].includes(k)));}
 function normalizeGearCatalog(d){
  const map=new Map();let invalid=0,duplicates=0,conflicts=0;
  for(const row of d.items){
@@ -736,7 +739,7 @@ function catalogHasEffect(value){
  if(value==null||value===false||value===0)return false;
  if(Array.isArray(value))return value.some(catalogHasEffect);
  if(typeof value==="object")return Object.values(value).some(catalogHasEffect);
- return !["","0","[]","{}","null"].includes(String(value).trim());
+ return !["","0","[]","{}","null","false","none","n/a","unknown","待查","無"].includes(String(value).trim().toLowerCase());
 }
 function catalogHasSpecial(x){return !!catalogSetName(x)||catalogHasEffect(x.effects)||catalogHasEffect(x.other_stats);}
 function catalogPlanSourceAllowed(x,options={}){
@@ -764,7 +767,7 @@ function catalogSetPools(spec,records,prof,weights,options={}){
   const slot=gearSlotNames[x.slot],id=String(x.id??"");
   if(!id||seen.has(id)||!pools.has(slot)||!catalogPlanSourceAllowed(x,options)||!gearCatalogEligible(spec,x,prof)||Number(x.quality||0)<Number(options.minQuality||0))continue;
   if(options.excludeEffects&&catalogHasSpecial(x))continue;
-  const score=catalogWeightScore(x,weights);if(!score.used||!Number.isFinite(score.total))continue;
+  const score=catalogWeightScore(x,weights);if(!score.used||score.incomplete||!Number.isFinite(score.total))continue;
   seen.add(id);pools.get(slot).push({item:x,score});
  }
  for(const rows of pools.values())rows.sort((a,b)=>b.score.total-a.score.total||Number(a.item.id)-Number(b.item.id));
@@ -917,9 +920,10 @@ function nativeSetUncertainty(a,b,metric){
 function nativeSetComparison(trial,role){
  if(!trial||!Array.isArray(trial.cases)||!["tank","dps","heal"].includes(role))return null;
  const metric=role==="tank"?"tps":role==="heal"?"hps":"dps";
- const valid=c=>c&&Number.isInteger(c.pieces)&&c.pieces>=0&&c.pieces<=14&&Number.isFinite(c.duration)&&c.duration>0&&Number.isFinite(c.metrics?.[metric])&&c.metrics[metric]>=0;
- const baselines=trial.cases.filter(c=>valid(c)&&c.pieces===0);if(baselines.length!==1)return null;const baseline=baselines[0];
- const counts=new Map();for(const c of trial.cases.filter(valid))counts.set(c.pieces,(counts.get(c.pieces)||0)+1);
+ const validCount=c=>c&&Number.isInteger(c.pieces)&&c.pieces>=0&&c.pieces<=14;
+ const valid=c=>validCount(c)&&Number.isFinite(c.duration)&&c.duration>0&&Number.isFinite(c.metrics?.[metric])&&c.metrics[metric]>0;
+ const baselines=trial.cases.filter(c=>validCount(c)&&c.pieces===0);if(baselines.length!==1||!valid(baselines[0]))return null;const baseline=baselines[0];
+ const counts=new Map();for(const c of trial.cases.filter(validCount))counts.set(c.pieces,(counts.get(c.pieces)||0)+1);
  const rows=trial.cases.filter(c=>valid(c)&&c.pieces>0&&counts.get(c.pieces)===1&&Math.abs(c.duration-baseline.duration)<1e-6&&(c.iterations==null&&baseline.iterations==null||Number.isInteger(c.iterations)&&c.iterations>0&&c.iterations===baseline.iterations)).sort((a,b)=>a.pieces-b.pieces).map(c=>{
   const delta=c.metrics[metric]-baseline.metrics[metric];
   const survival=role==="tank"?(["dtps","death"].every(k=>[c.metrics[k],baseline.metrics[k]].every(v=>Number.isFinite(v)&&v>=0&&(k!=="death"||v<=1)))?c.metrics.dtps<=baseline.metrics.dtps+1e-8&&c.metrics.death<=baseline.metrics.death+1e-8:null):true;
@@ -989,7 +993,7 @@ function catalogWeaponScore(x,position,weights){
   if(!Number.isFinite(value)||value<=0||Number(x.dps_approx))return {...score,incomplete:true};
   score.total+=value*weight;score.parts.push({label,value,weight});score.used++;
  }
- return {...score,incomplete:false};
+ return {...score,incomplete:score.incomplete||!Number.isFinite(score.total)};
 }
 function catalogRankableWeights(weights){
  return [...Object.values(catalogWeightFields),...Object.values(catalogDpsKeys),"武器DPS"].some(k=>Number.isFinite(weights?.[k])&&weights[k]>0);
@@ -1261,7 +1265,7 @@ function gearCatalogView(spec){
  list.append(node("p",rows.length+" 件候選；"+(weighted?"依部分已儲存權重排序（非完整BiS）。":"依單項數值排序，非專精BiS。"),"gt-muted"));
  for(const x of rows.slice(0,limit)){const c=node("article",undefined,"gt-card");add(c,add(node("div",undefined,"gt-item-heading"),itemIcon(x.id),link((globalThis.GTLocale?.item(x.id,x.name)||x.name)+"（ID "+x.id+"）","https://www.wowhead.com/forever/tw/item="+x.id)),node("p",(sl.value==="副手"&&x.slot==="One-Hand"?"副手可用（通用單手）":gearSlotNames[x.slot])+"｜"+gearType(x)+(gearCrossArmor(cls,x)?"（跨甲）":"")+"｜"+gearCatalogTags(x).join("・")+"｜"+(Number(x.estimated)?"經典推定":"客戶端資料；取得狀態待逐件確認"),"gt-muted"),node("p",x.source_summary||(catalogSourceRecorded(x)?"結構化來源："+gearCatalogTags(x).join("、")+"（詳細來源待核）":"取得來源待查")));
  const stats=Object.entries(gearStatNames).filter(([k])=>Number(x[k])).map(([k,v])=>v+" "+x[k]);if(x.dps)stats.unshift("武器DPS "+x.dps+(Number(x.dps_approx)?"（估算）":""));if(stats.length)c.append(node("p",stats.join(" · ")));
- if(weighted){const score=scoreCache.get(x);c.append(node("p",score.rankable?"部分面板試算："+score.total.toFixed(2)+"｜"+score.parts.map(v=>v.label+" "+v.value+" × "+v.weight).join("；"):!catalogSourceRecorded(x)?"來源或數值待核，不列入有效順位":score.incomplete?"缺可核對的武器DPS，不列入有效順位":"未取得正分，不列入有效順位（仍保留特殊效果供研究）","gt-muted"));}
+ if(weighted){const score=scoreCache.get(x);c.append(node("p",score.rankable?"部分面板試算："+score.total.toFixed(2)+"｜"+score.parts.map(v=>v.label+" "+v.value+" × "+v.weight).join("；"):!catalogSourceRecorded(x)?"來源或數值待核，不列入有效順位":score.incomplete?"面板屬性或武器DPS資料不完整，不列入有效順位":"未取得正分，不列入有效順位（仍保留特殊效果供研究）","gt-muted"));}
  const qualityLabel=["粗糙","普通","優良","精良","史詩","傳說","神器","傳家寶"][Number(x.quality)]||"品質待查";
  add(c,node("p",qualityLabel+"｜需求等級 "+(x.required_level||"未標示")+"｜物品等級 "+(x.item_level||"未標示")+(x.bonding?"｜"+x.bonding:"")+(Number(x.is_unique)?"｜唯一限制（詳見物品提示）":"")+(knownIds.has(String(x.id))?"｜已在本站候選":"｜尚未納入本站候選"),"gt-muted"));
  if(x.speed)add(c,node("p","速度 "+x.speed+" 秒"+(x.min_damage&&x.max_damage?"｜傷害 "+x.min_damage+"–"+x.max_damage:""),"gt-muted"));
