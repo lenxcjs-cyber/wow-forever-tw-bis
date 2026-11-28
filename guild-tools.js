@@ -782,6 +782,46 @@ function loadSetEffects(){
  if(!setEffectsPromise)setEffectsPromise=fetch("set-effects.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("套裝資料未生成");return r.json();}).then(d=>d?.commit===combatPresetCommit&&Array.isArray(d.sets)?d.sets:[]).catch(()=>[]);
  return setEffectsPromise;
 }
+function nativeSetComparison(trial,role){
+ if(!trial||!Array.isArray(trial.cases)||!["tank","dps","heal"].includes(role))return null;
+ const metric=role==="tank"?"tps":role==="heal"?"hps":"dps";
+ const valid=c=>c&&Number.isInteger(c.pieces)&&c.pieces>=0&&c.pieces<=14&&Number.isFinite(c.duration)&&c.duration>0&&Number.isFinite(c.metrics?.[metric])&&c.metrics[metric]>=0;
+ const baseline=trial.cases.find(c=>valid(c)&&c.pieces===0);if(!baseline)return null;
+ const rows=trial.cases.filter(c=>valid(c)&&c.pieces>0&&Math.abs(c.duration-baseline.duration)<1e-6).sort((a,b)=>a.pieces-b.pieces).map(c=>{
+  const delta=c.metrics[metric]-baseline.metrics[metric];
+  const survival=role==="tank"?(["dtps","death"].every(k=>Number.isFinite(c.metrics[k])&&Number.isFinite(baseline.metrics[k]))?c.metrics.dtps<=baseline.metrics.dtps+1e-8&&c.metrics.death<=baseline.metrics.death+1e-8:null):true;
+  return {...c,delta,percent:baseline.metrics[metric]>0?100*delta/baseline.metrics[metric]:null,win:delta>1e-8&&survival===true,survival};
+ });
+ return {metric,baseline,rows,firstWin:rows.find(x=>x.win)?.pieces??null};
+}
+let nativeSetTrialsPromise=null;
+function nativeSetTrialView(parent,id){
+ const c=box(parent,"套裝效果原生實戰比較","比較同一目標、技能策略、天賦與團隊條件的0件散裝對照與各已登錄套裝門檻；原生引擎自動計入已實作效果。");
+ if(!nativeSetTrialsPromise)nativeSetTrialsPromise=fetch("set-trials.json",{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json();}).then(d=>{if(d?.commit!==combatPresetCommit||!Array.isArray(d.trials))throw Error("版本不符");return d;}).catch(()=>null);
+ nativeSetTrialsPromise.then(data=>{
+  if(!c.isConnected)return;
+  const trials=data?.trials.filter(t=>t?.spec===id)||[];
+  if(!trials.length){c.append(node("p","此專精尚無已產出的原生套裝對照；不以假設收益判定 BiS。","gt-muted"));return;}
+  const role=combatRole(id);
+  for(const t of trials){
+   const d=node("details");d.append(node("summary",zhDisplay(t.setName||"未知套裝")+" ｜ "+(guildScenarios[t.scenario]?.label||t.scenario)));
+   const result=nativeSetComparison(t,role);
+   add(d,node("p","引擎登錄件數："+(Array.isArray(t.thresholds)?t.thresholds.join("／"):"未知")+" ｜ 基準："+(t.baseLabel||"")+"。散件與套裝候選以同部位、同護甲類型及接近物品等級選取；換裝位置的附魔均清除，非全目錄最優。","gt-muted"));
+   if(typeof t.source==="string"&&/^sim\/[a-zA-Z0-9_/.]+\.go$/.test(t.source)&&!t.source.includes(".."))d.append(link("套裝原生效果實作","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+t.source));
+   if(!result)d.append(node("p","0件基準尚未成功，不能判定勝負。","gt-muted"));
+   else{
+    const m=result.metric.toUpperCase();
+    const line=(x,label)=>{const part=node("p",label+" ｜ "+m+" "+x.metrics[result.metric].toFixed(2)+(role==="tank"&&Number.isFinite(x.metrics.dtps)?" ｜ DTPS "+x.metrics.dtps.toFixed(2):"")+(role==="tank"&&Number.isFinite(x.metrics.death)?" ｜ 死亡 "+(100*x.metrics.death).toFixed(1)+"%":""));d.append(part);const path=combatRequestPath(x.requestFile,id);if(path)d.append(link("下載完整 "+label+" 請求",path));};
+    line(result.baseline,"0件散裝對照");
+    for(const x of result.rows){line(x,x.pieces+"件");d.append(node("p","相較0件 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+" "+m+(x.percent!==null?"（"+x.percent.toFixed(2)+"%）":"")+(x.win?"；本組勝出":role==="tank"&&x.delta>0?"；生存未同時勝出或資料不足":"；未勝出"),"gt-muted"));}
+    d.append(node("p",result.firstWin===null?"目前成功的門檻尚未證明勝過0件對照。":"本次已測門檻中，最少 "+result.firstWin+" 件勝過0件對照。不是所有可能散件的全域 BiS。","gt-muted"));
+   }
+   if(Array.isArray(t.failed)&&t.failed.length)d.append(node("p","未成功："+t.failed.map(x=>x.pieces+"件").join("、"),"gt-muted"));
+   c.append(d);
+  }
+ });
+ return c;
+}
 function catalogSetTradeoff(base,alternative,netBonus=null){
  if(!Number.isFinite(base)||!Number.isFinite(alternative)||!Number.isFinite(base-alternative))return null;
  const gap=base-alternative;
@@ -1151,6 +1191,7 @@ function audit(){
  const research=node("details",undefined,"gt-card gt-audit-research"),tools=node("details",undefined,"gt-card gt-audit-tools");
  add(research,node("summary","配裝研究與資料核對"),bisReasonView(spec),...(spec.id==="spec-26"?[feralSetView(spec)]:[]),...(spec.id==="spec-26"&&feralWeaponMode(spec.id)==="twohand"?[catWeaponResearch(spec)]:[]),communityEvidenceView(spec,slots),candidateAuditView(spec,slots),candidateDataCoverageView(all),excludedDetails,node("p","構築排除 "+excluded.length+" 筆不適用候選。","gt-muted"),metrics,progress,node("p","完整度僅統計已列部位及文字資料，不代表已驗證。","gt-muted"));
  const armorPlan=catalogArmorPlanView(spec,()=>weaponMode.value||"auto");add(tools,node("summary","進階配裝與全裝備查詢"),armorPlan,gearCatalogView(spec),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]));
+ nativeSetTrialView(panel,spec.id);
  add(panel,workspace,node("p",(model?"排序："+(model.source||"本機權重")+"（部分面板試算）":"排序：既有候選及外部攻略，非實戰BiS。")+(omittedFeralWeights(spec.id,saved?.weights).length?" 野性武器DPS未計入。":""),"gt-muted"),button("前往實戰模擬／配裝 JSON 匯出",()=>show("combat")),tools,research);draw();attachLegacy(spec);
 }
 function talentPageURL(embedded=false){
@@ -1602,7 +1643,7 @@ function combatLab(){
  if(url)engine.append(link("開啟對應職業模擬器",url));
  add(engine,link("WoWSims 開源引擎（MIT）","https://github.com/wowsims/forever"),node("p","請在引擎內設定裝備、天賦、種族、附魔、消耗品、團隊增益、敵人數、戰鬥時間及技能優先序（APL）。用相同遭遇與迭代條件比較方案；查看戰鬥紀錄／時間軸。可在下方匯出候選配裝及替換原生請求；本站不即時代跑個人外部引擎。","gt-muted"));
  const standards=box(panel,"公會標準實戰目標","三種情境使用零基礎護甲與抗性，非坦克背後攻擊，坦克正面。首領暫定63級。");for(const x of Object.values(guildScenarios))standards.append(node("p",x.label+" ｜ "+x.count+" 個目標 ｜ 每隻 "+x.health.toLocaleString("zh-TW")+" HP ｜ 固定 "+x.duration+" 秒"));standards.append(node("p","原生引擎以時間結束，血量不是停止條件；血量／平均DPS只能估算擊殺時間。60／180秒及坦克受擊設定為本站暫定測試條件。","gt-muted"));
- const loadGearTemplate=combatGearView(panel,id,build);
+ const loadGearTemplate=combatGearView(panel,id,build);nativeSetTrialView(panel,id);
  const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
  fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
   if(!presets.isConnected)return;if(!combatSnapshotValid(data))throw Error("版本或快照格式不符");const cases=combatPresetCases(data,id);presets.replaceChildren(node("h4","開源引擎實跑預設案例"));combatCoverageView(presets,data);
