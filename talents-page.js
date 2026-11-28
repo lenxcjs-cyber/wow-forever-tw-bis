@@ -63,16 +63,26 @@ function questPath(cls,plan){
  }
  return steps;
 }
-function validateClass(cls){return !!cls&&Array.isArray(cls.talents)&&cls.talents.length>30&&Array.isArray(cls.trees)&&cls.trees.length===3&&Array.isArray(cls.arrows)&&cls.talents.every(t=>Number.isInteger(t.id)&&Number.isInteger(t.tree)&&t.tree>=0&&t.tree<=2&&Number.isInteger(t.maxRank)&&t.maxRank>0&&Number.isFinite(t.pointsInTreeRequired)&&Number.isInteger(t.column)&&Number.isInteger(t.row))&&cls.arrows.every(a=>cls.talents.some(t=>String(t.id)===String(a.from))&&cls.talents.some(t=>String(t.id)===String(a.to)));}
+function validateClass(cls){
+ if(!cls||!Array.isArray(cls.talents)||cls.talents.length<=30||!Array.isArray(cls.trees)||cls.trees.length!==3||!Array.isArray(cls.arrows)||!cls.trees.every(t=>t&&Number.isInteger(t.index)&&t.index>=0&&t.index<=2)||new Set(cls.trees.map(t=>t.index)).size!==3)return false;
+ if(!cls.talents.every(t=>t&&Number.isSafeInteger(t.id)&&t.id>0&&typeof t.name==="string"&&t.name.trim()&&Number.isInteger(t.tree)&&t.tree>=0&&t.tree<=2&&Number.isInteger(t.maxRank)&&t.maxRank>0&&Number.isInteger(t.pointsInTreeRequired)&&t.pointsInTreeRequired>=0&&Number.isInteger(t.column)&&Number.isInteger(t.row)&&t.column>=1&&t.row>=1))return false;
+ const ids=new Map(cls.talents.map(t=>[String(t.id),t]));
+ if(ids.size!==cls.talents.length||new Set(cls.talents.map(t=>t.tree+":"+t.name.toLowerCase())).size!==cls.talents.length)return false;
+ if(!cls.arrows.every(a=>a&&ids.has(String(a.from))&&ids.has(String(a.to))&&String(a.from)!==String(a.to)))return false;
+ // A circular required dependency can never be allocated legally.
+ const required=new Map();for(const a of cls.arrows)if(a.required!==false){const k=String(a.to);if(!required.has(k))required.set(k,[]);required.get(k).push(String(a.from));}
+ const visiting=new Set(),done=new Set();function acyclic(k){if(visiting.has(k))return false;if(done.has(k))return true;visiting.add(k);if(!(required.get(k)||[]).every(acyclic))return false;visiting.delete(k);done.add(k);return true;}
+ return [...ids.keys()].every(acyclic);
+}
 function mapBuild(cls,profile){
- const ranks={},issues=[];if(!profile.talents)return {ranks,issues:["此構築尚無逐項配點資料。"],complete:false};
- for(const [tree,entries] of profile.talents.entries())for(const [name,n] of Object.entries(entries)){const t=cls.talents.find(x=>x.tree===tree&&x.name.toLowerCase()===name.toLowerCase());if(!t){issues.push(name+"：新版同系找不到此天賦");continue;}ranks[t.id]=n;if(!Number.isInteger(n)||n<1||n>t.maxRank||t.notYetAvailable)issues.push(name+"：參考 "+n+" 點，現版上限 "+t.maxRank+" 或尚未開放");}
+ const ranks={},issues=[];if(!Array.isArray(profile?.talents)||profile.talents.length!==3||profile.talents.some(t=>!t||typeof t!=="object"||Array.isArray(t)))return {ranks,issues:["此構築尚無完整三系逐項配點資料。"],complete:false};
+ for(const [tree,entries] of profile.talents.entries())for(const [name,n] of Object.entries(entries)){const t=cls.talents.find(x=>x.tree===tree&&x.name.toLowerCase()===name.toLowerCase());if(!t){issues.push(name+"：新版同系找不到此天賦");continue;}if(Object.hasOwn(ranks,t.id)){issues.push(name+"：同一天賦被重複指定");continue;}if(!Number.isInteger(n)||n<1){issues.push(name+"：點數格式不合法");continue;}ranks[t.id]=n;if(n>t.maxRank||t.notYetAvailable)issues.push(name+"：參考 "+n+" 點，現版上限 "+t.maxRank+" 或尚未開放");}
  for(const t of cls.talents.filter(x=>ranks[x.id]>0)){const lower=lowerPoints(cls,t,ranks);if(lower<t.pointsInTreeRequired)issues.push(t.name+"：低層點數不足");if(deps(cls,t).some(d=>!d||(ranks[d.id]||0)<d.maxRank))issues.push(t.name+"：前置天賦未滿");}
  if(sum(ranks)!==51)issues.push("新版對應總點數 "+sum(ranks)+"/51");
  return {ranks,issues,complete:!issues.length};
 }
-function validateCommunitySnapshot(d){return !!d&&d.format==="gt-community-talents/1"&&d.source==="Talents Forever"&&Array.isArray(d.classes)&&d.classes.length===9&&CLASSES.every(k=>validateClass(d.classes.find(c=>c.token===k)));}
-function validateSnapshot(d){return !!d&&d.format==="zephras-talents/1"&&d.build==="1.60.1.71139"&&Array.isArray(d.classes)&&CLASSES.every(k=>validateClass(d.classes.find(c=>String(c.token).toLowerCase()===k)));}
+function validateCommunitySnapshot(d){return !!d&&d.format==="gt-community-talents/1"&&d.source==="Talents Forever"&&Array.isArray(d.classes)&&d.classes.length===9&&CLASSES.every(k=>validateClass(d.classes.find(c=>c?.token===k)));}
+function validateSnapshot(d){return !!d&&d.format==="zephras-talents/1"&&d.build==="1.60.1.71139"&&Array.isArray(d.classes)&&d.classes.length===9&&CLASSES.every(k=>validateClass(d.classes.find(c=>String(c?.token).toLowerCase()===k)));}
 function partialBuildCheck(p,index){
  const issues=[];let matched=0,total=0;
  for(const [tree,t] of (p?.talents||[]).entries()){
@@ -99,7 +109,7 @@ function skillScenarios(data,profile){
 function skillClientRecord(data,cls,name){
  if(data?.build!=="1.60.1.71139")return null;
  const x=data.classes?.[cls]?.[name];if(!x||!Array.isArray(x.records)||!x.records.length)return null;
- const records=x.records.filter(r=>Number.isSafeInteger(r.id)&&r.id>0);if(!records.length)return null;
+ const records=x.records.filter(r=>r&&Number.isSafeInteger(r.id)&&r.id>0);if(!records.length)return null;
  const label=typeof x.name==="string"&&/[\u3400-\u9fff]/.test(x.name)&&records.every(r=>r.name===x.name)?x.name:null;
  return {name:label,records};
 }
