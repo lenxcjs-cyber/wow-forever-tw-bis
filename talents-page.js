@@ -120,9 +120,9 @@ function talentArt(t,tree){
  const known=partialIndex[classSel.value+":"+tree+":"+t.name],holder=el("span","圖示待查","talent-symbol talent-icon-missing"),urls=talentIconURLs({...t,tree,icon:t.icon||known?.icon},classSel.value);
  holder.dataset.iconState=urls.length?"loading":"unmapped";holder.title=urls.length?"正在載入遊戲原始圖示":"未取得原始圖示對應";
  if(urls.length){const img=el("img");img.alt="";img.width=56;img.height=56;img.loading="lazy";img.decoding="async";img.referrerPolicy="no-referrer";let i=0;
-  img.onload=()=>{holder.dataset.iconState="loaded";holder.title="遊戲原始圖示";holder.classList.remove("talent-icon-missing");img.hidden=false;label.hidden=true;};
+  img.onload=()=>{holder.dataset.iconState="loaded";holder.title="遊戲原始圖示";holder.classList.remove("talent-icon-missing");label.hidden=true;};
   img.onerror=()=>{if(++i<urls.length){img.src=urls[i];return;}holder.dataset.iconState="unavailable";holder.title="原始圖示暫不可用";img.remove();label.textContent="圖示未載入";};
-  const label=el("span","載入中","talent-icon-label");holder.replaceChildren(label,img);img.hidden=true;img.src=urls[0];
+  const label=el("span","載入中","talent-icon-label");holder.replaceChildren(label,img);img.src=urls[0];
  }return holder;
 }
 function detail(t){selected=t.id;const d=$("detail"),n=ranks[t.id]||0;d.replaceChildren(el("h2",localized(t)),el("p","目前投入 "+n+"/"+t.maxRank+" ｜ 第 "+t.row+" 層，需該系 "+t.pointsInTreeRequired+" 點"),el("p",purpose(t)),el("p",localizedRanks(t)?"以下為版本相符的繁中技能效果。":"已知句型顯示繁中參考譯文；未核對的效果保留英文原文並標示待譯。","muted"));const list=el("ol",undefined,"ranklist");for(const [i,v] of (localizedRanks(t)||t.ranks||[]).entries()){const translated=localizedRanks(t)?v:globalThis.GTLocale?.effect?.(v);const li=el("li",translated||v+"（技能效果待譯）","detail");if(i+1===n)li.classList.add("ok");list.append(li);}d.append(list);if(mode==="level"){const cls=getClass();if(cls)d.append(el("p",available(cls,t,ranks)?"依目前點數可再投入1點。":(n>=t.maxRank?"已達此天賦上限。":"尚未符合加點條件；低層已投入 "+lowerPoints(cls,t,ranks)+"/"+t.pointsInTreeRequired+" 點。"),"muted"));}const pre=deps(getClass(),t);if(pre.length)d.append(el("p","前置："+pre.map(x=>x?localized(x)+" "+x.maxRank+"/"+x.maxRank:"未知").join("、")));document.querySelectorAll(".talent").forEach(b=>b.classList.toggle("selected",b.dataset.id===String(t.id)));}
