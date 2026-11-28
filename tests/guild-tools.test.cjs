@@ -972,6 +972,21 @@ assert.ok(nativeImport.nativeCanonicalJSON([1,2])!==nativeImport.nativeCanonical
 const reorderKeys=x=>Array.isArray(x)?x.map(reorderKeys):x&&typeof x==="object"?Object.fromEntries(Object.entries(x).reverse().map(([k,v])=>[k,reorderKeys(v)])):x;
 const reorderedBatch=JSON.parse(JSON.stringify(localBatch));reorderedBatch.cases[1].request=reorderKeys(reorderedBatch.cases[1].request);
 assert.equal(nativeImport.nativeBrowserBatchJobs(reorderedBatch,"spec-1",metadata,200).length,localBatch.cases.length);
+const scopedAB=combat.combatGuildBatch(imported.request,"spec-1",[sameGearVariant],["guild-50k"]);
+assert.equal(scopedAB.cases.length,2);
+assert.deepEqual(scopedAB.scenarios,["guild-50k"]);
+assert.equal(nativeImport.nativeBrowserBatchJobs(scopedAB,"spec-1",metadata,200).length,2);
+assert.deepEqual(nativeImport.nativeBrowserBatchJobs({...scopedAB,cases:[...scopedAB.cases].reverse()},"spec-1",metadata,200).map(x=>x.variant),[0,1]);
+assert.throws(()=>nativeImport.nativeBrowserBatchJobs({...scopedAB,scenarios:["guild-boss"]},"spec-1",metadata,200));
+assert.throws(()=>combat.combatGuildBatch(imported.request,"spec-1",[sameGearVariant],["guild-50k","guild-boss"]));
+const scopedResult={...batchOut(completeBatch.slice(0,2)),scenarios:["guild-50k"],expectedCases:2,finished:true};
+const scopedSummary=batchImport.combatGuildBatchResults(scopedResult,"spec-1");
+assert.equal(scopedSummary.groups.length,1);
+assert.equal(scopedSummary.finished,true);
+assert.equal(scopedSummary.groups[0].best.name,"方案A");
+assert.equal(batchImport.combatGuildBatchResults({...scopedResult,cases:scopedResult.cases.slice(0,1)},"spec-1").finished,false);
+assert.throws(()=>batchImport.combatGuildBatchResults({...scopedResult,scenarios:["guild-boss"]},"spec-1"));
+
 const tooManyDummies=JSON.parse(JSON.stringify(localBatch));tooManyDummies.cases[0].request.raid.targetDummies=25;
 assert.throws(()=>nativeImport.nativeBrowserBatchJobs(tooManyDummies,"spec-1",metadata,200),/假人/);
 console.log("PASS: standalone settings and controlled native browser batch comparison");
