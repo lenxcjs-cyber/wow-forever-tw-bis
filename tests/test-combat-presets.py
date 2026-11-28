@@ -305,5 +305,35 @@ class PresetTests(unittest.TestCase):
         result={"iterationsDone":mod.ITERATIONS,"avgIterationDuration":60,"raidMetrics":{"parties":[{"players":[{"dps":{"avg":123,"stdev":20}}]}]}}
         self.assertEqual(batch.metrics(result,cases[0]["request"],"spec-1")["metrics"],{"dps":123,"dpsStdev":20})
 
+    def test_ep_presets_and_profession_gated_set(self):
+        def load(filename):
+            loader=importlib.util.spec_from_file_location(filename,SCRIPT.with_name(filename))
+            module=importlib.util.module_from_spec(loader);loader.loader.exec_module(module)
+            return module
+        ep=load("build-ep-presets.py")
+        rows=ep.parse_weights("export const Test = PresetUtils.makePresetEpWeights('test', Stats.fromMap({ [Stat.StatAgility]: 2, [Stat.StatHitRating]: 5, [Stat.StatHasteRating]: -0.1, [Stat.StatAttackPower]: 1 }, { [PseudoStat.PseudoStatMainHandDps]: 10 }));","Test")
+        self.assertEqual(rows["catalogWeights"],{"agility":2,"attack_power":1})
+        self.assertIn("HitRating",rows["omitted"])
+        self.assertIn("HasteRating",rows["omitted"])
+        self.assertIn("PseudoStat.MainHandDps",rows["omitted"])
+        parser=load("build-set-effects.py")
+        parsed=parser.parse_sets('var X=core.NewItemSet(core.ItemSet{ID: 99,Name:"Fixture",RequiredProfession:proto.Profession_Tailoring,Bonuses:map[int32]core.ApplySetBonus{2:effect,}})',"sim/example.go")
+        self.assertEqual(parsed[0]["requiredProfession"],"Tailoring")
+        sets=load("run-set-trials.py")
+        def item(i,slot,name="",agility=1,level=60):
+            return {"id":i,"slot":slot,"item_class":"Armor","subclass":"Plate","item_set":name,"source_summary":"fixture","item_level":level,"quality":3,"agility":agility,"required_level":60}
+        items=[item(1,"Head","Fixture",10),item(2,"Shoulder","Fixture",10),item(3,"Head","",1),item(4,"Shoulder","",1),item(5,"Head","",30,65),item(6,"Shoulder","",25,65)]
+        gear=[{} for _ in range(17)]
+        gear[0]={"id":1};gear[2]={"id":2}
+        request={"raid":{"parties":[{"players":[{"equipment":{"items":gear},"rotation":{"type":"TypeAPL"},"profession1":"Engineering"}]}]}}
+        self.assertIsNone(sets.set_plan(request,"spec-1",items,parsed,ep=rows))
+        sets.player(request)["profession2"]=11
+        plan=sets.set_plan(request,"spec-1",items,parsed,ep=rows)
+        self.assertIsNotNone(plan)
+        self.assertEqual({x["scatterId"] for x in plan["items"]},{5,6})
+        self.assertEqual(plan["requiredProfession"],"Tailoring")
+        self.assertEqual({x["scatterScore"] for x in plan["items"]},{50,60})
+        self.assertIsNotNone(sets.set_plan(request,"spec-1",items,parsed))
+
 if __name__=="__main__":
     unittest.main()
