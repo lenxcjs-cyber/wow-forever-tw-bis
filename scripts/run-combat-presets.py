@@ -315,6 +315,42 @@ def direct_metrics(result):
         metrics["death"]=p["chanceOfDeath"]
     return metrics,duration,str(result.get("logs") or "")[:80000]
 
+def direct_action_rows(result):
+    """Aggregate per-action totals across iterations, not average DPS.
+    Keep pets distinct. Target-level cast counts may not equal unique casts.
+    """
+    iterations=result.get("iterationsDone")
+    if not isinstance(iterations,int) or iterations<=0:
+        return []
+    players=[p for party in result.get("raidMetrics",{}).get("parties",[]) for p in party.get("players",[]) if finite(p.get("dps",{}).get("avg"))]
+    if len(players)!=1:
+        return []
+    rows=[]
+    def visit(unit,owner,depth=0):
+        if depth>3 or not isinstance(unit,dict):
+            return
+        for action in unit.get("actions",[]):
+            if not isinstance(action,dict) or not isinstance(action.get("id"),dict):
+                continue
+            aid=action["id"]
+            identifier=next(((k,aid[k]) for k in ("spellId","itemId","otherId") if aid.get(k)),None)
+            if not identifier:
+                continue
+            targets=action.get("targets",[])
+            totals={}
+            for field in ("damage","threat","healing","shielding","casts","manualCasts"):
+                values=[t[field] for t in targets if isinstance(t,dict) and finite(t.get(field)) and t[field]>=0]
+                if values:
+                    totals[field]=sum(values)/iterations
+            if not any(totals.values()):
+                continue
+            rows.append({"owner":owner[:100],"kind":identifier[0],"id":identifier[1],"tag":aid.get("tag",0),"rank":aid.get("rank",0),"passive":bool(action.get("isPassive")),**totals})
+        for i,pet in enumerate(unit.get("pets",[])[:20]):
+            if isinstance(pet,dict):
+                visit(pet,owner+"／"+str(pet.get("name") or ("Pet "+str(i+1))),depth+1)
+    visit(players[0],"角色")
+    return sorted(rows,key=lambda x:max(x.get("damage",0),x.get("threat",0),x.get("healing",0)+x.get("shielding",0)),reverse=True)[:80]
+
 def direct_comparison_group(request):
     """Only rank cases with identical encounter and external conditions.
     Builds can differ in gear, talents, rotation, personal consumables and race.
@@ -368,7 +404,7 @@ def direct_case(cli,root,job,duration=None,output_dir=None,targets=None):
     group=direct_comparison_group(request)
     request_file=write_request_file(output_dir,spec,request) if output_dir is not None else None
     suffix=("／"+str(duration)+"秒" if duration is not None else "")+("／"+str(targets)+"目標" if targets is not None else "")
-    return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
+    return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeActions":direct_action_rows(result),"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
 
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
