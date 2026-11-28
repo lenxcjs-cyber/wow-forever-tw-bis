@@ -365,6 +365,16 @@ const server=http.createServer((req,res)=>{
   assert.ok(await localCard.getByText(/資源溢出/).isVisible());
   await lab.getByRole("button",{name:"搜尋最佳固定優先序（最多5技能）"}).click();
   assert.ok(await lab.getByRole("heading",{name:"假設模型最佳固定優先序"}).isVisible());
+  await lab.getByRole("button",{name:"比較 30／60／120／180 秒"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"不同戰鬥時間的優先序比較"}).isVisible());
+  assert.ok(await lab.getByRole("heading",{name:"180 秒",exact:true}).isVisible());
+  await lab.getByRole("button",{name:"比較指定技能的開場延後時機"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"技能開場時機比較：示意技能 A"}).isVisible());
+  await lab.getByText("各技能施放與貢獻（假設模型）",{exact:true}).click();
+  assert.ok(await lab.getByText(/示意技能 A ｜ .*次 ｜ 首次/).isVisible());
+  await lab.getByText("本組最佳施放時間軸",{exact:true}).click();
+  assert.ok(await lab.getByText(/本組最佳：延後/).isVisible());
+
   await lab.getByRole("textbox",{name:"模擬結果 A"}).fill(JSON.stringify({iterationsDone:1000,avgIterationDuration:180,raidMetrics:{parties:[{players:[{dps:{avg:500},threat:{avg:700}}]}]}}));
   await lab.getByRole("button",{name:"比較已完成的模擬"}).click();
   assert.ok(await lab.getByText("DPS 500.00 ｜ TPS 700.00 ｜ HPS 未提供 ｜ DTPS 未提供",{exact:true}).isVisible());
