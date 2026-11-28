@@ -397,6 +397,13 @@ const server=http.createServer((req,res)=>{
   await nativeCard.getByText("實際配裝與技能優先序設定檔（原文）",{exact:true}).click();
   await nativeCard.getByText("ui/specs/druid/feralcat/gt_test.siml",{exact:true}).click();
   assert.ok((await nativeCard.locator(".gt-combat-log").last().textContent()).includes("siml 1"));
+  await lab.getByRole("textbox",{name:"自訂模擬模型"}).fill(JSON.stringify({duration:60,gcd:1,cap:100,initial:100,regen:0,skills:[{name:"測試傷害",cost:0,gain:0,cd:0,cast:0,damage:30000,threat:1,targetCap:2}]}));
+  await lab.getByLabel("公會擊殺目標").selectOption("guild-5x50k");
+  await lab.getByLabel("擊殺測試時間上限").selectOption("60");
+  await lab.getByRole("button",{name:"比較公會目標擊殺時間（自訂模型）"}).click();
+  assert.ok(await lab.getByRole("heading",{name:"目標血量與轉火比較",exact:true}).isVisible());
+  assert.ok(await lab.getByText("全部擊殺：5.00 秒",{exact:true}).first().isVisible());
+  assert.ok(await lab.getByText("目標 5 ｜ 擊殺 5.00s",{exact:true}).first().isVisible());
   await lab.getByRole("button",{name:"載入純教學範例（非遊戲數值）"}).click();
   await lab.getByRole("button",{name:"執行 A／B 優先序試算"}).click();
   assert.ok(await lab.getByRole("heading",{name:"A：原優先序",exact:true}).isVisible());
