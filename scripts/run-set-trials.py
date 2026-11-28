@@ -48,7 +48,14 @@ def prepare_catalog(items):
         classes[cls]=(sets,scatter,class_sets)
     return by_id,classes
 
-def set_plan(request,spec_id,items,registry,excluded=(),prepared=None):
+def ep_score(item,weights):
+    total=0.0
+    for k,w in (weights or {}).items():
+        v=item.get(k,0)
+        if mod.finite(v) and mod.finite(w) and w>0:total+=v*w
+    return total
+
+def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
     p=player(request);gear=p.get("equipment",{}).get("items",[])
     if len(gear)!=17 or p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or '"itemSwap":' in json.dumps(p.get("rotation",{})):return None
     cls=CLASSES[int(spec_id.split("-")[1])-1]
@@ -58,8 +65,10 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None):
     if any(x is None and gear[i].get("id") for i,x in enumerate(current)):return None
     # Prefer worn sets, then explicitly class-restricted candidate sets.
     names=Counter(item_set(x) for x in current if x and item_set(x))
-    order=list(set(names)|set(class_sets))
-    order.sort(key=lambda name:(-names.get(name,0),-class_sets.get(name,0),name))
+    weights=ep.get("catalogWeights",{}) if ep else {}
+    generic={name:sum(bool(by_slot.get((SLOTS[i],old.get("subclass")))) for i,old in enumerate(current) if old) for name,by_slot in sets.items()}
+    order=list(set(names)|set(class_sets)|{name for name,n in generic.items() if n>=2})
+    order.sort(key=lambda name:(-names.get(name,0),-class_sets.get(name,0),-generic.get(name,0),name))
     for name in order:
         if name in excluded:continue
         matches=[s for s in registry if name in (s.get("name"),s.get("alternativeName"))]
@@ -79,18 +88,18 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None):
             old_id=num(old.get("id"));old_set=item_set(old)==name
             candidates=[x for x in available.get((slot,old.get("subclass")),[]) if (num(x["id"]) not in reserved or num(x["id"])==old_id) and num(x["id"]) not in used]
             if not candidates:continue
-            # Closest item level to original piece, then quality and ID.
-            key=lambda x:(abs(num(x.get("item_level"))-num(old.get("item_level"))),-num(x.get("quality")),num(x["id"]))
+            # Prefer role-specific verified partial EP; otherwise nearest item level.
+            key=lambda x:(-ep_score(x,weights),abs(num(x.get("item_level"))-num(old.get("item_level"))),-num(x.get("quality")),num(x["id"]))
             chosen=old if old_set else min(candidates,key=key)
-            if old_set:
+            if not old_set and item_set(old):continue # do not remove another set
+            if old_set or weights:
                 alternatives=[x for x in scatter.get((slot,old.get("subclass")),[]) if num(x["id"]) not in reserved|used]
+                if not old_set:alternatives.append(old)
                 if not alternatives:continue
                 loose=min(alternatives,key=key)
-            else:
-                if item_set(old):continue # do not remove another set
-                loose=old
+            else:loose=old
             used.update((num(chosen["id"]),num(loose["id"])))
-            positions.append((i,chosen,loose,abs(num(chosen.get("item_level"))-num(loose.get("item_level")))))
+            positions.append((i,chosen,loose,ep_score(loose,weights)-ep_score(chosen,weights) if weights else abs(num(chosen.get("item_level"))-num(loose.get("item_level")))))
         worn={i for i,x in enumerate(current) if x and item_set(x)==name}
         if not worn<={i for i,_,_,_ in positions}:continue
         possible=[n for n in thresholds if n<=len(positions)]
@@ -106,7 +115,7 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None):
             for rank,(i,yes,no,_) in enumerate(positions):
                 g[i]={"id":num((yes if rank<count else no)["id"])}
             cases.append((count,req))
-        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"adjacentCounts":adjacent,"cases":cases,"positions":[i for i,_,_,_ in positions],"items":[{"slot":SLOTS[i],"setId":num(yes["id"]),"scatterId":num(no["id"])} for i,yes,no,_ in positions]}
+        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"adjacentCounts":adjacent,"cases":cases,"positions":[i for i,_,_,_ in positions],"epProfile":{k:ep[k] for k in ("label","source","declaration","catalogWeights","omitted") if k in ep} if weights else None,"items":[{"slot":SLOTS[i],"position":i,"setId":num(yes["id"]),"scatterId":num(no["id"]),"setScore":ep_score(yes,weights) if weights else None,"scatterScore":ep_score(no,weights) if weights else None} for i,yes,no,_ in positions]}
     return None
 
 def run(cli,root,site):
@@ -114,7 +123,12 @@ def run(cli,root,site):
     def read(name):return json.loads((site/name).read_text(encoding="utf-8"))
     snapshot=read("combat-presets.json");catalog=read("gear-catalog.json");registry=read("set-effects.json")
     if snapshot.get("commit")!=mod.COMMIT or registry.get("commit")!=mod.COMMIT:raise ValueError("Mismatched native snapshot")
-    results=[];jobs=[];seen=set();prepared=prepare_catalog(catalog["items"])
+    results=[];jobs=[];seen=set();prepared=prepare_catalog(catalog["items"]);ep_by_spec={}
+    try:
+        ep=read("ep-presets.json")
+        if ep.get("commit")==mod.COMMIT:
+            for profile in ep.get("profiles",[]):ep_by_spec.setdefault(profile["spec"],profile)
+    except (OSError,ValueError,KeyError,TypeError):pass
     # First boss, then single mob, then five mobs. Round-robin specs within each.
     order={"guild-boss":0,"guild-50k":1,"guild-5x50k":2}
     for case in sorted(snapshot.get("cases",[]),key=lambda x:(order.get(x.get("scenario"),9),num(str(x.get("spec","")).split("-")[-1]))):
@@ -124,17 +138,17 @@ def run(cli,root,site):
         try:
             request=read(file);excluded=set()
             for rank in range(3):
-                plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded,prepared)
+                plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded,prepared,ep_by_spec.get(sid))
                 if not plan:break
                 excluded.add(plan["name"])
-                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"adjacentCounts":plan["adjacentCounts"],"positions":plan["positions"],"items":plan["items"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
+                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"adjacentCounts":plan["adjacentCounts"],"positions":plan["positions"],"items":plan["items"],"epProfile":plan["epProfile"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
                 results.append(row);jobs.append((row,plan["cases"]))
             if excluded:seen.add((sid,scenario))
         except (ValueError,KeyError,TypeError,OSError):continue
     start=time.monotonic()
     def save(finished=False):
         dest=site/"set-trials.json";temp=dest.with_suffix(".tmp")
-        temp.write_text(json.dumps({"commit":mod.COMMIT,"release":mod.RELEASE,"catalogBuild":catalog["meta"].get("client_build"),"scope":"同部位、同護甲類型、接近物品等級的原生套裝控制比較；每專精遭遇最多3套候選，優先已穿套裝及明確職業限定套裝，不代表最佳散件或完整BiS。","finished":finished,"elapsedSeconds":round(time.monotonic()-start,1),"trials":results},ensure_ascii=False,allow_nan=False),encoding="utf-8");temp.replace(dest)
+        temp.write_text(json.dumps({"commit":mod.COMMIT,"release":mod.RELEASE,"catalogBuild":catalog["meta"].get("client_build"),"scope":"同部位、同護甲類型的原生套裝控制比較；有上游EP時依可核對的部分面板權重挑選散件，否則依接近物品等級；每專精遭遇最多3套候選，不代表全目錄最佳散件或完整BiS。","finished":finished,"elapsedSeconds":round(time.monotonic()-start,1),"trials":results},ensure_ascii=False,allow_nan=False),encoding="utf-8");temp.replace(dest)
     save()
     def execute(row,count,request):
         try:
