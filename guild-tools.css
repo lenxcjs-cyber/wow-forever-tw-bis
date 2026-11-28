@@ -170,3 +170,9 @@ html.gt-blue-mode .gt-legacy-history{display:none!important}
 #guild-tools .gt-shopping-grid input{box-sizing:border-box;width:100%;min-width:0;min-height:32px;padding:4px 6px;font-size:13px}
 #guild-tools .gt-shopping-remaining{color:#e9c78c;font-weight:700;font-variant-numeric:tabular-nums}
 @media(max-width:450px){#guild-tools .gt-shopping-grid{grid-template-columns:minmax(0,1fr) 34px 59px 34px;gap:5px;font-size:12px}}
+
+/* Combat lab: compact metric cards, readable local or native timelines. */
+#guild-tools .gt-combat-log{white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;margin:8px 0;padding:10px;border:1px solid #34465a;border-radius:6px;background:#101923;color:#c4d4e5;font:12px/1.7 ui-monospace,monospace}
+#guild-tools .gt-combat-presets .gt-card{margin:8px 0}
+#guild-tools .gt-combat-metric{font-size:22px;font-weight:700;color:#e9c78c;font-variant-numeric:tabular-nums}
+#guild-tools textarea[aria-label="自訂模擬模型"],#guild-tools textarea[aria-label^="模擬結果"]{box-sizing:border-box;width:100%;max-width:100%;padding:8px;font:12px/1.5 ui-monospace,monospace;resize:vertical}
