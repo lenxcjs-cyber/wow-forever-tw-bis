@@ -545,6 +545,20 @@ def main(cli,root,output):
         (siml_extra if entry[0] in seen else siml_first).append(entry)
         seen.add(entry[0])
     scenario_grid=guild_schedule(first_direct,extra_direct,siml_first,siml_extra)
+    # Publish usable request templates independently of long simulation success/budget.
+    templates=[];template_failures=[];seen_templates=set()
+    for job,key in scenario_grid:
+        if key!="guild-50k" or (job[0],job[1]) in seen_templates:continue
+        seen_templates.add((job[0],job[1]))
+        try:
+            data,_,_,_,config=direct_settings(root,cli,job)
+            request=guild_scenario(direct_request(data),job[0],"guild-50k")
+            if len(request["raid"]["parties"][0]["players"][0].get("equipment",{}).get("items",[]))!=17:raise ValueError("Template gear must have 17 positions")
+            templates.append({"spec":job[0],"label":job[1],"requestFile":write_request_file(output.parent,job[0],request),"configuration":config})
+        except (OSError,ValueError,KeyError,TypeError,subprocess.SubprocessError) as e:
+            template_failures.append({"spec":job[0],"label":job[1],"reason":failure_kind(e)})
+        dest=output.parent/"combat-templates.json";tmp=dest.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"commit":COMMIT,"templates":templates,"failed":template_failures},ensure_ascii=False,allow_nan=False),encoding="utf-8");tmp.replace(dest)
     planned_scenarios=Counter((job[0],key) for job,key in scenario_grid)
     planned_by_spec=Counter([x[0] for x in cases_to_run+feral_extra+first_direct+extra_direct]+[job[0] for job,_ in scenario_grid])
     planned=sum(planned_by_spec.values())
