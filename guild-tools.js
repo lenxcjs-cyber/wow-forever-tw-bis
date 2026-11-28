@@ -604,6 +604,14 @@ function expandCandidateSlots(spec){
  }
  return result;
 }
+// Verified one-time choice shared by the Alliance and Horde Blackrock Spire quest chains.
+function questChoiceGroup(id){return ["13965","13966","13968"].includes(String(id))?"blackrock-quest-trinkets":"";}
+function questChoiceConflicts(id,ids){const group=questChoiceGroup(id);return !!group&&[...ids].some(other=>String(other)!==String(id)&&questChoiceGroup(other)===group);}
+function catalogCompatiblePicks(rows,count,selected=[]){
+ const picks=[],ids=new Set(selected.map(p=>String(p.item.id)));
+ for(const p of rows){if(picks.length>=count)break;const id=String(p.item.id);if(ids.has(id)||questChoiceConflicts(id,ids))continue;ids.add(id);picks.push(p);}
+ return picks;
+}
 function questSourceText(value){return /任務|任务|\bquests?\b|\bquestline\b|\bquesting\b/i.test(String(value||""));}
 function acquisitionMatches(x,selected){
  if(!selected)return true;
@@ -715,7 +723,7 @@ function catalogArmorPlan(spec,records,prof,weights,options={}){
  const pools=catalogSetPools(spec,records,prof,weights,options);
  const groups=catalogArmorGroups.map(([slot,count])=>{
   const rows=pools.get(slot).filter(p=>p.score.total>0);
-  return {slot,count,eligible:rows.length,picks:rows.slice(0,count)};
+  return {slot,count,eligible:rows.length,picks:catalogCompatiblePicks(rows,count)};
  });
  return {groups,total:groups.reduce((n,g)=>n+g.picks.reduce((a,p)=>a+p.score.total,0),0),filled:groups.reduce((n,g)=>n+g.picks.length,0),expected:catalogArmorGroups.reduce((n,g)=>n+g[1],0)};
 }
@@ -753,7 +761,8 @@ function catalogSetAlternative(pools,name,minimum){
   const rows=pools.get(slot)||[],yes=rows.filter(p=>catalogSetName(p.item)===name),no=rows.filter(p=>catalogSetName(p.item)!==name&&p.score.total>0);
   const next=new Map();
   for(let count=0;count<=Math.min(capacity,yes.length);count++){
-   const chosen=[...yes.slice(0,count),...no.slice(0,capacity-count)].map(p=>({...p,slot}));
+   const chosenYes=catalogCompatiblePicks(yes,count);if(chosenYes.length!==count)continue;
+   const chosen=[...chosenYes,...catalogCompatiblePicks(no,capacity-count,chosenYes)].map(p=>({...p,slot}));
    const score=chosen.reduce((sum,p)=>sum+p.score.total,0);
    for(const [oldCount,prev] of states){const total=prev.total+score,key=oldCount+count,existing=next.get(key);
     if(!existing||total>existing.total)next.set(key,{total,picks:[...prev.picks,...chosen]});
@@ -773,8 +782,8 @@ function catalogMultiSetAlternative(pools,requirements){
   const other=rows.filter(p=>!names.includes(catalogSetName(p.item))&&p.score.total>0);
   const choices=[];
   function choose(index,counts,remaining,selected){
-   if(index===names.length){const picks=[...selected,...other.slice(0,remaining)].map(p=>({...p,slot}));choices.push({counts,picks,total:picks.reduce((n,p)=>n+p.score.total,0)});return;}
-   for(let n=0;n<=Math.min(remaining,buckets[index].length);n++)choose(index+1,[...counts,n],remaining-n,[...selected,...buckets[index].slice(0,n)]);
+   if(index===names.length){const picks=[...selected,...catalogCompatiblePicks(other,remaining,selected)].map(p=>({...p,slot}));choices.push({counts,picks,total:picks.reduce((n,p)=>n+p.score.total,0)});return;}
+   for(let n=0;n<=Math.min(remaining,buckets[index].length);n++){const chosen=catalogCompatiblePicks(buckets[index],n,selected);if(chosen.length===n)choose(index+1,[...counts,n],remaining-n,[...selected,...chosen]);}
   }
   choose(0,[],capacity,[]);
   const next=new Map();
@@ -797,7 +806,8 @@ function catalogExactSetPlans(pools,name,max){
  for(const [slot,capacity] of catalogArmorGroups){
   const rows=pools.get(slot)||[],yes=rows.filter(p=>catalogSetName(p.item)===name),no=rows.filter(p=>catalogSetName(p.item)!==name&&p.score.total>0),next=new Map();
   for(const [old,prev] of states)for(let n=0;n<=Math.min(max-old,capacity,yes.length);n++){
-   const picks=[...yes.slice(0,n),...no.slice(0,capacity-n)].map(p=>({...p,slot}));
+   const chosenYes=catalogCompatiblePicks(yes,n);if(chosenYes.length!==n)continue;
+   const picks=[...chosenYes,...catalogCompatiblePicks(no,capacity-n,chosenYes)].map(p=>({...p,slot}));
    const total=prev.total+picks.reduce((sum,p)=>sum+p.score.total,0),k=old+n;
    const combined=[...prev.picks,...picks],prior=next.get(k);
    if(!prior||combined.length>prior.picks.length||combined.length===prior.picks.length&&total>prior.total)next.set(k,{total,picks:combined});
@@ -1133,6 +1143,7 @@ function catalogQuestView(spec){
   const renderItem=(item,score=null)=>{
    const c=node("article",undefined,"gt-card");add(c,add(node("div",undefined,"gt-item-heading"),itemIcon(item.id),link(zhItem(item)+"（ID "+item.id+"）","https://www.wowhead.com/forever/tw/item="+item.id)),node("p",item.source_summary||"任務來源待核"),node("p",(known.has(String(item.id))?"已列入原候選":"尚未列入原候選")+"｜"+(catalogSourceRecorded(item)?"客戶端數值＋來源記載":"經典推定或來源待核")+"｜"+gearType(item),"gt-muted"));
    if(score)add(c,node("p","同部位全來源第 "+score.rank+" 名｜面板 "+score.score.toFixed(2)+"｜距首選 "+score.gap.toFixed(2)+" 分"));
+   if(questChoiceGroup(item.id))add(c,node("p","黑石塔陣營任務三選一：黑手飾物／暴君印記／比斯巨獸之眼不可在同一角色配裝同時選取。","gt-muted"),link("聯盟任務與獎勵","https://azeroth.wiki/forever/quests/general-drakkisath-s-demise"),link("部落／聯盟任務獎勵對照","https://everfor.gg/items/13965/"));
    if(catalogHasSpecial(item))add(c,node("p","含套裝或特殊效果，未計入面板順位："+[item.item_set,item.effects,item.other_stats].filter(Boolean).join("；"),"gt-muted"));
    if(!score)c.append(node("p","尚無可比較的正分或武器DPS資料；仍保留供核對。","gt-muted"));return c;
   };
@@ -1264,7 +1275,7 @@ function auditEquipmentChoices(slots,match=()=>true){
  const used=new Set();
  return slots.map(slot=>{
   const matches=slot.items.filter(x=>match(x,slot.name));
-  const available=matches.filter(x=>!used.has(String(x.id)));
+  const available=matches.filter(x=>!used.has(String(x.id))&&!questChoiceConflicts(x.id,used));
   const featured=available.find(x=>!x.review&&!x.model?.incomplete)||available[0]||null;
   if(featured)used.add(String(featured.id));
   return {...slot,matches,featured};
@@ -1342,9 +1353,9 @@ function audit(){
  const moreFilters=node("details",undefined,"gt-gear-more-filters"),moreFields=node("div",undefined,"gt-gear-more-fields");add(moreFields,field("取得方式",acq),field("篩選",mode),field("顯示密度",compact),button("清除篩選",()=>{q.value="";acq.value="";mode.value="all";draw();}));add(moreFilters,node("summary","更多篩選與顯示設定"),moreFields);add(gearFilters,field("搜尋",q),field("跳至部位",jump),...(partition.modes.length>1?[field("武器配置（擇一）",weaponMode)]:[]),moreFilters);add(gearScroll,out);add(left,leftHead,frame);add(right,rightHead,gearFilters,gearScroll);add(workspace,left,right);
  const research=node("details",undefined,"gt-card gt-audit-research"),tools=node("details",undefined,"gt-card gt-audit-tools");
  add(research,node("summary","配裝研究與資料核對"),bisReasonView(spec),...(spec.id==="spec-26"?[feralSetView(spec)]:[]),...(spec.id==="spec-26"&&feralWeaponMode(spec.id)==="twohand"?[catWeaponResearch(spec)]:[]),communityEvidenceView(spec,slots),candidateAuditView(spec,slots),candidateDataCoverageView(all),excludedDetails,node("p","構築排除 "+excluded.length+" 筆不適用候選。","gt-muted"),metrics,progress,node("p","完整度僅統計已列部位及文字資料，不代表已驗證。","gt-muted"));
- const armorPlan=catalogArmorPlanView(spec,()=>weaponMode.value||"auto");add(tools,node("summary","進階配裝與全裝備查詢"),armorPlan,catalogQuestView(spec),gearCatalogView(spec),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]));
+ const armorPlan=catalogArmorPlanView(spec,()=>weaponMode.value||"auto"),questReview=catalogQuestView(spec);add(tools,node("summary","進階配裝與全裝備查詢"),armorPlan,questReview,gearCatalogView(spec),...(model&&feralWeaponMode(spec.id)!=="twohand"?[weaponSetView(spec,model)]:[]));
  nativeSetTrialView(panel,spec.id);
- add(panel,workspace,node("p",(model?"排序："+(model.source||"本機權重")+"（部分面板試算）":"排序：既有候選及外部攻略，非實戰BiS。")+(omittedFeralWeights(spec.id,saved?.weights).length?" 野性武器DPS未計入。":""),"gt-muted"),button("前往實戰模擬／配裝 JSON 匯出",()=>show("combat")),tools,research);draw();attachLegacy(spec);
+ add(panel,workspace,node("p",(model?"排序："+(model.source||"本機權重")+"（部分面板試算）":"排序：既有候選及外部攻略，非實戰BiS。")+(omittedFeralWeights(spec.id,saved?.weights).length?" 野性武器DPS未計入。":""),"gt-muted"),button("前往實戰模擬／配裝 JSON 匯出",()=>show("combat")),button("掃描任務獎勵 BiS 候選",()=>{tools.open=true;questReview.open=true;questReview.scrollIntoView({block:"start"});}),tools,research);draw();attachLegacy(spec);
 }
 function talentPageURL(embedded=false){
  const id=getSpec(),p=new URLSearchParams();
@@ -1589,6 +1600,7 @@ function combatEquipmentSpec(rows,mode){
   if(!/^[1-9]\d{0,8}$/.test(String(row.id)))throw Error("物品 ID 不合法");
   const id=Number(row.id);
   if(used.has(id))throw Error("同一物品 ID 不可重複選擇："+id);
+  if(questChoiceConflicts(id,used))throw Error("黑石塔任務三選一飾品不能同時裝備");
   used.add(id);items[index]={id};
   for(const k of ["enchant","randomSuffix"]){
    const v=row[k];if(v==null||v==="")continue;
@@ -1639,6 +1651,7 @@ function combatApplyEquipment(request,equipment,id,keepMatching=true,preserveEmp
   const item=preserveEmpty&&!x?.id?old:x;
   if(!item?.id)return {};
   if(!Number.isSafeInteger(item.id)||item.id<1||item.id>999999999||seen.has(item.id))throw Error("無效或重複的物品 ID");
+  if(questChoiceConflicts(item.id,seen))throw Error("黑石塔任務三選一飾品不能同時裝備");
   seen.add(item.id);
   if(preserveEmpty&&!x?.id)return old;
   const next=keepMatching&&old?.id===item.id?{...old}:{id:item.id};
@@ -1925,6 +1938,7 @@ function nativeImportGear(gear,meta){
   if(x==null||x?.id===0||x&&typeof x==="object"&&!Object.keys(x).length)continue;
   if(!x||!positive(x.id)||!Array.isArray(meta.items[x.id]))throw Error("引擎缺少物品 ID "+(x?.id??"未知"));
   if(seen.has(x.id))throw Error("同 ID 重複裝備，唯一裝備資格尚未驗證："+x.id);
+  if(questChoiceConflicts(x.id,seen))throw Error("黑石塔任務三選一飾品不能同時裝備");
   seen.add(x.id);
   const [type,hand,weapon]=meta.items[x.id];let slot=uniqueSlots[type];
   if(type===11)slot=items[10].id?11:10;
