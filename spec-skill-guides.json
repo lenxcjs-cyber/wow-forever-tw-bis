@@ -150,6 +150,12 @@
           "Last Stand",
           "保命",
           "若已點出，在血量壓力急升時爭取治療時間。"
+        ],
+        [
+          "雷霆一擊",
+          "Thunder Clap",
+          "多目標",
+          "五人副本變體投入強化雷霆一擊；符合姿態與技能條件時用於怪群減速／減傷及仇恨，注意控場。"
         ]
       ],
       "class": "warrior"
@@ -512,6 +518,12 @@
           "Eviscerate",
           "終結",
           "切割安全且連擊點足夠時消耗。"
+        ],
+        [
+          "背手刺擊（參考譯名）",
+          "Shank",
+          "情境",
+          "毒藥變體已習得時依副手與 Venom 連動條件使用；不列為所有戰鬥賊必用。"
         ]
       ],
       "class": "rogue"
@@ -1391,6 +1403,12 @@
         "Tranquilizing Shot",
         "驅散",
         "已習得且敵人有可解除的狂怒效果時依分工使用。"
+      ],
+      [
+        "治療寵物",
+        "Mend Pet",
+        "保命",
+        "帶寵物時留意其血量，危險承傷前治療；獨行無寵物時不適用。"
       ]
     ],
     "rogue": [
@@ -1533,6 +1551,18 @@
         "Banish",
         "控制",
         "對符合種類的可控目標使用，協調解除時機。"
+      ],
+      [
+        "召喚小鬼",
+        "Summon Imp",
+        "寵物",
+        "小鬼構築確認其存活與站位；犧牲流不假設寵物持續輸出。"
+      ],
+      [
+        "召喚魅魔",
+        "Summon Succubus",
+        "寵物",
+        "依選擇的惡魔構築與控場需求使用，留意寵物存活。"
       ]
     ],
     "druid": [
@@ -1634,6 +1664,173 @@
       "Totemic Recall": "trainer",
       "Rage of the Farseer": "talent",
       "Riptide": "talent"
+    }
+  },
+  "buildNotes": {
+    "spec-2:fury_spear": {
+      "note": "此變體以 Spearing Strike 為差異；依敵人類型與技能條件決定是否施放，不取代通用狂怒的怒氣管理。",
+      "focus": [
+        "Spearing Strike",
+        "Bloodthirst",
+        "Whirlwind"
+      ]
+    },
+    "spec-3:prot_dungeon": {
+      "note": "五人副本構築投入強化雷霆一擊。多目標仇恨與減傷優先，保留單體仇恨技能給集火目標。",
+      "focus": [
+        "Thunder Clap",
+        "Shield Slam",
+        "Revenge"
+      ]
+    },
+    "spec-6:ret_shock": {
+      "note": "混合流名稱指向神聖震擊，但沒有獨立逐項配點；不要假定已習得神聖震擊或其連動天賦。",
+      "focus": [
+        "Holy Shock",
+        "Judgement"
+      ]
+    },
+    "spec-7:pet_aura": {
+      "note": "已有強擊光環的隊伍變體：先確認隊伍分工，不重複為同一光環調整構築。",
+      "focus": [
+        "Bestial Wrath",
+        "Auto Shot"
+      ]
+    },
+    "spec-8:lonewolf": {
+      "note": "獨行遠程配點已列 Lone Wolf 與 Sniper Shot。優先研究射擊節奏；不把需要寵物的爆發當作此流派固定技能。",
+      "focus": [
+        "Auto Shot",
+        "Sniper Shot",
+        "Aimed Shot"
+      ]
+    },
+    "spec-8:mm_pet": {
+      "note": "帶寵物射擊構築尚無獨立逐項配點；寵物攻擊、存活與轉火需另外管理，不沿用獨行者的假設。",
+      "focus": [
+        "Auto Shot",
+        "Aimed Shot",
+        "Mend Pet"
+      ]
+    },
+    "spec-9:melee": {
+      "note": "此為純近戰比較構築，尚無獨立配點；優先研究合法近戰技能，不把遠程射擊當作必須穿插的循環。",
+      "focus": [
+        "Raptor Strike",
+        "Mongoose Bite",
+        "Strider Kick"
+      ]
+    },
+    "spec-11:backstab": {
+      "note": "主手匕首背刺流：優先確認背後站位。此構築未有獨立逐項配點，不能套用通用武器流的天賦結論。",
+      "focus": [
+        "Backstab",
+        "Slice and Dice"
+      ]
+    },
+    "spec-11:venom": {
+      "note": "參考配點已列 Venom 與 Vile Poisons；依毒藥與武器條件安排攻擊，不能直接以深戰鬥的優先序代替。",
+      "focus": [
+        "Shank",
+        "Slice and Dice",
+        "Sinister Strike"
+      ]
+    },
+    "spec-12:hemo": {
+      "note": "參考配點已列 Hemorrhage 與 Death Mark。出血為此變體的集星候選；主手不是匕首時不要使用背刺或伏擊。",
+      "focus": [
+        "Hemorrhage",
+        "Death Mark",
+        "Slice and Dice"
+      ]
+    },
+    "spec-13:disc_renew": {
+      "note": "恢復術變體著重護盾與持續治療的搭配；仍按承傷選擇，不把所有吸收都視為一般治療加成。",
+      "focus": [
+        "Renew",
+        "Power Word: Shield",
+        "Greater Heal"
+      ]
+    },
+    "spec-19:arc_pure": {
+      "note": "參考配點已列 Arcane Blast、Arcane Wrath 及 Arcane Power。以秘法技能與法力管理為主，不強制加入火球術。",
+      "focus": [
+        "Arcane Blast",
+        "Arcane Missiles",
+        "Arcane Wrath",
+        "Evocation"
+      ]
+    },
+    "spec-20:fire_frost": {
+      "note": "冰火混合流缺獨立逐項配點；先核對冰、火系天賦，再比較霜火箭與火球術，不提供未驗證固定循環。",
+      "focus": [
+        "Frostfire Bolt",
+        "Fireball"
+      ]
+    },
+    "spec-21:frost_aoe": {
+      "note": "五人副本範圍流，按坦克仇恨及怪群位置安排控場、暴風雪；不套用首領單體循環。",
+      "focus": [
+        "Blizzard",
+        "Frost Nova",
+        "Cone of Cold"
+      ]
+    },
+    "spec-22:aff_dungeon": {
+      "note": "此配點未列 Wrack，並投入 Improved Shadow Bolt；以暗影箭與持續傷害安排短戰及轉火，不強制使用 Wrack。",
+      "focus": [
+        "Shadow Bolt",
+        "Corruption",
+        "Life Tap"
+      ]
+    },
+    "spec-24:dest_imp": {
+      "note": "小鬼流保留寵物；不要將犧牲惡魔當作固定起手。實際獨立配點尚待補。",
+      "focus": [
+        "Summon Imp",
+        "Immolate",
+        "Incinerate"
+      ]
+    },
+    "spec-24:dest_sayaad": {
+      "note": "魅魔流保留寵物；本體與寵物收益分開看，不直接沿用犧牲流假設。",
+      "focus": [
+        "Summon Succubus",
+        "Shadow Bolt",
+        "Immolate"
+      ]
+    },
+    "spec-25:balance_mana": {
+      "note": "現有配點資料早於日月蝕改動；依遊戲內實際觸發和資源決定施法，不沿用舊版固定日月蝕循環。",
+      "focus": [
+        "Wrath",
+        "Starfire",
+        "Moonfire"
+      ]
+    },
+    "spec-26:cat_no_lotp": {
+      "note": "參考配點移除 Leader of the Pack 並調整 Rend and Tear；只在隊伍已有適用獸群領袖時比較此變體。",
+      "focus": [
+        "Shred",
+        "Rip",
+        "Shifting Power"
+      ]
+    },
+    "spec-27:bear_cat": {
+      "note": "貓熊混合構築尚無獨立逐項配點；坦克未交接時不得為輸出切成貓形態。兩種形態分開試算。",
+      "focus": [
+        "Growl",
+        "Maul",
+        "Frenzied Regeneration"
+      ]
+    },
+    "spec-26:feral_onehand": {
+      "note": "此為武器替代比較，不是獨立天賦或已驗證輸出手法；不要因改用單手武器便假定技能效果改變。",
+      "focus": []
+    },
+    "spec-27:feral_onehand": {
+      "note": "此為武器替代比較，不是獨立天賦或已驗證坦克手法；熊形態技能仍需確認實際習得。",
+      "focus": []
     }
   }
 }
