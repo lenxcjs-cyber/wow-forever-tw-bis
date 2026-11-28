@@ -503,6 +503,27 @@ def direct_case(cli,root,job,duration=None,output_dir=None,targets=None,scenario
     if scenario:config+=" 公會標準遭遇覆蓋原目標；零基礎護甲及抗性、固定時間、坦克正面／其他背面；坦克受擊為示意每2秒300（首領1000）基礎傷害。非擊殺模擬。"
     return {"requestFile":request_file,"spec":spec,"label":label+suffix,"nominalDuration":nominal,"targetCount":len(request["encounter"]["targets"]),"scenario":scenario,"targetHealth":GUILD_SCENARIOS[scenario]["health"] if scenario else None,"targetLevel":GUILD_SCENARIOS[scenario]["level"] if scenario else None,"inFrontOfTarget":request["raid"]["parties"][0]["players"][0].get("inFrontOfTarget"),"settings":settings,"apl":apl,"configuration":config+" 名義戰鬥 "+str(nominal)+"±"+str(variation)+" 秒；"+str(len(request["encounter"]["targets"]))+" 個相同屬性目標。","comparisonGroup":group,"duration":actual,"iterations":ITERATIONS,"dps":metrics["dps"],"nativeMetrics":metrics,"nativeTargets":native_target_damage(result,request) if scenario else [],"nativeActions":direct_action_rows(result),"nativeLog":logs,"timeline":[],"sources":sources,"character":{"talents":p.get("talentsString",""),"race":p.get("race","")}}
 
+def guild_schedule(first_direct,extra_direct,siml_first,siml_extra):
+    def raw_siml(entry):
+        spec,label,settings,apl,source,configuration=entry
+        return (spec,label,"siml","__LOCAL__:"+settings,(source,apl,configuration))
+    baseline=sorted(first_direct+[raw_siml(e) for e in siml_first],key=lambda j:int(j[0].split("-")[1]))
+    extras=extra_direct+[raw_siml(e) for e in siml_extra]
+    by_spec={}
+    for j in extras:by_spec.setdefault(j[0],[]).append(j)
+    ordered=[]
+    for i in range(max((len(v) for v in by_spec.values()),default=0)):
+        ordered.extend(by_spec[sid][i] for sid in sorted(by_spec,key=lambda x:int(x.split("-")[1])) if i<len(by_spec[sid]))
+    keys=list(GUILD_SCENARIOS)
+    # Complete baseline coverage first; rotate order by scenario so classes
+    # at the end of the numerical sequence do not always go last.
+    rounds=[]
+    for i,key in enumerate(keys):
+        k=i*len(baseline)//len(keys)
+        rounds.extend((job,key) for job in baseline[k:]+baseline[:k])
+    for key in keys:rounds.extend((job,key) for job in ordered)
+    return rounds
+
 def main(cli,root,output):
     output=Path(output).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
     cases=[]
@@ -523,14 +544,14 @@ def main(cli,root,output):
     for entry in cases_to_run:
         (siml_extra if entry[0] in seen else siml_first).append(entry)
         seen.add(entry[0])
-    all_base=first_direct+[(spec,label,"siml","__LOCAL__:"+settings,(source,apl,configuration)) for spec,label,settings,apl,source,configuration in siml_first]
-    scenario_grid=[(job,key) for key in GUILD_SCENARIOS for job in all_base]
+    scenario_grid=guild_schedule(first_direct,extra_direct,siml_first,siml_extra)
+    planned_scenarios=Counter((job[0],key) for job,key in scenario_grid)
     planned_by_spec=Counter([x[0] for x in cases_to_run+feral_extra+first_direct+extra_direct]+[job[0] for job,_ in scenario_grid])
     planned=sum(planned_by_spec.values())
     start=time.monotonic()
     started_at=datetime.now(timezone.utc).isoformat()
     def publish(complete=False):
-        payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":planned,"plannedBySpec":dict(planned_by_spec),"failed":failed,"finished":complete,"startedAt":started_at,"elapsedSeconds":round(time.monotonic()-start,1),"healerPending":[{"spec":spec,"source":"ui/specs/"+folder+"/presets.ts","reason":"尚缺可驗證的治療遭遇、完整技能策略及有效治療基準；不以 DPS 代替 HPS。"} for spec,folder in HEALERS.items()],"guildScenarios":GUILD_SCENARIOS,"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
+        payload={"format":1,"release":RELEASE,"commit":COMMIT,"seed":SEED,"cases":cases,"planned":planned,"plannedBySpec":dict(planned_by_spec),"plannedScenarios":{sid:{key:planned_scenarios[sid,key] for key in GUILD_SCENARIOS} for sid in planned_by_spec},"failed":failed,"finished":complete,"startedAt":started_at,"elapsedSeconds":round(time.monotonic()-start,1),"healerPending":[{"spec":spec,"source":"ui/specs/"+folder+"/presets.ts","reason":"尚缺可驗證的治療遭遇、完整技能策略及有效治療基準；不以 DPS 代替 HPS。"} for spec,folder in HEALERS.items()],"guildScenarios":GUILD_SCENARIOS,"scope":"Upstream and controlled presets, not guild BiS. SIML CLI does not add the UI-generated potion/conjured APL rows. Timeline is one iteration."}
         temp=output.with_suffix(output.suffix+".tmp")
         temp.write_text(json.dumps(payload,ensure_ascii=False,allow_nan=False),encoding="utf-8")
         temp.replace(output)
