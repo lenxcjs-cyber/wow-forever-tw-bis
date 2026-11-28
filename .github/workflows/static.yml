@@ -185,7 +185,10 @@ jobs:
           git -C "$root" sparse-checkout set sim proto assets/database ui/worker
           git -C "$root" fetch --depth=1 --filter=blob:none origin 3b9c125a9b1387cd53ce2bb12969e0c6b54b813e
           git -C "$root" checkout --detach FETCH_HEAD
-          command -v protoc || sudo apt-get update && command -v protoc || sudo apt-get install -y protobuf-compiler
+          if ! command -v protoc >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y protobuf-compiler
+          fi
           bash scripts/build-browser-engine.sh . "$root"
       - name: Report actual browser-engine availability
         run: |
@@ -209,9 +212,19 @@ jobs:
             "$RUNNER_TEMP/guild-browser/node_modules/.bin/playwright" install chromium
           fi
           node tests/browser-smoke.cjs
+          if test -s native-engine/manifest.json && ! node tests/wasm-browser-smoke.cjs; then
+            rm -f native-engine/manifest.json
+            echo "::warning::Real browser engine test failed; disable native simulator rather than publish a broken engine."
+          fi
       - name: Report skipped browser tests
         if: steps.browser_setup.outcome != 'success'
         run: echo "::warning::Browser dependency installation unavailable; browser tests skipped."
+      - name: Gate published browser simulator on both real-engine checks
+        run: |
+          if test -s native-engine/manifest.json && ! node -e 'const d=require("./native-engine/manifest.json");if(d.verified!==true||d.browserVerified!==true)process.exit(1)'; then
+            rm -f native-engine/manifest.json
+            echo "::warning::Real browser engine verification missing; native simulator remains disabled."
+          fi
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
