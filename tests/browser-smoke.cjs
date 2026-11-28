@@ -24,7 +24,8 @@ const server=http.createServer((req,res)=>{
   await page.route("**/*",route=>route.request().url().startsWith(origin+"/")?route.continue():route.abort());
   // Isolate UI behavior from actual external icon availability with explicit test fixtures.
   await page.route("**/skill-client.json",route=>route.fulfill({json:{build:"1.60.1.71139",classes:{druid:{Shred:{name:"撕碎（測試名稱）",records:[{id:5221,name:"撕碎（測試名稱）",level:22,cooldownMs:6000,categoryCooldownMs:0}]}}}}}));
-  await page.route("**/combat-presets.json",route=>route.fulfill({json:{format:1,release:"v1.0.12",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",seed:1,cases:[{spec:"spec-26",label:"測試引擎案例",dps:123.45,duration:180,iterations:1000,timeline:[{timeMs:-1500,label:"Fixture prepull"},{timeMs:0,label:"Fixture attack"},{timeMs:12000,label:"Fixture second burst"},{timeMs:35000,label:"Fixture late attack"}],sources:[{path:"ui/specs/druid/feralcat/gt_test.siml",text:"siml 1\n# fixture"}],settings:"ui/specs/druid/feralcat/gear_sets/pre_raid.gear.siml",apl:"ui/specs/druid/feralcat/apls/adaptive.apl.siml",configuration:"測試設定"},{spec:"spec-27",label:"原生坦克測試案例",dps:111,duration:180,iterations:1000,timeline:[],nativeMetrics:{dps:111,tps:600,dtps:300,death:0.1},nativeLog:"[0.00] Fixture tank attack",settings:"ui/specs/druid/feralbear/gear_sets/default.gear.siml",apl:"ui/specs/druid/feralbear/apls/adaptive.apl.siml"}],healerPending:[{spec:"spec-28",source:"ui/specs/druid/restoration/presets.ts",reason:"尚缺可驗證治療遭遇"}]}}));
+  await page.route("**/combat-presets.json",route=>route.fulfill({json:{format:1,release:"v1.0.12",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",seed:1,cases:[{spec:"spec-26",label:"測試引擎案例",dps:123.45,duration:180,iterations:1000,timeline:[{timeMs:-1500,label:"Fixture prepull"},{timeMs:0,label:"Fixture attack"},{timeMs:12000,label:"Fixture second burst"},{timeMs:35000,label:"Fixture late attack"}],sources:[{path:"ui/specs/druid/feralcat/gt_test.siml",text:"siml 1\n# fixture"}],settings:"ui/specs/druid/feralcat/gear_sets/pre_raid.gear.siml",apl:"ui/specs/druid/feralcat/apls/adaptive.apl.siml",configuration:"測試設定",templateFile:"combat-requests/spec-26-0123456789abcdef.json"},{spec:"spec-27",label:"原生坦克測試案例",dps:111,duration:180,iterations:1000,timeline:[],nativeMetrics:{dps:111,tps:600,dtps:300,death:0.1},nativeLog:"[0.00] Fixture tank attack",settings:"ui/specs/druid/feralbear/gear_sets/default.gear.siml",apl:"ui/specs/druid/feralbear/apls/adaptive.apl.siml"}],healerPending:[{spec:"spec-28",source:"ui/specs/druid/restoration/presets.ts",reason:"尚缺可驗證治療遭遇"}]}}));
+  await page.route("**/combat-requests/spec-26-0123456789abcdef.json",route=>route.fulfill({json:{type:"SimTypeIndividual",raid:{parties:[{players:[{feralCatDruid:{},rotation:{type:"TypeAPL"},equipment:{items:Array.from({length:17},()=>({}))},talentsString:"fixture"}]}]},encounter:{duration:180,targets:[{}]},simOptions:{iterations:1000}}}));
   await page.route("**/item-icons.json",route=>route.fulfill({json:{build:"1.60.1.71139",items:{"19323":"fixture_mace","252484":"fixture_missing"}}}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_mace.jpg",route=>route.fulfill({contentType:"image/svg+xml",body:'<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="green"/></svg>'}));
   await page.route("https://wow.zamimg.com/images/wow/icons/medium/fixture_missing.jpg",route=>route.abort());
@@ -343,6 +344,22 @@ const server=http.createServer((req,res)=>{
   await lab.locator(".gt-combat-presets").getByText("DPS 123.45",{exact:true}).waitFor({state:"visible"});
   assert.ok(await lab.getByText("全28專精原生案例覆蓋：2 / 28",{exact:true}).isVisible());
   assert.ok(await lab.getByRole("heading",{name:"此專精的配裝與循環研究",exact:true}).isVisible());
+  assert.ok(await lab.getByRole("link",{name:"下載解析後的 SIML 設定範本"}).isVisible());
+  await lab.getByRole("button",{name:"載入此案例作為配裝範本"}).click();
+  const gearArea=lab.getByRole("textbox",{name:"原生模擬請求"});
+  await gearArea.waitFor({state:"visible"});
+  assert.equal(JSON.parse(await gearArea.inputValue()).raid.parties[0].players[0].talentsString,"fixture");
+  await lab.getByRole("button",{name:"載入本站首列候選（非已驗證 BiS）"}).click();
+  const gear=JSON.parse(await lab.getByRole("textbox",{name:"模擬配裝 JSON"}).inputValue());
+  assert.equal(gear.items.length,17);
+  assert.ok(gear.items[12].id&&gear.items[13].id&&gear.items[12].id!==gear.items[13].id);
+  assert.equal(gear.items[15].id,undefined);
+  await lab.getByRole("button",{name:"儲存此構築配裝"}).click();
+  assert.ok(await lab.getByText(/已儲存本專精／構築的/).isVisible());
+  const gearDownload=page.waitForEvent("download");
+  await lab.getByRole("button",{name:"下載替換配裝後的 RaidSimRequest"}).click();
+  assert.equal((await gearDownload).suggestedFilename(),"tomb-spec-26-request.json");
+
   await lab.locator(".gt-combat-presets").getByText("第一輪技能時間軸（最多400個事件）",{exact:true}).click();
   const nativeCard=lab.locator(".gt-combat-presets");
   const nativeLog=nativeCard.locator(".gt-combat-log").first();
@@ -381,7 +398,8 @@ const server=http.createServer((req,res)=>{
   await lab.getByRole("button",{name:"比較 1／2／3／5／8 個目標"}).click();
   assert.ok(await lab.getByRole("heading",{name:"多目標技能優先序比較",exact:true}).isVisible());
   assert.ok(await lab.getByRole("heading",{name:"8 個目標",exact:true}).isVisible());
-  await lab.getByRole("textbox",{name:"模擬結果 A"}).fill(JSON.stringify({iterationsDone:1000,avgIterationDuration:180,raidMetrics:{parties:[{players:[{dps:{avg:500},threat:{avg:700}}]}]}}));
+  await lab.getByLabel("上傳模擬結果 A JSON").setInputFiles({name:"fixture.json",mimeType:"application/json",buffer:Buffer.from(JSON.stringify({iterationsDone:1000,avgIterationDuration:180,raidMetrics:{parties:[{players:[{dps:{avg:500},threat:{avg:700}}]}]}}))});
+  await lab.getByText("已讀取 fixture.json，請確認內容後執行。",{exact:true}).waitFor({state:"visible"});
   await lab.getByRole("button",{name:"比較已完成的模擬"}).click();
   assert.ok(await lab.getByText("DPS 500.00 ｜ TPS 700.00 ｜ HPS 未提供 ｜ DTPS 未提供",{exact:true}).isVisible());
   await spec.selectOption("spec-27");
