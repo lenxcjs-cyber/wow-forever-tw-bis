@@ -786,13 +786,15 @@ function nativeSetComparison(trial,role){
  if(!trial||!Array.isArray(trial.cases)||!["tank","dps","heal"].includes(role))return null;
  const metric=role==="tank"?"tps":role==="heal"?"hps":"dps";
  const valid=c=>c&&Number.isInteger(c.pieces)&&c.pieces>=0&&c.pieces<=14&&Number.isFinite(c.duration)&&c.duration>0&&Number.isFinite(c.metrics?.[metric])&&c.metrics[metric]>=0;
- const baseline=trial.cases.find(c=>valid(c)&&c.pieces===0);if(!baseline)return null;
- const rows=trial.cases.filter(c=>valid(c)&&c.pieces>0&&Math.abs(c.duration-baseline.duration)<1e-6).sort((a,b)=>a.pieces-b.pieces).map(c=>{
+ const baselines=trial.cases.filter(c=>valid(c)&&c.pieces===0);if(baselines.length!==1)return null;const baseline=baselines[0];
+ const counts=new Map();for(const c of trial.cases.filter(valid))counts.set(c.pieces,(counts.get(c.pieces)||0)+1);
+ const rows=trial.cases.filter(c=>valid(c)&&c.pieces>0&&counts.get(c.pieces)===1&&Math.abs(c.duration-baseline.duration)<1e-6).sort((a,b)=>a.pieces-b.pieces).map(c=>{
   const delta=c.metrics[metric]-baseline.metrics[metric];
-  const survival=role==="tank"?(["dtps","death"].every(k=>Number.isFinite(c.metrics[k])&&Number.isFinite(baseline.metrics[k]))?c.metrics.dtps<=baseline.metrics.dtps+1e-8&&c.metrics.death<=baseline.metrics.death+1e-8:null):true;
+  const survival=role==="tank"?(["dtps","death"].every(k=>[c.metrics[k],baseline.metrics[k]].every(v=>Number.isFinite(v)&&v>=0&&(k!=="death"||v<=1)))?c.metrics.dtps<=baseline.metrics.dtps+1e-8&&c.metrics.death<=baseline.metrics.death+1e-8:null):true;
   return {...c,delta,percent:baseline.metrics[metric]>0?100*delta/baseline.metrics[metric]:null,win:delta>1e-8&&survival===true,survival};
  });
- return {metric,baseline,rows,firstWin:rows.find(x=>x.win)?.pieces??null};
+ const expected=Array.isArray(trial.thresholds)?[...new Set(trial.thresholds.filter(n=>Number.isInteger(n)&&n>0&&n<=14))].sort((a,b)=>a-b):[];
+ return {metric,baseline,rows,firstWin:rows.find(x=>x.win)?.pieces??null,missing:expected.filter(n=>!rows.some(x=>x.pieces===n))};
 }
 let nativeSetTrialsPromise=null;
 function nativeSetTrialView(parent,id){
@@ -808,13 +810,15 @@ function nativeSetTrialView(parent,id){
    const result=nativeSetComparison(t,role);
    add(d,node("p","引擎登錄件數："+(Array.isArray(t.thresholds)?t.thresholds.join("／"):"未知")+" ｜ 基準："+(t.baseLabel||"")+"。散件與套裝候選以同部位、同護甲類型及接近物品等級選取；換裝位置的附魔均清除，非全目錄最優。","gt-muted"));
    if(typeof t.source==="string"&&/^sim\/[a-zA-Z0-9_/.]+\.go$/.test(t.source)&&!t.source.includes(".."))d.append(link("套裝原生效果實作","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+t.source));
+   if(Array.isArray(t.registeredThresholds)){const unplanned=t.registeredThresholds.filter(n=>Number.isInteger(n)&&!t.thresholds?.includes(n));if(unplanned.length)d.append(node("p","尚無合資格候選可測的登錄門檻："+unplanned.join("／")+" 件","gt-muted"));}
+   if(Array.isArray(t.items)&&t.items.length){const gear=node("details");gear.append(node("summary","實際套裝與散件替換部位"));for(const x of t.items.slice(0,14)){if(!x||!Number.isSafeInteger(x.setId)||x.setId<=0||!Number.isSafeInteger(x.scatterId)||x.scatterId<=0)continue;const line=node("p");add(line,node("span",(gearSlotNames[x.slot]||x.slot)+"："),link("套裝 "+x.setId,"https://www.wowhead.com/forever/tw/item="+x.setId),node("span"," ／ "),link("散裝 "+x.scatterId,"https://www.wowhead.com/forever/tw/item="+x.scatterId));gear.append(line);}d.append(gear);}
    if(!result)d.append(node("p","0件基準尚未成功，不能判定勝負。","gt-muted"));
    else{
     const m=result.metric.toUpperCase();
     const line=(x,label)=>{const part=node("p",label+" ｜ "+m+" "+x.metrics[result.metric].toFixed(2)+(role==="tank"&&Number.isFinite(x.metrics.dtps)?" ｜ DTPS "+x.metrics.dtps.toFixed(2):"")+(role==="tank"&&Number.isFinite(x.metrics.death)?" ｜ 死亡 "+(100*x.metrics.death).toFixed(1)+"%":""));d.append(part);const path=combatRequestPath(x.requestFile,id);if(path)d.append(link("下載完整 "+label+" 請求",path));};
     line(result.baseline,"0件散裝對照");
     for(const x of result.rows){line(x,x.pieces+"件");d.append(node("p","相較0件 "+(x.delta>=0?"+":"")+x.delta.toFixed(2)+" "+m+(x.percent!==null?"（"+x.percent.toFixed(2)+"%）":"")+(x.win?"；本組勝出":role==="tank"&&x.delta>0?"；生存未同時勝出或資料不足":"；未勝出"),"gt-muted"));}
-    d.append(node("p",result.firstWin===null?"目前成功的門檻尚未證明勝過0件對照。":"本次已測門檻中，最少 "+result.firstWin+" 件勝過0件對照。不是所有可能散件的全域 BiS。","gt-muted"));
+    d.append(node("p",result.firstWin===null?"目前成功的門檻尚未證明勝過0件對照。":"本次已測門檻中，最少 "+result.firstWin+" 件勝過0件對照。不是所有可能散件的全域 BiS。","gt-muted"));if(result.missing.length)d.append(node("p","未取得可比較結果："+result.missing.join("／")+" 件；不能排除其中有更早勝出門檻。","gt-muted"));
    }
    if(Array.isArray(t.failed)&&t.failed.length)d.append(node("p","未成功："+t.failed.map(x=>x.pieces+"件").join("、"),"gt-muted"));
    c.append(d);
