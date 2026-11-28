@@ -412,7 +412,7 @@ const jewelryExport=expansion.catalogPlanText({total:10},[1,2].map(id=>({slot:"�
 assert.ok(jewelryExport.includes("飾品 1｜")&&jewelryExport.includes("飾品 2｜"));
 console.log("PASS: 16/17 physical battle positions, two rings and trinkets, shared ranged/relic, no repeated featured IDs and numbered export");
 
-const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats};")();
+const combat=new Function(section("const combatPaths=","function combatLab(")+";return {combatEngineURL,simulatePriority,combatBestPriority,combatResult,combatPresetCases,combatTimelineText,combatPresetCommit,combatPhaseMetrics,combatDurationSweep,combatTimingSweep,combatSkillStats,combatNativeGroups};")();
 for(let i=1;i<=28;i++)assert.match(combat.combatEngineURL("spec-"+i),/^https:\/\/www\.wowsims\.com\/forever\//);
 assert.equal(combat.combatEngineURL("spec-26"),"https://www.wowsims.com/forever/druid/feralcat/");
 assert.equal(combat.combatEngineURL("spec-27"),"https://www.wowsims.com/forever/druid/feralbear/");
@@ -489,3 +489,8 @@ assert.equal(combat.combatSkillStats(thresholdResult).reduce((sum,x)=>sum+x.dama
 assert.equal(combat.combatEngineURL("x-26"),null);
 assert.equal(combat.combatEngineURL("spec-026"),null);
 console.log("PASS: exact resource thresholds, encounter length comparisons, opening delay grid and skill contribution");
+
+const nativeGroups=combat.combatNativeGroups([{comparisonGroup:"30",dps:1},{comparisonGroup:"180",dps:100},{comparisonGroup:"30",dps:2},{dps:4}]);
+assert.deepEqual(nativeGroups.map(x=>[x.label,x.rows.length]),[["30",2],["180",1]]);
+assert.equal(combat.combatNativeGroups([{comparisonGroup:" ",dps:10}]).length,0);
+console.log("PASS: native results remain grouped by explicit encounter; unknown groups excluded");
