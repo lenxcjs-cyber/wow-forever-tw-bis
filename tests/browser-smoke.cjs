@@ -460,6 +460,12 @@ const server=http.createServer((req,res)=>{
   await lab.getByRole("textbox",{name:"三遭遇批次結果 JSON"}).fill(JSON.stringify(result));
   await lab.getByRole("button",{name:"比較三遭遇批次結果",exact:true}).click();
   assert.ok(await lab.getByText("本次候選中具勝出證據的最高平均值：測試候選",{exact:true}).isVisible());
+  await lab.getByRole("textbox",{name:"三遭遇批次結果 JSON"}).fill("{}");
+  assert.equal(await lab.getByText("本次候選中具勝出證據的最高平均值：測試候選",{exact:true}).count(),0);
+  assert.ok(await lab.getByText("結果資料已變更，請重新比較。",{exact:true}).isVisible());
+  await lab.getByRole("button",{name:"比較三遭遇批次結果",exact:true}).click();
+  assert.ok(await lab.getByText(/匯入失敗：批次結果格式/).isVisible());
+  console.log("PASS: editing a batch import immediately removes stale gear rankings");
 
   await lab.getByText("匯入外部或整套面板配裝",{exact:true}).click();
   await lab.getByLabel("匯入武器模式").selectOption("two");
