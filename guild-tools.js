@@ -1677,12 +1677,15 @@ function combatGuildBatch(request,id,variants){
 }
 function combatGuildBatchResults(data,id){
  if(!data||data.format!=="tomb-guild-results/1"||data.commit!==combatPresetCommit||data.spec!==id||!Array.isArray(data.cases)||data.cases.length>18||!combatEngineURL(id))throw Error("批次結果格式、版本或專精不符");
- const role=combatRole(id),metric=role==="tank"?"tps":role==="heal"?"hps":"dps",seen=new Set(),groups=[];
+ const role=combatRole(id),metric=role==="tank"?"tps":role==="heal"?"hps":"dps",seen=new Set(),groups=[],variantNames=new Map(),nameVariants=new Map();
+ if(data.expectedCases!=null&&(![6,9,12,15,18].includes(data.expectedCases)||data.cases.length>data.expectedCases))throw Error("預定批次案例數不合法");
  for(const [key,cfg] of Object.entries(guildScenarios)){
   const rows=[];
   for(const x of data.cases.filter(x=>x?.scenario===key)){
    if(!Number.isInteger(x.variant)||x.variant<0||x.variant>5||typeof x.name!=="string"||!x.name.trim()||x.name.length>80||seen.has(key+":"+x.variant))throw Error("批次包含重複或無效方案");
    seen.add(key+":"+x.variant);
+   if(x.variant===0&&x.name!=="原始配裝"||x.variant>0&&x.name==="原始配裝"||variantNames.has(x.variant)&&variantNames.get(x.variant)!==x.name||nameVariants.has(x.name)&&nameVariants.get(x.name)!==x.variant)throw Error("跨遭遇的方案名稱或編號不一致");
+   variantNames.set(x.variant,x.name);nameVariants.set(x.name,x.variant);
    if(x.error){rows.push({variant:x.variant,name:x.name,error:true});continue;}
    if(!Number.isInteger(x.iterations)||x.iterations<1||x.iterations>10000||!Number.isFinite(x.duration)||Math.abs(x.duration-cfg.duration)>1e-6||!Number.isFinite(x.metrics?.[metric])||x.metrics[metric]<=0)throw Error("批次結果的迭代、時間或角色指標無效");
    rows.push(x);
@@ -1697,7 +1700,9 @@ function combatGuildBatchResults(data,id){
   groups.push({key,cfg,rows,base,comparisons,best:comparisons.find(x=>x.confirmed)||null});
  }
  if(seen.size!==data.cases.length)throw Error("包含未知遭遇");
- return {role,metric,groups,finished:data.finished===true};
+ const planned=data.expectedCases??variantNames.size*3,variants=planned/3;
+ const complete=[2,3,4,5,6].includes(variants)&&data.cases.length===planned&&groups.every(g=>g.rows.length===variants&&Array.from({length:variants},(_,i)=>i).every(i=>g.rows.some(x=>x.variant===i)));
+ return {role,metric,groups,finished:data.finished===true&&complete,expectedCases:data.expectedCases??null};
 }
 function combatGuildBatchResultView(parent,id){
  const c=box(parent,"多方案原生批次結果匯入","匯入本機批次工具的結果，分開比較三種遭遇。只接受對應專精及固定版本格式；本站不能證明外部檔案未遭修改。");
@@ -1969,6 +1974,14 @@ function nativeBrowserBatchJobs(batch,id,meta,n){
   jobs.push({scenario:x.scenario,variant:x.variant,name:x.name,request});
  }
  const signature=req=>{const r=JSON.parse(JSON.stringify(req));delete combatRequestPlayer(r,id).equipment;return JSON.stringify(r);};
+ const variantSignatures=new Map(),names=new Set();
+ // The encounter may change; the actual character and each named equipment variant must not.
+ const crossScenarioSignature=job=>{const r=JSON.parse(JSON.stringify(job.request));delete r.encounter;return JSON.stringify(r);};
+ for(const job of jobs){
+  const sig=JSON.stringify([job.name,crossScenarioSignature(job)]);
+  if(variantSignatures.has(job.variant)){if(variantSignatures.get(job.variant)!==sig)throw Error("同一配裝方案在不同遭遇使用了不同角色設定或裝備");}
+  else{if(names.has(job.name))throw Error("配裝方案名稱不得重複");names.add(job.name);variantSignatures.set(job.variant,sig);}
+ }
  for(const k of Object.keys(guildScenarios)){
   const rows=jobs.filter(x=>x.scenario===k),base=rows.find(x=>x.variant===0);
   if(rows.length!==expected||base?.name!=="原始配裝"||rows.some(x=>signature(x.request)!==signature(base.request)))throw Error("批次比較條件不一致");
@@ -2029,7 +2042,7 @@ function nativeBrowserView(parent,id){
   const batchRows=[];let successful=0;
   function reportBatch(){
    if(!batch)return;
-   const payload={format:"tomb-guild-results/1",commit:combatPresetCommit,spec:id,cases:batchRows,finished:batchRows.length===jobs.length};
+   const payload={format:"tomb-guild-results/1",commit:combatPresetCommit,spec:id,cases:batchRows,expectedCases:jobs.length,finished:batchRows.length===jobs.length};
    const part=box(results,"三遭遇原生配裝比較","各遭遇獨立排名；同一迭代數、天賦、消耗品及 APL。"+(payload.finished?"":"｜部分快照 "+batchRows.length+"／"+jobs.length+"，未完成候選不得視為落敗。"));
    const summary=combatGuildBatchResults(payload,id);
    for(const group of summary.groups){
