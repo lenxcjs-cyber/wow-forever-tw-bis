@@ -441,6 +441,7 @@ const server=http.createServer((req,res)=>{
   await lab.getByLabel("相同目標數").selectOption("3");
   await lab.getByLabel("公會標準目標").selectOption("guild-50k");
   assert.equal(await lab.getByLabel("名義戰鬥時間").inputValue(),"");
+  assert.equal(await lab.getByLabel("相同目標數").inputValue(),"");
   assert.equal(await lab.getByLabel("名義戰鬥時間").isDisabled(),true);
   await lab.getByLabel("公會標準目標").selectOption("");
   await lab.getByLabel("名義戰鬥時間").selectOption("60");
@@ -449,6 +450,8 @@ const server=http.createServer((req,res)=>{
   const scenarioDownload=page.waitForEvent("download");
   await lab.getByRole("button",{name:"下載 A 基準請求"}).click();
   assert.equal((await scenarioDownload).suggestedFilename(),"tomb-spec-26-A.json");
+  const scenarioFile=await scenarioDownload;
+  assert.equal(JSON.parse(fs.readFileSync(await scenarioFile.path(),"utf8")).encounter.targets.length,1);
   await lab.getByText("三種公會遭遇 × 多套配裝批次",{exact:true}).click();
   await lab.getByLabel("批次方案名稱").fill("測試候選");
   await lab.getByRole("button",{name:"加入目前配裝至批次",exact:true}).click();
@@ -456,6 +459,13 @@ const server=http.createServer((req,res)=>{
   const batchDownload=page.waitForEvent("download");
   await lab.getByRole("button",{name:"下載三遭遇批次 JSON",exact:true}).click();
   assert.equal((await batchDownload).suggestedFilename(),"tomb-spec-26-guild-batch.json");
+  const previousBase=await gearArea.inputValue();
+  await gearArea.fill(previousBase+" ");
+  assert.equal(await lab.getByText(/1｜測試候選｜/).count(),0);
+  assert.ok(await lab.getByText("目前尚未加入方案。",{exact:true}).isVisible());
+  assert.ok(await lab.getByText("基準角色已變更，已清空舊批次候選，請重新加入。",{exact:true}).isVisible());
+  await gearArea.fill(previousBase);
+  console.log("PASS: stale custom target count and stale batch candidates are cleared");
   const result={format:"tomb-guild-results/1",commit:"3b9c125a9b1387cd53ce2bb12969e0c6b54b813e",spec:"spec-26",scenarios:["guild-50k"],expectedCases:2,finished:true,cases:[{scenario:"guild-50k",variant:0,name:"原始配裝",iterations:1000,duration:60,metrics:{dps:100,dpsStdev:10}},{scenario:"guild-50k",variant:1,name:"測試候選",iterations:1000,duration:60,metrics:{dps:150,dpsStdev:10}}]};
   await lab.getByRole("textbox",{name:"三遭遇批次結果 JSON"}).fill(JSON.stringify(result));
   await lab.getByRole("button",{name:"比較三遭遇批次結果",exact:true}).click();
