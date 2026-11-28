@@ -252,6 +252,16 @@ const server=http.createServer((req,res)=>{
   await build.selectOption("cat_no_lotp");
   await skillsPane.locator(".skill-build-note").getByText("參考配點移除 Leader of the Pack",{exact:false}).waitFor({state:"visible"});
   assert.ok(await skillsPane.locator('[data-skill="Shred"] .skill-focus').isVisible());
+  await skillsPane.getByRole("button",{name:"只看本構築重點"}).click();
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),3);
+  await skillsPane.locator(".skill-scenarios > summary").click();
+  await skillsPane.getByRole("button",{name:"回能與起手",exact:true}).click();
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),1);
+  assert.ok((await skillsPane.locator(":scope > .skill-list").innerText()).includes("Shifting Power"));
+  await skillsPane.getByRole("button",{name:"清除技能篩選"}).click();
+  assert.equal(await skillsPane.locator(":scope > .skill-list > .skill-card").count(),9);
+  assert.equal(await skillsPane.getByRole("button",{name:"全部情境",exact:true}).getAttribute("aria-pressed"),"true");
+
   await build.selectOption("general");
   await skillsPane.getByText("野性貓 · 9 項核心／情境技能",{exact:true}).waitFor({state:"visible"});
   assert.equal(await skillsPane.locator(".skill-focus").count(),0);
