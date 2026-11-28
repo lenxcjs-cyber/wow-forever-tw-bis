@@ -1389,8 +1389,17 @@ function combatApplyEquipment(request,equipment,id,keepMatching=true,preserveEmp
  })};
  return copy;
 }
+const guildScenarios={"guild-50k":{label:"60級單體／5萬血",level:60,health:50000,count:1,duration:60},"guild-boss":{label:"63級首領／30萬血",level:63,health:300000,count:1,duration:180},"guild-5x50k":{label:"60級五目標／各5萬血",level:60,health:50000,count:5,duration:60}};
+function combatGuildScenario(request,id,key){
+ const cfg=guildScenarios[key];if(!cfg)throw Error("不明公會標準遭遇");
+ const result=JSON.parse(JSON.stringify(request)),p=combatRequestPlayer(result,id),tank=combatRole(id)==="tank",stats=Array(39).fill(0);stats[29]=cfg.health;
+ p.inFrontOfTarget=tank;result.raid.tanks=tank?[{type:"Player",index:0}]:[];
+ result.encounter={apiVersion:result.encounter.apiVersion??2,duration:cfg.duration,durationVariation:0,executeProportion20:.2,executeProportion35:.35,targets:Array.from({length:cfg.count},(_,i)=>({name:cfg.label+" "+(i+1),level:cfg.level,mobType:"MobTypeUnknown",stats:[...stats],minBaseDamage:cfg.level===63?1000:300,damageSpread:0,swingSpeed:2,tankIndex:tank?0:-1,canCrush:cfg.level===63,parryHaste:false}))};
+ for(const k of Object.keys(result.raid.debuffs||{}))if(/sunder|exposeArmor|faerieFire|curseOfRecklessness|curseOfElements|curseOfShadow|armor|resistance/i.test(k))delete result.raid.debuffs[k];
+ return result;
+}
 function combatScenarioRequest(request,id,options={}){
- const result=JSON.parse(JSON.stringify(request));combatRequestPlayer(result,id);
+ const result=options.guild?combatGuildScenario(request,id,options.guild):JSON.parse(JSON.stringify(request));combatRequestPlayer(result,id);
  const e=result.encounter;
  if(options.duration!=null){
   if(!Number.isFinite(options.duration)||options.duration<10||options.duration>600)throw Error("戰鬥時間必須為 10–600 秒");
@@ -1504,11 +1513,12 @@ function combatGearView(parent,id,build){
   try{const gear=combatReadJSON(imported.value),rows=combatEquipmentRows(gear,importMode.value);stored={mode:importMode.value,slots:Object.fromEntries(rows.map(x=>[x.name,x.id])),mods:Object.fromEntries(rows.map(x=>[x.name,{enchant:x.enchant,randomSuffix:x.randomSuffix}])),source:"外部配裝（資格待核）"};if(![...mode.options].some(o=>o.value===stored.mode))mode.add(new Option((stored.mode==="two"?"雙手武器":"單手／副手")+"（匯入，資格待核）",stored.mode));mode.value=stored.mode;draw();msg.textContent="已載入 "+rows.filter(x=>x.id).length+" 件物品 ID；匯入不代表職業、部位、唯一群組或取得資格已驗證，已保留 JSON 中的附魔與詞綴 ID，仍須核對合法性。";}catch(e){msg.textContent="匯入失敗："+e.message;}
  }
  const importBox=node("details");add(importBox,node("summary","匯入外部或整套面板配裝"),field("匯入武器模式",importMode),imported,combatFileInput(imported,msg,"上傳配裝 JSON"),button("載入17格配裝",loadEquipment));
- const preview=node("div"),durationPick=select([["","沿用原遭遇"],["30","30秒"],["60","60秒"],["120","120秒"],["180","180秒"],["300","300秒"]]),targetPick=select([["","沿用原遭遇"],["1","1個目標"],["3","3個相同目標"],["5","5個相同目標"],["8","8個相同目標"]]),variation=inp("0","number");
+ const preview=node("div"),guildPick=select([...Object.entries(guildScenarios).map(([k,v])=>[k,v.label]),["","沿用原遭遇／自訂"]]),durationPick=select([["","沿用原遭遇"],["30","30秒"],["60","60秒"],["120","120秒"],["180","180秒"],["300","300秒"]]),targetPick=select([["","沿用原遭遇"],["1","1個目標"],["3","3個相同目標"],["5","5個相同目標"],["8","8個相同目標"]]),variation=inp("0","number");
  variation.value="0";variation.min="0";variation.max="60";variation.step="1";variation.disabled=true;durationPick.addEventListener("change",()=>{variation.disabled=!durationPick.value;preview.replaceChildren();});
  targetPick.addEventListener("change",()=>preview.replaceChildren());variation.addEventListener("input",()=>preview.replaceChildren());request.addEventListener("input",()=>preview.replaceChildren());keep.addEventListener("change",()=>preview.replaceChildren());preserve.addEventListener("change",()=>preview.replaceChildren());
- const scenario=node("details");add(scenario,node("summary","A／B 共用戰鬥情境（選填）"),field("名義戰鬥時間",durationPick),field("時間浮動秒數",variation),field("相同目標數",targetPick),node("p","只在原遭遇為單體且無複雜目標設定時允許複製敵人；兩份請求使用完全相同遭遇。群體目標仍可能需要在引擎確認仇恨與技能策略。","gt-muted"));
- function trial(){const base=combatScenarioRequest(combatReadJSON(request.value),id,{duration:durationPick.value?Number(durationPick.value):null,variation:durationPick.value?Number(variation.value):null,targets:targetPick.value?Number(targetPick.value):null});return combatGearTrial(base,current(),id,mode.value,keep.checked,preserve.checked);}
+ const scenario=node("details");scenario.open=true;add(scenario,node("summary","A／B 共用戰鬥情境"),field("公會標準目標",guildPick),node("p","標準遭遇：零基礎護甲、零抗性；非坦克背面，坦克正面。首領暫定63級；固定時間而非血量擊殺停止。坦克假設每2秒受到300或首領1000基礎傷害。","gt-muted"),field("名義戰鬥時間",durationPick),field("時間浮動秒數",variation),field("相同目標數",targetPick),node("p","只在原遭遇為單體且無複雜目標設定時允許複製敵人；兩份請求使用完全相同遭遇。群體目標仍可能需要在引擎確認仇恨與技能策略。","gt-muted"));
+ function syncGuild(){targetPick.disabled=!!guildPick.value;preview.replaceChildren();}guildPick.addEventListener("change",syncGuild);syncGuild();
+ function trial(){const base=combatScenarioRequest(combatReadJSON(request.value),id,{guild:guildPick.value||null,duration:durationPick.value?Number(durationPick.value):null,variation:durationPick.value?Number(variation.value):null,targets:!guildPick.value&&targetPick.value?Number(targetPick.value):null});return combatGearTrial(base,current(),id,mode.value,keep.checked,preserve.checked);}
  function compareGear(){
   preview.replaceChildren();
   try{const result=trial();const part=box(preview,"A／B 配裝變更","A 為原始裝備與本次共用遭遇；B 只變更裝備。兩份請求的天賦、增益、消耗品、戰鬥時間及迭代設定完全相同。");
@@ -1537,6 +1547,7 @@ function combatLab(){
  const engine=box(panel,"完整戰鬥模擬（外部引擎）","上游網站參考版本：2026/11/27、客戶端 1.60.1.71139（71311a4）。本站預設案例使用固定 CLI v1.0.12；外部網站會更新，請核對版本與構築。");
  if(url)engine.append(link("開啟對應職業模擬器",url));
  add(engine,link("WoWSims 開源引擎（MIT）","https://github.com/wowsims/forever"),node("p","請在引擎內設定裝備、天賦、種族、附魔、消耗品、團隊增益、敵人數、戰鬥時間及技能優先序（APL）。用相同遭遇與迭代條件比較方案；查看戰鬥紀錄／時間軸。可在下方匯出候選配裝及替換原生請求；本站不即時代跑個人外部引擎。","gt-muted"));
+ const standards=box(panel,"公會標準實戰目標","三種情境使用零基礎護甲與抗性，非坦克背後攻擊，坦克正面。首領暫定63級。");for(const x of Object.values(guildScenarios))standards.append(node("p",x.label+" ｜ "+x.count+" 個目標 ｜ 每隻 "+x.health.toLocaleString("zh-TW")+" HP ｜ 固定 "+x.duration+" 秒"));standards.append(node("p","原生引擎以時間結束，血量不是停止條件；血量／平均DPS只能估算擊殺時間。60／180秒及坦克受擊設定為本站暫定測試條件。","gt-muted"));
  const loadGearTemplate=combatGearView(panel,id,build);
  const presets=box(panel,"開源引擎實跑預設案例","讀取固定版本實跑結果中…");presets.classList.add("gt-combat-presets");
  fetch("combat-presets.json",{cache:"no-cache"}).then(res=>{if(!res.ok)throw Error("HTTP "+res.status);return res.json();}).then(data=>{
@@ -1546,7 +1557,7 @@ function combatLab(){
   if(Array.isArray(data.failed)){const failed=data.failed.filter(x=>x?.spec===id&&typeof x.label==="string");if(failed.length){const d=node("details");d.append(node("summary","此專精未產出案例（"+failed.length+"）"));for(const x of failed)d.append(node("p",x.label+" ｜ "+combatFailureLabel(x.reason),"gt-muted"));presets.append(d);}}
   if(!cases.length){const pending=Array.isArray(data.healerPending)?data.healerPending.find(x=>x?.spec===id):null;presets.append(node("p",pending?.reason||"目前此專精沒有已成功匯入的原生引擎案例；請使用上方引擎連結。","gt-muted"));if(pending&&typeof pending.source==="string"&&/^ui\/specs\/[a-z/]+\/presets\.ts$/.test(pending.source))presets.append(link("上游治療專精原始設定","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+pending.source));return;}
   add(presets,node("p","WoWSims v1.0.12 ｜ 固定種子 "+data.seed+" ｜ 上游預設或本站明示的控制變因案例，不代表本站目前構築或最佳 BiS。CLI 未自動加入網頁生成的藥水／魔法物品 APL 行。","gt-muted"));
-  for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));
+  for(const x of cases){const c=box(presets,x.label,x.iterations+" 次迭代 ｜ 平均 "+x.duration.toFixed(1)+" 秒");add(c,node("p","DPS "+x.dps.toFixed(2),"gt-combat-metric"));if(guildScenarios[x.scenario]){const cfg=guildScenarios[x.scenario];add(c,node("p",cfg.label+" ｜ 零基礎護甲／抗性 ｜ "+(x.inFrontOfTarget?"正面":"背面")+" ｜ 固定時間","gt-muted"));if(x.dps>0)add(c,node("p","總血量 ÷ 平均DPS："+(cfg.health*cfg.count/x.dps).toFixed(1)+" 秒（粗估；非實際擊殺，不反映逐隻死亡或斬殺階段變化）","gt-muted"));}
    if(x.tank&&Number.isFinite(x.tank.tps))add(c,node("p","另一次完整引擎坦克測試：TPS "+x.tank.tps.toFixed(2)+(Number.isFinite(x.tank.dtps)?" ｜ DTPS "+x.tank.dtps.toFixed(2):"")+(Number.isFinite(x.tank.death)?" ｜ 死亡機率 "+(x.tank.death*100).toFixed(1)+"%":"")));
    add(c,link("裝備、天賦與設定來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.settings),link("技能優先序（APL）來源","https://github.com/wowsims/forever/blob/"+combatPresetCommit+"/"+x.apl));
    if(typeof x.configuration==="string"&&x.configuration){add(c,node("p",x.configuration,"gt-muted"),link("本站控制變因配置與產生程式","https://github.com/lenxcjs-cyber/wow-forever-tw-bis/blob/main/scripts/run-combat-presets.py"));}
