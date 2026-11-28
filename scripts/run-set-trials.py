@@ -60,6 +60,12 @@ def ep_score(item,weights):
         if mod.finite(v) and mod.finite(w) and w>0:total+=v*w
     return total
 
+def slot_candidates(index,slot,subclass,cross_armor=False):
+    # Only widen armor slots; ring/trinket/neck miscellany retain their type.
+    if cross_armor and subclass in ARMOR_ORDER:
+        return [x for armor in ARMOR_ORDER for x in index.get((slot,armor),[])]
+    return index.get((slot,subclass),[])
+
 def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
     p=player(request);gear=p.get("equipment",{}).get("items",[])
     if len(gear)!=17 or p.get("enableItemSwap") or any(x.get("id") for x in p.get("itemSwap",{}).get("items",[]) if isinstance(x,dict)) or '"itemSwap":' in json.dumps(p.get("rotation",{})):return None
@@ -71,7 +77,7 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
     # Prefer worn sets, then explicitly class-restricted candidate sets.
     names=Counter(item_set(x) for x in current if x and item_set(x))
     weights=ep.get("catalogWeights",{}) if ep else {}
-    generic={name:sum(bool(by_slot.get((SLOTS[i],old.get("subclass")))) for i,old in enumerate(current) if old) for name,by_slot in sets.items()}
+    generic={name:sum(bool(slot_candidates(by_slot,SLOTS[i],old.get("subclass"),bool(weights))) for i,old in enumerate(current) if old) for name,by_slot in sets.items()}
     order=list(set(names)|set(class_sets)|{name for name,n in generic.items() if n>=2})
     order.sort(key=lambda name:(-names.get(name,0),-class_sets.get(name,0),-generic.get(name,0),name))
     for name in order:
@@ -84,7 +90,8 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
         if not thresholds:continue
         available=sets.get(name,{})
         # Restrict to positions already occupied by this set or a compatible
-        # same-subclass piece. Include both rings and trinkets; weapons remain fixed.
+        # same-subclass piece, or legal cross-armor where a partial EP is available.
+        # Include both rings and trinkets; weapons remain fixed.
         positions=[]
         reserved={num(x.get("id")) for x in gear if x.get("id")}
         used=set()
@@ -92,7 +99,7 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
             old=current[i]
             if not old:continue
             old_id=num(old.get("id"));old_set=item_set(old)==name
-            candidates=[x for x in available.get((slot,old.get("subclass")),[]) if (num(x["id"]) not in reserved or num(x["id"])==old_id) and num(x["id"]) not in used]
+            candidates=[x for x in slot_candidates(available,slot,old.get("subclass"),bool(weights)) if (num(x["id"]) not in reserved or num(x["id"])==old_id) and num(x["id"]) not in used]
             if not candidates:continue
             # Prefer role-specific verified partial EP; otherwise nearest item level.
             key=lambda x:(-ep_score(x,weights),abs(num(x.get("item_level"))-num(old.get("item_level"))),-num(x.get("quality")),num(x["id"]))
@@ -101,7 +108,7 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
             if not old_set and item_set(old):continue # do not remove another set
             if not old_set and not eligible(old,cls):continue # no restricted scatter replacement
             if old_set or weights:
-                alternatives=[x for x in scatter.get((slot,old.get("subclass")),[]) if num(x["id"]) not in reserved|used]
+                alternatives=[x for x in slot_candidates(scatter,slot,old.get("subclass"),bool(weights)) if num(x["id"]) not in reserved|used]
                 if not old_set:alternatives.append(old)
                 if not alternatives:continue
                 loose=min(alternatives,key=key)
@@ -123,8 +130,23 @@ def set_plan(request,spec_id,items,registry,excluded=(),prepared=None,ep=None):
             for rank,(i,yes,no,_) in enumerate(positions):
                 g[i]={"id":num((yes if rank<count else no)["id"])}
             cases.append((count,req))
-        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"adjacentCounts":adjacent,"cases":cases,"positions":[i for i,_,_,_ in positions],"requiredProfession":registered.get("requiredProfession"),"epProfile":{k:ep[k] for k in ("label","source","declaration","catalogWeights","omitted") if k in ep} if weights else None,"items":[{"slot":SLOTS[i],"position":i,"setId":num(yes["id"]),"scatterId":num(no["id"]),"setScore":ep_score(yes,weights) if weights else None,"scatterScore":ep_score(no,weights) if weights else None} for i,yes,no,_ in positions]}
+        return {"name":name,"setId":registered.get("id"),"source":registered.get("source"),"thresholds":possible,"registeredThresholds":thresholds,"adjacentCounts":adjacent,"cases":cases,"positions":[i for i,_,_,_ in positions],"crossArmor":bool(weights),"requiredProfession":registered.get("requiredProfession"),"epProfile":{k:ep[k] for k in ("label","source","declaration","catalogWeights","omitted") if k in ep} if weights else None,"items":[{"slot":SLOTS[i],"position":i,"setId":num(yes["id"]),"scatterId":num(no["id"]),"setArmor":yes.get("subclass"),"scatterArmor":no.get("subclass"),"setScore":ep_score(yes,weights) if weights else None,"scatterScore":ep_score(no,weights) if weights else None} for i,yes,no,_ in positions]}
     return None
+
+def profile_for(profiles,sid,label):
+    rows=profiles.get(sid,[])
+    if not rows:return None
+    variants={
+        "spec-2":(("雙手","fury2h"),("雙持","fury")),
+        "spec-3":(("進攻","offensive"),("平衡","balanced")),
+        "spec-6":(("神聖震擊","holyshock"),("聖印","unsealed")),
+        "spec-9":(("純近戰","melee"),("近遠穿插","weave")),
+        "spec-11":(("背刺","daggers"),("邪惡攻擊","sinister")),
+    }
+    for marker,variant in variants.get(sid,()):
+        if marker in str(label):
+            return next((p for p in rows if p.get("variant")==variant),None)
+    return rows[0]
 
 def run(cli,root,site):
     site=Path(site).resolve();root=Path(root).resolve();cli=Path(cli).resolve()
@@ -135,7 +157,7 @@ def run(cli,root,site):
     try:
         ep=read("ep-presets.json")
         if ep.get("commit")==mod.COMMIT:
-            for profile in ep.get("profiles",[]):ep_by_spec.setdefault(profile["spec"],profile)
+            for profile in ep.get("profiles",[]):ep_by_spec.setdefault(profile["spec"],[]).append(profile)
     except (OSError,ValueError,KeyError,TypeError):pass
     # First boss, then single mob, then five mobs. Round-robin specs within each.
     order={"guild-boss":0,"guild-50k":1,"guild-5x50k":2}
@@ -146,17 +168,17 @@ def run(cli,root,site):
         try:
             request=read(file);excluded=set()
             for rank in range(3):
-                plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded,prepared,ep_by_spec.get(sid))
+                plan=set_plan(request,sid,catalog["items"],registry["sets"],excluded,prepared,profile_for(ep_by_spec,sid,case.get("label")))
                 if not plan:break
                 excluded.add(plan["name"])
-                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"adjacentCounts":plan["adjacentCounts"],"positions":plan["positions"],"items":plan["items"],"epProfile":plan["epProfile"],"requiredProfession":plan["requiredProfession"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
+                row={"spec":sid,"scenario":scenario,"setName":plan["name"],"setId":plan["setId"],"source":plan["source"],"thresholds":plan["thresholds"],"registeredThresholds":plan["registeredThresholds"],"adjacentCounts":plan["adjacentCounts"],"positions":plan["positions"],"items":plan["items"],"epProfile":plan["epProfile"],"crossArmor":plan["crossArmor"],"requiredProfession":plan["requiredProfession"],"baseLabel":case.get("label"),"candidateRank":rank,"cases":[],"failed":[]}
                 results.append(row);jobs.append((row,plan["cases"]))
             if excluded:seen.add((sid,scenario))
         except (ValueError,KeyError,TypeError,OSError):continue
     start=time.monotonic()
     def save(finished=False):
         dest=site/"set-trials.json";temp=dest.with_suffix(".tmp")
-        temp.write_text(json.dumps({"commit":mod.COMMIT,"release":mod.RELEASE,"catalogBuild":catalog["meta"].get("client_build"),"scope":"同部位、同護甲類型的原生套裝控制比較；有上游EP時依可核對的部分面板權重挑選散件，否則依接近物品等級；每專精遭遇最多3套候選，不代表全目錄最佳散件或完整BiS。","finished":finished,"elapsedSeconds":round(time.monotonic()-start,1),"trials":results},ensure_ascii=False,allow_nan=False),encoding="utf-8");temp.replace(dest)
+        temp.write_text(json.dumps({"commit":mod.COMMIT,"release":mod.RELEASE,"catalogBuild":catalog["meta"].get("client_build"),"scope":"同部位原生套裝控制比較；有上游EP時依可核對的部分面板權重挑選合法跨甲散件，否則同護甲類型、接近物品等級；每專精遭遇最多3套候選，不代表全目錄最佳散件或完整BiS。","finished":finished,"elapsedSeconds":round(time.monotonic()-start,1),"trials":results},ensure_ascii=False,allow_nan=False),encoding="utf-8");temp.replace(dest)
     save()
     def execute(row,count,request):
         try:
